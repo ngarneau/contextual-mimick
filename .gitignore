@@ -99,3 +99,11 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+.idea/
+
+predicted_embeddings/
+
+models/
+
+embeddings/glove-embeddings-6B-50D.txt

@@ -1,0 +1,266 @@
+from typing import Dict
+
+import torch
+from torch import nn, autograd
+from torch.nn import functional as F
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.init import kaiming_uniform
+
+
+class Mimick(nn.Module):
+    def __init__(self, characters_vocabulary: Dict[str, int], characters_embedding_dimension: int,
+                 characters_hidden_state_dimension: int, word_embeddings_dimension: int,
+                 fully_connected_layer_hidden_dimension: int):
+        super().__init__()
+        self.fully_connected_layer_hidden_dimension = fully_connected_layer_hidden_dimension
+        self.characters_vocabulary = characters_vocabulary
+        self.characters_embedding_dimension = characters_embedding_dimension
+        self.characters_hidden_state_dimension = characters_hidden_state_dimension
+        self.word_embeddings_dimension = word_embeddings_dimension
+        self.num_layers = 1
+        self.bidirectional = True
+
+        self.characters_embeddings = nn.Embedding(
+            num_embeddings=len(self.characters_vocabulary),
+            embedding_dim=self.characters_embedding_dimension,
+            padding_idx=0,
+            max_norm=5
+        )
+        kaiming_uniform(self.characters_embeddings.weight)
+
+
+        self.lstm = nn.LSTM(
+            input_size=self.characters_embedding_dimension,
+            hidden_size=self.characters_hidden_state_dimension,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=self.bidirectional
+        )
+
+        self.fully_connected_1 = nn.Linear(
+            self.characters_hidden_state_dimension * 2,  # Two hidden states concatenated
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_1.weight)
+
+        self.fully_connected_2 = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_2.weight)
+
+        self.output = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.word_embeddings_dimension
+        )
+        kaiming_uniform(self.output.weight)
+
+    def init_hidden(self, batch):
+        if self.bidirectional:
+            first_dim = 2 * self.num_layers
+        else:
+            first_dim = self.num_layers
+        return (autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)),
+                autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)))
+
+    def forward(self, x):
+        # Pre processing
+        lengths = x.data.ne(0).sum(dim=1).long()
+        seq_lengths, perm_idx = lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+
+        # Embed
+        embeds = self.characters_embeddings(x)
+
+        # LSTM thing
+        self.hidden = self.init_hidden(len(x))
+        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+        packed_output, (ht, ct) = self.lstm(packed_input, self.hidden)
+        output = torch.cat([ht[0], ht[1]], dim=1)
+        output = output[rev_perm_idx]
+
+        # Map to word embedding dim
+        x = self.fully_connected_1(output)
+        x = F.tanh(x)
+        x = self.output(x)
+        return x
+
+
+
+
+class ContextualMimick(nn.Module):
+    def __init__(self, characters_vocabulary: Dict[str, int], characters_embedding_dimension: int,
+                 characters_hidden_state_dimension: int, word_embeddings_dimension: int,
+                 words_vocabulary: Dict[str, int], words_hidden_state_dimension: int,
+                 fully_connected_layer_hidden_dimension: int):
+        super().__init__()
+        self.words_hidden_state_dimension = words_hidden_state_dimension
+        self.words_vocabulary = words_vocabulary
+        self.fully_connected_layer_hidden_dimension = fully_connected_layer_hidden_dimension
+        self.characters_vocabulary = characters_vocabulary
+        self.characters_embedding_dimension = characters_embedding_dimension
+        self.characters_hidden_state_dimension = characters_hidden_state_dimension
+        self.word_embeddings_dimension = word_embeddings_dimension
+        self.num_layers = 1
+        self.bidirectional = True
+
+        self.characters_embeddings = nn.Embedding(
+            num_embeddings=len(self.characters_vocabulary),
+            embedding_dim=self.characters_embedding_dimension,
+            padding_idx=0
+        )
+        kaiming_uniform(self.characters_embeddings.weight)
+
+        self.words_embeddings = nn.Embedding(
+            num_embeddings=len(self.words_vocabulary),
+            embedding_dim=self.word_embeddings_dimension,
+            padding_idx=0
+        )
+
+        self.left_to_right_lstm = nn.LSTM(
+            input_size=self.word_embeddings_dimension,
+            hidden_size=self.words_hidden_state_dimension,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=self.bidirectional
+        )
+
+        self.lstm = nn.LSTM(
+            input_size=self.characters_embedding_dimension,
+            hidden_size=self.characters_hidden_state_dimension,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=self.bidirectional
+        )
+
+        self.right_to_left_lstm = nn.LSTM(
+            input_size=self.word_embeddings_dimension,
+            hidden_size=self.words_hidden_state_dimension,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=self.bidirectional
+        )
+
+        self.fully_connected_1 = nn.Linear(
+            # self.characters_hidden_state_dimension * 2 + self.words_hidden_state_dimension * 2,  # Two hidden states concatenated
+            self.characters_hidden_state_dimension * 2,
+            # self.characters_hidden_state_dimension,
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_1.weight)
+
+        self.fully_connected_2 = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_2.weight)
+
+        self.fully_connected_3 = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_3.weight)
+
+        self.fully_connected_4 = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.fully_connected_layer_hidden_dimension
+        )
+        kaiming_uniform(self.fully_connected_4.weight)
+
+        self.output = nn.Linear(
+            self.fully_connected_layer_hidden_dimension,
+            self.word_embeddings_dimension
+        )
+        kaiming_uniform(self.output.weight)
+
+    def init_hidden(self, batch):
+        if self.bidirectional:
+            first_dim = 2 * self.num_layers
+        else:
+            first_dim = self.num_layers
+        return (autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)),
+                autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)))
+
+    def init_hidden_words(self, batch):
+        if self.bidirectional:
+            first_dim = 2 * self.num_layers
+        else:
+            first_dim = self.num_layers
+        return (autograd.Variable(torch.zeros(first_dim, batch, self.words_hidden_state_dimension)),
+                autograd.Variable(torch.zeros(first_dim, batch, self.words_hidden_state_dimension)))
+
+    def load_words_embeddings(self, word_to_embed):
+        for word, embed in word_to_embed.items():
+            target_word = word
+            if target_word not in self.words_vocabulary:
+                target_word = word.upper()
+                if target_word not in self.words_vocabulary:
+                    pass
+            else:
+                word_idx = self.words_vocabulary[target_word]
+                self.words_embeddings.weight[word_idx].data = torch.FloatTensor(embed)
+
+    def forward(self, x):
+        # Pre processing
+        left_contexts, words, right_contexts = x
+
+        ### LEFT THING HERE
+        lengths = left_contexts.data.ne(0).sum(dim=1).long()
+        seq_lengths, perm_idx = lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+
+        # Embed
+        embeds = self.words_embeddings(left_contexts)
+
+        # LSTM thing
+        # Initialize hidden to zero
+        self.hidden = self.init_hidden_words(len(left_contexts))
+        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+        packed_output, (ht, ct) = self.left_to_right_lstm(packed_input, self.hidden)
+        output = ht[0]
+        output_left = output[rev_perm_idx]
+
+
+        ### WORDS THING HERE
+        lengths = words.data.ne(0).sum(dim=1).long()
+        seq_lengths, perm_idx = lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+
+        # Embed
+        embeds = self.characters_embeddings(words)
+
+        # LSTM thing
+        self.hidden = self.init_hidden(len(words))
+        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+        packed_output, (ht, ct) = self.lstm(packed_input, self.hidden)
+        output = torch.cat([ht[0], ht[1]], dim=1)
+        # output = ht[0] + ht[1]
+        output_middle = output[rev_perm_idx]
+
+        ### RIGHT THING HERE
+        lengths = right_contexts.data.ne(0).sum(dim=1).long()
+        seq_lengths, perm_idx = lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+
+        # Embed
+        embeds = self.words_embeddings(right_contexts)
+
+        # LSTM thing
+        self.hidden = self.init_hidden_words(len(right_contexts))
+        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+        packed_output, (ht, ct) = self.right_to_left_lstm(packed_input, self.hidden)
+        output = ht[1]
+        output_right = output[rev_perm_idx]
+
+        # final_output = output_left + output_middle + output_right
+        # final_output = torch.cat([output_left, output_middle, output_right], dim=1)
+        # final_output = torch.cat([output_middle], dim=1)
+        final_output = output_middle
+
+
+        # Map to word embedding dim
+        x = self.fully_connected_1(final_output)
+        x = F.tanh(x)
+        x = self.output(x)
+        return x
+
