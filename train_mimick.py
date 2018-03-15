@@ -1,29 +1,15 @@
 import numpy
-import torch
-from torch._utils import _accumulate
-from torch.nn import MSELoss, functional as F
-from torch.optim import Adam, SGD
-from torch.utils.data import DataLoader, TensorDataset, Dataset
-from pytoune.framework import Model, torch_to_numpy
+from torch.optim import Adam
+from torch.utils.data import DataLoader, TensorDataset
+from pytoune.framework import Model
 from pytoune.framework.callbacks import *
 
-from model import Mimick
+from mimick import Mimick
+from utils import load_embeddings, pad_sequences, random_split, euclidean_distance, square_distance
 
-
-def load_embeddings(path):
-    embeddings = {}
-    # First we read the embeddings from the file, only keeping vectors for the words we need.
-    i = 0
-    with open(path, 'r') as embeddings_file:
-        for line in embeddings_file:
-            if i > 100000:
-                break
-            i += 1
-            fields = line.strip().split(' ')
-            word = fields[0]
-            vector = numpy.asarray(fields[1:], dtype='float32')
-            embeddings[word] = vector
-    return embeddings
+import logging
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 
 def build_vocab(words):
@@ -62,13 +48,6 @@ class WordsVectorizer:
         return vectorized_word
 
 
-def pad_sequences(vectorized_seqs, seq_lengths):
-    seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
-    for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
-        seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
-    return seq_tensor
-
-
 def collate_examples(samples):
     words, labels = list(zip(*samples))
 
@@ -85,44 +64,6 @@ def collate_examples(samples):
         padded_words,
         labels
     )
-
-
-class Subset(Dataset):
-    def __init__(self, dataset, indices):
-        self.dataset = dataset
-        self.indices = indices
-
-    def __getitem__(self, idx):
-        return self.dataset[self.indices[idx]]
-
-    def __len__(self):
-        return len(self.indices)
-
-
-def random_split(dataset, lengths):
-    if sum(lengths) != len(dataset):
-        raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
-    indices = torch.randperm(sum(lengths))
-    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(_accumulate(lengths), lengths)]
-
-
-def euclidean_distance(y_pred_tensor, y_true_tensor):
-    y_pred = torch_to_numpy(y_pred_tensor)
-    y_true = torch_to_numpy(y_true_tensor)
-    dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
-    return torch.FloatTensor([dist.tolist()])
-
-
-def square_distance(input, target):
-    return F.pairwise_distance(input, target).mean()
-
-
-def load_vocab(path):
-    vocab = set()
-    with open(path) as fhandle:
-        for line in fhandle:
-            vocab.add(line[:-1])
-    return vocab
 
 
 def main():
@@ -176,7 +117,6 @@ def main():
     checkpoint = ModelCheckpoint('mimick.torch')
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
     model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping])
-    # model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[])
 
 if __name__ == '__main__':
     main()

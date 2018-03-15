@@ -1,14 +1,20 @@
-import numpy
+import logging
+
 import torch
 from pytoune import torch_to_numpy
 
-from model import Mimick
-from train_mimick import load_embeddings, load_vocab, build_vocab, WordsVectorizer
+from evaluation import evaluate_embeddings
+from mimick import Mimick
+from train_mimick import build_vocab, WordsVectorizer
+from utils import load_embeddings, load_vocab
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 
 def main():
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
-    test = load_vocab('./validation_vocab.txt')
+    test = load_vocab('./conll/oov_vocab.txt')
 
     vocab = build_vocab(train_embeddings.keys())
     corpus_vectorizer = WordsVectorizer(vocab)
@@ -24,7 +30,9 @@ def main():
     )
     net.load_state_dict(torch.load('./models/mimick.torch'))
     net.eval()
+
     my_embeddings = dict()
+    logging.info('Predicting embeddings for test set...')
     with open('./predicted_embeddings/current_mimick_validation_embeddings.txt', 'w') as fhandle:
         for word, tensor in x_test_tensor:
             prediction = net(torch.autograd.Variable(tensor))
@@ -33,34 +41,7 @@ def main():
             fhandle.write(s)
             my_embeddings[word] = torch_to_numpy(prediction[0])
 
-
-    # Load glove embeddings for comparisons
-    glove_embeddings = load_embeddings('./embeddings/glove_valid_embeddings.txt')
-
-    # Compare distance of mimick with the glove embeddings
-    mimick_distances = list()
-    mimick_embeddings = load_embeddings('./embeddings/previous_mimick_validation_embeddings.txt')
-    for word, embedding in mimick_embeddings.items():
-        if word in glove_embeddings:
-            target_embedding = glove_embeddings[word]
-            mimick_distances.append(numpy.linalg.norm(embedding - target_embedding))
-    print("Mimick distance: {}, {} ({})".format(numpy.mean(mimick_distances), numpy.std(mimick_distances), len(mimick_distances)))
-
-    # Compare distance of our implementation with the glove embeddings
-    our_distances = list()
-    for word, embedding in my_embeddings.items():
-        if word in glove_embeddings:
-            target_embedding = glove_embeddings[word]
-            our_distances.append(numpy.linalg.norm(embedding - target_embedding))
-    print("Our distance: {}, {} ({})".format(numpy.mean(our_distances), numpy.std(our_distances), len(our_distances)))
-
-    # Compare distance of our embeds from mimick's
-    our_distances_with_mimick = list()
-    for word, embedding in my_embeddings.items():
-        if word in mimick_embeddings:
-            target_embedding = mimick_embeddings[word]
-            our_distances_with_mimick.append(numpy.linalg.norm(embedding - target_embedding))
-    print("Our distance: {}, {} ({})".format(numpy.mean(our_distances_with_mimick), numpy.std(our_distances_with_mimick), len(our_distances_with_mimick)))
+    evaluate_embeddings(my_embeddings)
 
 if __name__ == '__main__':
     main()
