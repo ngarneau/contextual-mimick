@@ -24,7 +24,7 @@ def main():
     # Prepare our examples
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
-    n = 5
+    n = 3
     raw_examples = [
         ngram for sentence in sentences for ngram in
         ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
@@ -93,9 +93,9 @@ def main():
 
     lrscheduler = ReduceLROnPlateau(patience=5, factor=.1)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}.torch'.format(n))
+    checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}.torch'.format(n), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/contextual_mimick_n{}.csv'.format(n))
-    model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
+    model = Model(net, Adam(net.parameters(), lr=0.0005), square_distance, metrics=[euclidean_distance])
     model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
 
