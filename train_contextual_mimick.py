@@ -7,7 +7,7 @@ import numpy
 import torch
 from nltk.util import ngrams
 from pytoune.framework import Model
-from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
+from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
@@ -91,11 +91,11 @@ def main():
     )
     net.load_words_embeddings(train_embeddings)
 
-    lrscheduler = ReduceLROnPlateau(patience=5, factor=.1)
+    lrscheduler = MultiStepLR(milestones=[3, 6, 9])
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}.torch'.format(n), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/contextual_mimick_n{}.csv'.format(n))
-    model = Model(net, Adam(net.parameters(), lr=0.0005), square_distance, metrics=[euclidean_distance])
+    model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
     model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
 
