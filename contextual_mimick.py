@@ -44,6 +44,11 @@ class ContextualMimick(nn.Module):
             bidirectional=self.bidirectional
         )
 
+        # self.left_to_right_fc = nn.Linear(
+        #     in_features=self.words_hidden_state_dimension*2,
+        #     out_features=self.characters_hidden_state_dimension*2
+        # )
+
         self.lstm = nn.LSTM(
             input_size=self.characters_embedding_dimension,
             hidden_size=self.characters_hidden_state_dimension,
@@ -59,6 +64,11 @@ class ContextualMimick(nn.Module):
             batch_first=True,
             bidirectional=self.bidirectional
         )
+
+        # self.right_to_left_fc = nn.Linear(
+        #     in_features=self.words_hidden_state_dimension*2,
+        #     out_features=self.characters_hidden_state_dimension*2
+        # )
 
         self.fully_connected_1 = nn.Linear(
             # self.characters_hidden_state_dimension * 2 + self.words_hidden_state_dimension * 2,  # Two hidden states concatenated
@@ -112,6 +122,8 @@ class ContextualMimick(nn.Module):
         packed_output, (ht, ct) = self.left_to_right_lstm(packed_input, self.hidden)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_left = output[rev_perm_idx]
+        # output_left = self.left_to_right_fc(output_left)
+        # output_left = F.relu(output_left)
 
 
         ### WORDS THING HERE
@@ -144,8 +156,11 @@ class ContextualMimick(nn.Module):
         packed_output, (ht, ct) = self.right_to_left_lstm(packed_input, self.hidden)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_right = output[rev_perm_idx]
+        # output_right = self.right_to_left_fc(output_right)
+        # output_right = F.relu(output_right)
 
         final_output = output_left + output_middle + output_right
+        # final_output = F.relu(final_output)
         # final_output = torch.cat([output_left, output_middle, output_right], dim=1)
         # final_output = torch.cat([output_middle], dim=1)
         # final_output = output_middle

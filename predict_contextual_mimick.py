@@ -17,7 +17,7 @@ from utils import load_embeddings, pad_sequences, parse_conll_file, make_vocab, 
 def main():
     # Prepare our examples
     sentences = parse_conll_file('./conll/train.txt')
-    n = 3
+    n = 31
 
     word_to_idx, char_to_idx = make_vocab(sentences)
 
@@ -34,14 +34,24 @@ def main():
     )
 
     net.eval()
-    net.load_state_dict(torch.load('./models/contextual_mimick_n3.torch'))
+    net.load_state_dict(torch.load('./results/contextual_mimick_n31/contextual_mimick_n31.torch'))
     test_sentences = parse_conll_file('./conll/valid.txt')
     test_sentences += parse_conll_file('./conll/train.txt')
-    test_vocab = load_vocab('./conll/oov_vocab.txt')
+    test_vocab = load_vocab('./conll/oov_vocab_wo_embeds.txt')
     raw_examples = [
         ngram  for sentence in test_sentences for ngram in ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
     ]
     filtered_examples = [e for e in raw_examples if e[math.floor(n/2)].lower() in test_vocab]  # Target word is in test vocab
+
+    examples_by_target_word = dict()
+    for e in filtered_examples:
+        if e[int(n/2)].lower() not in examples_by_target_word:
+            examples_by_target_word[e[int(n/2)].lower()] = [e]
+        else:
+            examples_by_target_word[e[int(n/2)].lower()].append(e)
+
+    more_than_one_examples = [e for e in examples_by_target_word.items() if len(e) > 1]
+
     filtered_examples_splitted = [(e[int(n/2)].lower(), vectorizer.vectorize_unknown_example((e[:int(n/2)], e[int(n/2)], e[int(n/2)+1:]))) for e in filtered_examples]
 
     my_embeddings = dict()

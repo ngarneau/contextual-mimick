@@ -8,8 +8,9 @@ import torch
 from nltk.util import ngrams
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
-from torch.optim import Adam
+from torch.optim import Adam, SGD
 from torch.utils.data import DataLoader
+import random
 
 from contextual_mimick import ContextualMimick
 from utils import load_embeddings, random_split, euclidean_distance, square_distance, parse_conll_file, \
@@ -20,11 +21,12 @@ def main():
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     numpy.random.seed(seed)
+    random.seed(seed)
 
     # Prepare our examples
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
-    n = 3
+    n = 11
     raw_examples = [
         ngram for sentence in sentences for ngram in
         ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
@@ -43,15 +45,30 @@ def main():
 
     training_data = [(x, train_embeddings[x[1].lower()]) for x in examples if x[1].lower() in train_embeddings]
 
-    population_sampling = dict()
+    unique_examples = set()
+    unique_training_data = list()
     for t in training_data:
+        x = t[0]
+        k = '-'.join(x[0]) + x[1] + '-'.join(x[2])
+        if k not in unique_examples:
+            unique_training_data.append(t)
+            unique_examples.add(k)
+
+    population_sampling = dict()
+    for t in unique_training_data:
         target_word = t[0][1].lower()
         if target_word not in population_sampling:
             population_sampling[target_word] = [t]
         else:
             population_sampling[target_word].append(t)
 
-    training_data = [e[0] for word, e in population_sampling.items()]
+    k = 3
+    training_data = list()
+    for word, e in population_sampling.items():
+        if len(e) >= k:
+            training_data += random.choices(e, k=3)
+        else:
+            training_data += e
     # training_data = training_data[:20]
 
     # Vectorize our examples
@@ -68,14 +85,14 @@ def main():
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     train_loader = DataLoader(
         Corpus(train_dataset, 'train', vectorizer.vectorize_example),
-        batch_size=1,
+        batch_size=4,
         collate_fn=collate_examples,
         shuffle=True
     )
 
     valid_loader = DataLoader(
         Corpus(valid_dataset, 'valid', vectorizer.vectorize_example),
-        batch_size=1,
+        batch_size=4,
         collate_fn=collate_examples,
         shuffle=True
     )
@@ -85,7 +102,7 @@ def main():
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
-        words_hidden_state_dimension=50,
+        words_hidden_state_dimension=100,
         word_embeddings_dimension=50,
         fully_connected_layer_hidden_dimension=50
     )
