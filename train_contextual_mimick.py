@@ -9,7 +9,7 @@ from nltk.util import ngrams
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
 from torch.optim import Adam, SGD
-from torch.utils.data import DataLoader
+from utils import DataLoader
 import random
 
 from contextual_mimick import ContextualMimick
@@ -26,7 +26,7 @@ def main():
     # Prepare our examples
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
-    n = 11
+    n = 31
     raw_examples = [
         ngram for sentence in sentences for ngram in
         ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
@@ -82,19 +82,23 @@ def main():
 
     print(len(train_dataset), len(valid_dataset))
 
+    use_gpu = torch.cuda.is_available()
+
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     train_loader = DataLoader(
         Corpus(train_dataset, 'train', vectorizer.vectorize_example),
-        batch_size=4,
+        batch_size=16,
         collate_fn=collate_examples,
-        shuffle=True
+        shuffle=True,
+        use_gpu=use_gpu
     )
 
     valid_loader = DataLoader(
         Corpus(valid_dataset, 'valid', vectorizer.vectorize_example),
-        batch_size=4,
+        batch_size=16,
         collate_fn=collate_examples,
-        shuffle=True
+        shuffle=True,
+        use_gpu=use_gpu
     )
 
     net = ContextualMimick(
@@ -106,14 +110,17 @@ def main():
         word_embeddings_dimension=50,
         fully_connected_layer_hidden_dimension=50
     )
+    if use_gpu:
+        net.cuda()
     net.load_words_embeddings(train_embeddings)
 
-    lrscheduler = MultiStepLR(milestones=[3, 6, 9])
+    # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
+    lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}.torch'.format(n), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/contextual_mimick_n{}.csv'.format(n))
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
-    model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
 
 if __name__ == '__main__':

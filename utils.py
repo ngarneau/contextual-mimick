@@ -3,7 +3,7 @@ import torch
 from pytoune import torch_to_numpy
 from torch._utils import _accumulate
 from torch.nn import functional as F
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 def load_embeddings(path):
@@ -66,7 +66,7 @@ def parse_conll_file(filename):
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
                 token, _, _, e = line[:-1].split(' ')
-                sentence.append(token)
+                sentence.append(token.lower())
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
@@ -183,3 +183,20 @@ def load_vocab(path):
         for line in fhandle:
             vocab.add(line[:-1])
     return vocab
+
+
+class DataLoader(DataLoader):
+    """
+    Overloads the DataLoader Class of PyTorch so that it can copy the data and target to the GPU if desired.
+    """
+
+    def __init__(self, *args, use_gpu=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.use_gpu = use_gpu and torch.cuda.is_available()
+
+    def to_cuda(self, obj):
+        return obj.cuda() if self.use_gpu else obj
+
+    def __iter__(self):
+        for x, y in super().__iter__():
+            yield self.to_cuda(x), self.to_cuda(y)

@@ -28,16 +28,16 @@ def main():
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
-        words_hidden_state_dimension=50,
+        words_hidden_state_dimension=100,
         word_embeddings_dimension=50,
         fully_connected_layer_hidden_dimension=50
     )
 
     net.eval()
-    net.load_state_dict(torch.load('./results/contextual_mimick_n31/contextual_mimick_n31.torch'))
+    net.load_state_dict(torch.load('./models/contextual_mimick_n31.torch'))
     test_sentences = parse_conll_file('./conll/valid.txt')
     test_sentences += parse_conll_file('./conll/train.txt')
-    test_vocab = load_vocab('./conll/oov_vocab_wo_embeds.txt')
+    test_vocab = load_vocab('./conll/oov_vocab.txt')
     raw_examples = [
         ngram  for sentence in test_sentences for ngram in ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
     ]
