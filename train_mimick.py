@@ -112,7 +112,7 @@ def main():
         fully_connected_layer_hidden_dimension=50
     )
 
-    lrscheduler = ReduceLROnPlateau(milestones=[3,6,9])
+    lrscheduler = MultiStepLR(milestones=[3,6,9])
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/mimick.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/mimick.csv')
