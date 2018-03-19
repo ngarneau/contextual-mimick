@@ -6,6 +6,7 @@ logging.getLogger().setLevel(logging.INFO)
 import numpy
 import torch
 from nltk.util import ngrams
+from itertools import chain
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
 from torch.optim import Adam, SGD
@@ -16,32 +17,47 @@ from contextual_mimick import ContextualMimick
 from utils import load_embeddings, random_split, euclidean_distance, square_distance, parse_conll_file, \
     make_vocab, WordsInContextVectorizer, Corpus, collate_examples
 
+def my_ngrams(sequence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
+    sequence.append(right_pad_symbol)
+    sequence.insert(0, left_pad_symbol)
+    L = len(sequence)
+    m = n//2
+    for i, item in enumerate(sequence[1:-1]):
+        left_idx = max(0, i-m+1)
+        left_side = sequence[left_idx:i+1]
+        right_idx = min(L, i+m+2)
+        right_side = sequence[i+2:right_idx]
+        yield (tuple(left_side), item, tuple(right_side))
 
-def main():
-    seed = 299792458  # "Seed" of light
-    torch.manual_seed(seed)
-    numpy.random.seed(seed)
-    random.seed(seed)
-
-    # Prepare our examples
+def prepare_datasets():
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
-    n = 31
-    raw_examples = [
-        ngram for sentence in sentences for ngram in
-        ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>')
-    ]
-    filtered_examples = [e for e in raw_examples if 'OS>' not in e[math.floor(n / 2)]]
-    filtered_examples_splitted = [(e[:int(n / 2)], e[int(n / 2)], e[int(n / 2) + 1:]) for e in filtered_examples]
+    n = 15
+    # print('sentences', sentences[0])
+    # raw_examples = [
+    #     ngram for sentence in sentences for ngram in
+    #     ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>')
+    # ]
+    # # print('raw ex', raw_examples[:15])
+    # filtered_examples = [e for e in raw_examples if 'OS>' not in e[math.floor(n / 2)]]
+    # # print('filt ex', filtered_examples[:10])
 
-    # Make sure we dont have multiple begin of string and end of string within left and right context
-    examples = list()
-    for left, middle, right in filtered_examples_splitted:
-        if left[-1] == '<BOS>':
-            left = [left[-1]]
-        if right[0] == '<EOS>':
-            right = [right[0]]
-        examples.append((left, middle, right))
+    # filtered_examples_splitted = [
+    #     (e[:int(n / 2)], e[int(n / 2)], e[int(n / 2) + 1:]) for e in filtered_examples]
+    # # print('filt ex splitted', filtered_examples_splitted[0])
+    # print('my raw ex', my_raw_ex[:10], my_raw_ex[0] == filtered_examples_splitted[0])
+
+    # # Make sure we dont have multiple begin of string and end of string within left and right context
+    # examples = list()
+    # for left, middle, right in filtered_examples_splitted:
+    #     if left[-1] == '<BOS>':
+    #         left = [left[-1]]
+    #     if right[0] == '<EOS>':
+    #         right = [right[0]]
+    #     examples.append((left, middle, right))
+
+    examples = [ngram for sentence in sentences for ngram in my_ngrams(sentence, n)]
+    print('examples', examples[:10])
 
     training_data = [(x, train_embeddings[x[1].lower()]) for x in examples if x[1].lower() in train_embeddings]
 
@@ -79,7 +95,17 @@ def main():
     train_valid_ratio = 0.8
     m = int(len(training_data) * train_valid_ratio)
     train_dataset, valid_dataset = random_split(training_data, [m, len(training_data) - m])
+    return train_dataset, valid_dataset
 
+
+def main():
+    seed = 299792458  # "Seed" of light
+    torch.manual_seed(seed)
+    numpy.random.seed(seed)
+    random.seed(seed)
+
+    # Prepare our examples
+    train_dataset, valid_dataset = prepare_datasets()
     print(len(train_dataset), len(valid_dataset))
 
     use_gpu = torch.cuda.is_available()
@@ -124,4 +150,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    tr, val = prepare_datasets()
