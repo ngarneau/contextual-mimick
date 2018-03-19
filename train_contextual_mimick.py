@@ -29,7 +29,7 @@ def main():
     n = 31
     raw_examples = [
         ngram for sentence in sentences for ngram in
-        ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
+        ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>')
     ]
     filtered_examples = [e for e in raw_examples if 'OS>' not in e[math.floor(n / 2)]]
     filtered_examples_splitted = [(e[:int(n / 2)], e[int(n / 2)], e[int(n / 2) + 1:]) for e in filtered_examples]
@@ -62,11 +62,11 @@ def main():
         else:
             population_sampling[target_word].append(t)
 
-    k = 3
+    k = 1
     training_data = list()
     for word, e in population_sampling.items():
         if len(e) >= k:
-            training_data += random.choices(e, k=3)
+            training_data += random.choices(e, k=k)
         else:
             training_data += e
     # training_data = training_data[:20]
