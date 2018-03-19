@@ -23,6 +23,12 @@ def main():
 
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        map_location = lambda storage, loc: storage.cuda(0)
+    else:
+        map_location = lambda storage, loc: storage
+
     net = ContextualMimick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
@@ -34,10 +40,12 @@ def main():
     )
 
     net.eval()
-    net.load_state_dict(torch.load('./models/contextual_mimick_n31.torch'))
+    net.load_state_dict(torch.load('./results/contextual_mimick_n31_k1/contextual_mimick_n31_k1.torch', map_location))
+
     test_sentences = parse_conll_file('./conll/valid.txt')
     test_sentences += parse_conll_file('./conll/train.txt')
-    test_vocab = load_vocab('./conll/oov_vocab.txt')
+    test_sentences += parse_conll_file('./conll/test.txt')
+    test_vocab = load_vocab('./conll/all_oov.txt')
     raw_examples = [
         ngram  for sentence in test_sentences for ngram in ngrams(sentence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='EOS')
     ]
