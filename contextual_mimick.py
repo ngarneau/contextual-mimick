@@ -89,8 +89,11 @@ class ContextualMimick(nn.Module):
             first_dim = 2 * self.num_layers
         else:
             first_dim = self.num_layers
-        return (autograd.Variable(torch.zeros(first_dim, batch, dim)),
-                autograd.Variable(torch.zeros(first_dim, batch, dim)))
+        hidden1, hidden2 = autograd.Variable(torch.zeros(first_dim, batch, dim)), autograd.Variable(torch.zeros(first_dim, batch, dim))
+        if torch.cuda.is_available():
+            hidden1.cuda()
+            hidden2.cuda()
+        return (hidden1, hidden2)
 
     def load_words_embeddings(self, word_to_embed):
         for word, embed in word_to_embed.items():
@@ -172,3 +175,16 @@ class ContextualMimick(nn.Module):
         x = F.tanh(x)
         x = self.output(x)
         return x
+
+
+def get_contextual_mimick(char_to_idx, word_to_idx):
+    net = ContextualMimick(
+        characters_vocabulary=char_to_idx,
+        words_vocabulary=word_to_idx,
+        characters_embedding_dimension=20,
+        characters_hidden_state_dimension=50,
+        words_hidden_state_dimension=100,
+        word_embeddings_dimension=50,
+        fully_connected_layer_hidden_dimension=50
+    )
+    return net
