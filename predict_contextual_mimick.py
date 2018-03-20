@@ -66,14 +66,18 @@ def main():
     my_embeddings = dict()
     for word, x in filtered_examples_splitted:
         l, w, r = x
-        l = torch.autograd.Variable(torch.LongTensor([l]))
-        w = torch.autograd.Variable(torch.LongTensor([w]))
-        r = torch.autograd.Variable(torch.LongTensor([r]))
+        l = torch.LongTensor([l])
+        w = torch.LongTensor([w])
+        r = torch.LongTensor([r])
         if use_gpu:
             l.cuda()
             w.cuda()
             r.cuda()
-        prediction = net((l, w, r))
+        prediction = net((
+            torch.autograd.Variable(l),
+            torch.autograd.Variable(w),
+            torch.autograd.Variable(r)
+        ))
         if word in my_embeddings:  # Compute the average
             my_embeddings[word] = (my_embeddings[word] + torch_to_numpy(prediction[0])) / 2
         else:

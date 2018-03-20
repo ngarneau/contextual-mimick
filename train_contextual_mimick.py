@@ -81,6 +81,7 @@ def main():
     # Prepare our examples
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
+    word_to_idx, char_to_idx = make_vocab(sentences)
 
     examples = [ngram for sentence in sentences for ngram in my_ngrams(sentence, n)]
     print('examples', examples[:10])
@@ -93,7 +94,6 @@ def main():
 
     training_data = sample_population(population_sampling, k)
 
-    word_to_idx, char_to_idx = make_vocab(sentences)
 
     train_valid_ratio = 0.8
     m = int(len(training_data) * train_valid_ratio)
