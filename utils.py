@@ -23,6 +23,9 @@ def load_embeddings(path):
 
 
 def pad_sequences(vectorized_seqs, seq_lengths):
+    """
+    Pads vectorized ngrams so that they occupy the same space in a LongTensor.
+    """
     seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
     for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
         seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
