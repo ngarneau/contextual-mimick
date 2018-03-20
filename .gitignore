@@ -109,3 +109,6 @@ models/
 embeddings/glove-embeddings-6B-50D.txt
 
 train_logs/
+
+# VSCode
+.vscode/
