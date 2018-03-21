@@ -198,7 +198,13 @@ class DataLoader(DataLoader):
         self.use_gpu = use_gpu and torch.cuda.is_available()
 
     def to_cuda(self, obj):
-        return obj.cuda() if self.use_gpu else obj
+        if self.use_gpu:
+            if isinstance(obj, tuple):
+                return [o.cuda() for o in obj]
+            else:
+                return obj.cuda()
+        else:
+            return obj
 
     def __iter__(self):
         for x, y in super().__iter__():

@@ -1,4 +1,5 @@
 import argparse
+import math
 import logging
 import os
 
@@ -8,6 +9,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import numpy
+import torch
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
@@ -80,16 +82,20 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("n")
     parser.add_argument("k")
+    parser.add_argument("device", default=0)
     args = parser.parse_args()
+    n = int(args.n)
+    k = int(args.k)
+    cuda_device = int(args.device)
+
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        torch.cuda.set_device(cuda_device)
 
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     numpy.random.seed(seed)
     random.seed(seed)
-    n = int(args.n)
-    k = int(args.k)
-
-    use_gpu = torch.cuda.is_available()
 
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8,
