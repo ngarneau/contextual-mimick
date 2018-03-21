@@ -5,12 +5,14 @@ logging.getLogger().setLevel(logging.INFO)
 
 import numpy
 import torch
+from torch import is_tensor
 from nltk.util import ngrams
 from itertools import chain
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
 from torch.optim import Adam, SGD
 from torch.utils.data.sampler import Sampler
+from torch.utils.data import Dataset
 from utils import DataLoader
 import random
 from time import time
@@ -50,20 +52,34 @@ class KPerClassLoader():
         self.collate_fn = collate_fn
         self.use_gpu = use_gpu
 
-    def to_gpu(self, obj):
-        return obj.cuda() if self.use_gpu else obj
-
+    def to_gpu(self, *obj):
+        """
+        Applies .cuda() on obj. Recursively unpacks the tuples of the object before applying .cuda().
+        """
+        if not self.use_gpu:
+            if len(obj) == 1:
+                obj = obj[0]
+            return obj
+        if len(obj) == 1 and not isinstance(obj[0], tuple):
+            return obj[0].cuda()
+        if len(obj) == 1 and isinstance(obj[0], tuple):
+            obj = obj[0]
+        return tuple(self.to_gpu(o) for o in obj)
+        
     def __iter__(self):
         e = self.epoch
         batch = []
         for j in range(self.k):
             for label, N in iter(self.dataset):
-                idx = (e*self.k+j)%N
-                sample = self.dataset[label, idx]
-                batch.append(sample)
-                if len(batch) == self.batch_size:
-                    yield self.to_gpu(self.collate_fn(batch))
-                    batch = []
+                if N > 0:
+                    idx = (e*self.k+j)%N
+                    sample = self.dataset[label, idx]
+                    batch.append(sample)
+                    if len(batch) == self.batch_size:
+                        z = self.to_gpu(self.collate_fn(batch))
+                        # print(z, len(z[0]))
+                        yield z#self.to_gpu(self.collate_fn(batch))
+                        batch = []
         self.epoch += 1
         if len(batch) > 0:
             yield self.to_gpu(self.collate_fn(batch))
@@ -74,7 +90,7 @@ class KPerClassLoader():
         """
         return (self.k*len(self.dataset.labels_mapping) + self.batch_size - 1)//self.batch_size
 
-class PerClassDataset():
+class PerClassDataset(Dataset):
     """
     This class implements a dataset which keeps examples according to their label.
     The data are organized in a dictionary in the format {label:list_of_examples}
@@ -125,14 +141,15 @@ class PerClassDataset():
         """
         Returns the number of examples there is in the dataset for the specified label.
         """
-        return self.nb_examples_for_label[self.labels_mapping[label]]
+        idx = self.labels_mapping[label]
+        return self.nb_examples_per_label[idx] if idx in self.nb_examples_per_label else 0
     
     def __iter__(self):
         """
         Iterates over all labels of the dataset, returning (label, number_of_examples_for_this_label).
         """
         for label, idx in self.labels_mapping.items():
-            yield (label, self.nb_examples_per_label[idx])
+            yield (label, self.nb_examples_for_label(label))
 
     def __getitem__(self, label_i):
         """
@@ -209,6 +226,7 @@ def main():
 
     # use_gpu = torch.cuda.is_available()
     use_gpu = False
+
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8, use_gpu=use_gpu)
 
@@ -228,15 +246,19 @@ def main():
     # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
-    model_path = './models/testing_contextual_mimick_n{}.torch'.format(n)
+    model_path = './models/'
+    model_file = 'testing_contextual_mimick_n{}.torch'.format(n)
     os.makedirs(model_path, exist_ok=True)
-    checkpoint = ModelCheckpoint(model_path, save_best_only=True)
+    checkpoint = ModelCheckpoint(model_path+model_file,
+                                 save_best_only=True,
+                                 temporary_filename=model_path+'temp_'+model_file)
     # There is a bug in Pytoune with the CSVLogger on my computer
-    # logger_path = './train_logs/testing_contextual_mimick_n{}.csv'.format(n)
-    # os.makedirs(logger_path, exist_ok=True)
-    # csv_logger = CSVLogger(logger_path)
+    logger_path = './train_logs/'
+    logger_file = 'testing_contextual_mimick_n{}.csv'.format(n)
+    os.makedirs(logger_path, exist_ok=True)
+    csv_logger = CSVLogger(logger_path + logger_file)
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
-    callbacks = [lrscheduler, checkpoint, early_stopping]#, csv_logger]
+    callbacks = [lrscheduler, checkpoint, early_stopping, csv_logger]
     model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=callbacks)
 
 
