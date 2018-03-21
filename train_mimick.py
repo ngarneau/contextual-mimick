@@ -112,12 +112,12 @@ def main():
         fully_connected_layer_hidden_dimension=50
     )
 
-    lrscheduler = MultiStepLR(milestones=[3,6,9])
+    lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/mimick.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/mimick.csv')
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
-    model.fit_generator(train_loader, valid_loader, n_epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
 if __name__ == '__main__':
     main()

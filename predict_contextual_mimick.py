@@ -83,7 +83,7 @@ def main():
         else:
             my_embeddings[word] = torch_to_numpy(prediction[0])
 
-    with open('./predicted_embeddings/contextual_mimick_validation_embeddings.txt', 'w') as fhandle:
+    with open('./predicted_embeddings/contextual_mimick_n40_k1_v1.txt', 'w') as fhandle:
         for word, embedding in my_embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
