@@ -1,23 +1,20 @@
 import argparse
-import math
-import os
 import logging
+import os
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import numpy
-import torch
 from pytoune.framework import Model
-from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, MultiStepLR
-from torch.optim import Adam, SGD
+from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
+from torch.optim import Adam
 import random
-from time import time
 
-from contextual_mimick import ContextualMimick
-from utils import load_embeddings, random_split, euclidean_distance,\
+from utils import load_embeddings, euclidean_distance,\
     square_distance, parse_conll_file,\
-    make_vocab, WordsInContextVectorizer, Corpus, collate_examples
-from PerClassDataset import *
+    make_vocab, WordsInContextVectorizer, collate_examples
+from per_class_dataset import *
 
 def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
     sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
