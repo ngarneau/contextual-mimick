@@ -69,14 +69,20 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("n")
     parser.add_argument("k")
+    parser.add_argument("device", default=0)
     args = parser.parse_args()
+    n = int(args.n)
+    k = int(args.k)
+    cuda_device = int(args.device)
+
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        torch.cuda.set_device(cuda_device)
 
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     numpy.random.seed(seed)
     random.seed(seed)
-    n = int(args.n)
-    k = int(args.k)
 
     # Prepare our examples
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
@@ -100,7 +106,6 @@ def main():
     train_dataset, valid_dataset = random_split(training_data, [m, len(training_data) - m])
     print(len(train_dataset), len(valid_dataset))
 
-    use_gpu = torch.cuda.is_available()
 
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     train_loader = DataLoader(
@@ -124,6 +129,7 @@ def main():
     if use_gpu:
         net.cuda()
     net.load_words_embeddings(train_embeddings)
+
 
     # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
     lrscheduler = ReduceLROnPlateau(patience=2)
