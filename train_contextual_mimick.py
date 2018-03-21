@@ -79,7 +79,7 @@ class PerClassDataset():
     This class implements a dataset which keeps examples according to their label.
     The data are organized in a dictionary in the format {label:list_of_examples}
     """
-    def __init__(self, dataset, transform=None, target_transform=None, filter_cond=None, labels_mapping={}):
+    def __init__(self, dataset, transform=None, target_transform=None, filter_cond=None, labels_mapping=None):
         """
         'dataset' must be an iterable of pair of elements (x, y). y must be hashable (str, tuple, etc.)
         'transform' must be a callable applied to x before item is returned.
@@ -90,6 +90,8 @@ class PerClassDataset():
         if filter_cond == None:
             filter_cond = lambda x, y: True
         self.labels_mapping = labels_mapping
+        if self.labels_mapping == None:
+            self.labels_mapping = {}
         self._len = 0
         self.build_dataset(dataset, filter_cond)
         self.transform = transform
@@ -149,7 +151,6 @@ class PerClassDataset():
 
 def split_train_valid(examples, ratio):
     m = int(ratio*len(examples))
-    print('m', m)
     train_examples, valid_examples = [], []
     for i, x in enumerate(examples):
         if i < m:
@@ -160,30 +161,30 @@ def split_train_valid(examples, ratio):
 
 def prepare_data(n=15, ratio=.8, use_gpu=False):
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
-    sentences = parse_conll_file('./conll/train.txt')
+    sentences = parse_conll_file('./conll/train.txt')[:100]
     word_to_idx, char_to_idx = make_vocab(sentences)
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
-    examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n)) # Keeps only different ngrams
-    print('nb of total examples', len(examples))
+    examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if ngram[1] in train_embeddings) # Keeps only different ngrams which have a training embedding 
+    print('Number of unique examples:', len(examples))
 
     train_examples, valid_examples = split_train_valid(examples, ratio)
 
-    filter_cond = lambda x, y: y in train_embeddings
+    # filter_cond = lambda x, y: y in train_embeddings
     transform = vectorizer.vectorize_unknown_example
     target_transform = lambda y: train_embeddings[y]
 
     train_dataset = PerClassDataset(train_examples,
-                                    filter_cond=filter_cond,
+                                    # filter_cond=filter_cond,
                                     transform=transform,
                                     target_transform=target_transform)
     # The filter_cond makes the dataset of different sizes each time. Should we filter before creating the dataset
 
     valid_dataset = PerClassDataset(valid_examples,
-                                    filter_cond=filter_cond,
+                                    # filter_cond=filter_cond,
                                     transform=transform,
                                     target_transform=target_transform)
-    print(len(train_dataset), len(valid_dataset))
+    print('Datasets size - Train:', len(train_dataset), 'Valid:',  len(valid_dataset))
 
     collate_fn = lambda samples: collate_examples([(*x,y) for x, y in samples])
     train_loader = KPerClassLoader(dataset=train_dataset,
