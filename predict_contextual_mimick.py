@@ -2,7 +2,7 @@ import logging
 import math
 import argparse
 
-from train_contextual_mimick import my_ngrams
+from utils import ngrams
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -51,7 +51,7 @@ def main():
     test_sentences += parse_conll_file('./conll/test.txt')
     test_vocab = load_vocab(path_words_to_predict)
 
-    examples = [ngram for sentence in test_sentences for ngram in my_ngrams(sentence, n)]
+    examples = [ngram for sentence in test_sentences for ngram in ngrams(sentence, n)]
     filtered_examples = [e for e in examples if e[1].lower() in test_vocab]  # Target word is in test vocab
 
     examples_by_target_word = dict()

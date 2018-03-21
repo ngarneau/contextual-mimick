@@ -2,6 +2,8 @@ import argparse
 import logging
 import os
 
+from contextual_mimick import get_contextual_mimick
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -11,40 +13,33 @@ from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelC
 from torch.optim import Adam
 import random
 
-from utils import load_embeddings, euclidean_distance,\
-    square_distance, parse_conll_file,\
-    make_vocab, WordsInContextVectorizer, collate_examples
+from utils import load_embeddings, euclidean_distance, \
+    square_distance, parse_conll_file, \
+    make_vocab, WordsInContextVectorizer, collate_examples, ngrams
 from per_class_dataset import *
 
-def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
-    sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
-
-    L = len(sequence)
-    m = n//2
-    for i, item in enumerate(sequence[1:-1]):
-        left_idx = max(0, i-m+1)
-        left_side = tuple(sequence[left_idx:i+1])
-        right_idx = min(L, i+m+2)
-        right_side = tuple(sequence[i+2:right_idx])
-        yield (left_side, item, right_side)
 
 def split_train_valid(examples, ratio):
-    m = int(ratio*len(examples))
+    m = int(ratio * len(examples))
     train_examples, valid_examples = [], []
-    for i, x in enumerate(examples):
+    sorted_examples = sorted(examples)
+    numpy.random.shuffle(sorted_examples)
+    for i, x in enumerate(sorted_examples):
         if i < m:
             train_examples.append(x)
         else:
             valid_examples.append(x)
     return train_examples, valid_examples
 
-def prepare_data(n=15, ratio=.8, use_gpu=False):
+
+def prepare_data(n=15, ratio=.8, use_gpu=False, k=1):
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
-    sentences = parse_conll_file('./conll/train.txt')[:100]
+    sentences = parse_conll_file('./conll/train.txt')
     word_to_idx, char_to_idx = make_vocab(sentences)
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
-    examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if ngram[1] in train_embeddings) # Keeps only different ngrams which have a training embedding 
+    examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
+                   ngram[1] in train_embeddings)  # Keeps only different ngrams which have a training embedding
     print('Number of unique examples:', len(examples))
 
     train_examples, valid_examples = split_train_valid(examples, ratio)
@@ -63,21 +58,23 @@ def prepare_data(n=15, ratio=.8, use_gpu=False):
                                     # filter_cond=filter_cond,
                                     transform=transform,
                                     target_transform=target_transform)
-    print('Datasets size - Train:', len(train_dataset), 'Valid:',  len(valid_dataset))
+    print('Datasets size - Train:', len(train_dataset), 'Valid:', len(valid_dataset))
+    print('Datasets labels - Train:', len(train_dataset.dataset), 'Valid:', len(valid_dataset.dataset))
 
-    collate_fn = lambda samples: collate_examples([(*x,y) for x, y in samples])
+    collate_fn = lambda samples: collate_examples([(*x, y) for x, y in samples])
     train_loader = KPerClassLoader(dataset=train_dataset,
                                    collate_fn=collate_fn,
-                                   batch_size=16,
-                                   k=1,
+                                   batch_size=1,
+                                   k=k,
                                    use_gpu=use_gpu)
     valid_loader = KPerClassLoader(dataset=valid_dataset,
                                    collate_fn=collate_fn,
-                                   batch_size=16,
-                                   k=1,
+                                   batch_size=1,
+                                   k=k,
                                    use_gpu=use_gpu)
 
     return train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -95,7 +92,8 @@ def main():
     use_gpu = torch.cuda.is_available()
 
     # Prepare our examples
-    train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8, use_gpu=use_gpu)
+    train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8,
+                                                                                          use_gpu=use_gpu, k=k)
 
     net = get_contextual_mimick(char_to_idx, word_to_idx)
 
@@ -109,9 +107,9 @@ def main():
     model_path = './models/'
     model_file = 'testing_contextual_mimick_n{}.torch'.format(n)
     os.makedirs(model_path, exist_ok=True)
-    checkpoint = ModelCheckpoint(model_path+model_file,
+    checkpoint = ModelCheckpoint(model_path + model_file,
                                  save_best_only=True,
-                                 temporary_filename=model_path+'temp_'+model_file)
+                                 temporary_filename=model_path + 'temp_' + model_file)
     # There is a bug in Pytoune with the CSVLogger on my computer
     logger_path = './train_logs/'
     logger_file = 'testing_contextual_mimick_n{}.csv'.format(n)
@@ -126,11 +124,8 @@ if __name__ == '__main__':
     from time import time
     t = time()
     try:
-        
         main()
-        
-        
     except:
-        print('Execution stopped after {:.2f} seconds.'.format(time()-t))
+        print('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
-    print('Execution completed in {:.2f} seconds.'.format(time()-t))
+    print('Execution completed in {:.2f} seconds.'.format(time() - t))

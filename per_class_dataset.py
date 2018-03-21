@@ -124,9 +124,7 @@ class KPerClassLoader():
                     sample = self.dataset[label, idx]
                     batch.append(sample)
                     if len(batch) == self.batch_size:
-                        z = self.to_gpu(self.collate_fn(batch))
-                        # print(z, len(z[0]))
-                        yield z  # self.to_gpu(self.collate_fn(batch))
+                        yield self.to_gpu(self.collate_fn(batch))
                         batch = []
         self.epoch += 1
         if len(batch) > 0:
@@ -136,4 +134,4 @@ class KPerClassLoader():
         """
         Returns the number of minibatchs that will be produced in one epoch.
         """
-        return (self.k*len(self.dataset.labels_mapping) + self.batch_size - 1)//self.batch_size
+        return (self.k*len(self.dataset.dataset) + self.batch_size - 1)//self.batch_size
