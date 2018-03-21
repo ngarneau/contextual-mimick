@@ -89,11 +89,11 @@ class ContextualMimick(nn.Module):
             first_dim = 2 * self.num_layers
         else:
             first_dim = self.num_layers
-        hidden1, hidden2 = autograd.Variable(torch.zeros(first_dim, batch, dim)), autograd.Variable(torch.zeros(first_dim, batch, dim))
+        hidden1, hidden2 = torch.zeros(first_dim, batch, dim), torch.zeros(first_dim, batch, dim)
         if torch.cuda.is_available():
             hidden1.cuda()
             hidden2.cuda()
-        return (hidden1, hidden2)
+        return (autograd.Variable(hidden1), autograd.Variable(hidden2))
 
     def load_words_embeddings(self, word_to_embed):
         for word, embed in word_to_embed.items():
@@ -120,9 +120,8 @@ class ContextualMimick(nn.Module):
 
         # LSTM thing
         # Initialize hidden to zero
-        self.hidden = self.init_hidden(len(left_contexts), self.words_hidden_state_dimension)
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (ht, ct) = self.left_to_right_lstm(packed_input, self.hidden)
+        packed_output, (ht, ct) = self.left_to_right_lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_left = output[rev_perm_idx]
         output_left = self.left_to_right_fc(output_left)
@@ -138,9 +137,8 @@ class ContextualMimick(nn.Module):
         embeds = self.characters_embeddings(words)
 
         # LSTM thing
-        self.hidden = self.init_hidden(len(words), self.characters_hidden_state_dimension)
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (ht, ct) = self.lstm(packed_input, self.hidden)
+        packed_output, (ht, ct) = self.lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
         # output = ht[0] + ht[1]
         output_middle = output[rev_perm_idx]
@@ -155,9 +153,8 @@ class ContextualMimick(nn.Module):
         embeds = self.words_embeddings(right_contexts)
 
         # LSTM thing
-        self.hidden = self.init_hidden(len(right_contexts), self.words_hidden_state_dimension)
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (ht, ct) = self.right_to_left_lstm(packed_input, self.hidden)
+        packed_output, (ht, ct) = self.right_to_left_lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_right = output[rev_perm_idx]
         output_right = self.right_to_left_fc(output_right)
@@ -183,7 +180,7 @@ def get_contextual_mimick(char_to_idx, word_to_idx):
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
-        words_hidden_state_dimension=100,
+        words_hidden_state_dimension=50,
         word_embeddings_dimension=50,
         fully_connected_layer_hidden_dimension=50
     )
