@@ -1,4 +1,4 @@
-import math
+import os
 import logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -20,9 +20,8 @@ from utils import load_embeddings, random_split, euclidean_distance,\
     square_distance, parse_conll_file,\
     make_vocab, WordsInContextVectorizer, Corpus, collate_examples
 
-def make_ngrams(sequence, n, pad_left=True, pad_right=True, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
-    sequence.append(right_pad_symbol)
-    sequence.insert(0, left_pad_symbol)
+def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
+    sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
 
     L = len(sequence)
     m = n//2
@@ -37,168 +36,180 @@ class KPerClassLoader():
     """
     This class implements a dataloader that returns exactly k examples per class per epoch.
 
-    dataset must be a dictionary of the form {class:[label, list_of_examples]}.
-
-    :TODO: valid dataset, use_gpu
+    'dataset' (PerClassDataset): Collection of data to be sampled.
+    'collate_fn' (Callable): Returns a concatenated version of a list of examples.
+    'k' (Integer, optional, default=1): Number of examples from each class loaded per epoch.
+    'batch_size' (Integer, optional, default=1): Number of examples returned per batch.
+    'use_gpu' (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
     """
-    def __init__(self, dataset, collate_fn, k=1, batch_size=1, transform=lambda x:x):
+    def __init__(self, dataset, collate_fn, k=1, batch_size=1, use_gpu=False):
         self.dataset = dataset
         self.epoch = 0
         self.k = k
         self.batch_size = batch_size
         self.collate_fn = collate_fn
-        self.transform = transform
-    
+        self.use_gpu = use_gpu
+
+    def to_gpu(self, obj):
+        return obj.cuda() if self.use_gpu else obj
+
     def __iter__(self):
         e = self.epoch
         batch = []
         for j in range(self.k):
-            for y, xs in self.dataset.values():
-                x = xs[(e*self.k+j)%len(xs)]
-                sample = self.transform((x, y))
+            for label, N in iter(self.dataset):
+                idx = (e*self.k+j)%N
+                sample = self.dataset[label, idx]
                 batch.append(sample)
                 if len(batch) == self.batch_size:
-                    yield self.collate_fn(batch)
+                    yield self.to_gpu(self.collate_fn(batch))
                     batch = []
         self.epoch += 1
         if len(batch) > 0:
-            yield self.collate_fn(batch)
+            yield self.to_gpu(self.collate_fn(batch))
     
     def __len__(self):
         """
         Returns the number of minibatchs that will be produced in one epoch.
         """
-        return (self.k*len(self.dataset) + self.batch_size - 1)//self.batch_size
+        return (self.k*len(self.dataset.labels_mapping) + self.batch_size - 1)//self.batch_size
 
+class PerClassDataset():
+    """
+    This class implements a dataset which keeps examples according to their label.
+    The data are organized in a dictionary in the format {label:list_of_examples}
+    """
+    def __init__(self, dataset, transform=None, target_transform=None, filter_cond=None, labels_mapping={}):
+        """
+        'dataset' must be an iterable of pair of elements (x, y). y must be hashable (str, tuple, etc.)
+        'transform' must be a callable applied to x before item is returned.
+        'target_transform' must be a callable applied to y before item is returned.
+        'filter_cond' is a callable which takes 2 arguments (x and y), and returns True or False whether or not this example should be included in the dataset. If filter_cond is None, no filtering will be made.
+        'labels_mapping' must be a dictionary mapping labels to an index. Labels missing from this mapping will be automatically added while building the dataset. Indices of the mapping should never exceed len(labels_mapping).
+        """
+        if filter_cond == None:
+            filter_cond = lambda x, y: True
+        self.labels_mapping = labels_mapping
+        self._len = 0
+        self.build_dataset(dataset, filter_cond)
+        self.transform = transform
+        if self.transform == None:
+            self.transform = lambda x: x
+        self.target_transform = target_transform
+        if self.target_transform == None:
+            self.target_transform = lambda x: x
 
-def prepare_datasets():
+    def build_dataset(self, dataset, filter_cond):
+        """
+        Takes an iterable of examples of the form (x, y) and makes it into a dictionary {class:list_of_examples}, and filters examples not satisfying the 'filter_cond' condition.
+        """
+        self.dataset = {}
+        for x, y in dataset:
+            idx = None
+            if y in self.labels_mapping:
+                idx = self.labels_mapping[y]
+            if idx in self.dataset:
+                self._len += 1
+                self.dataset[idx].append(x)
+            elif filter_cond(x, y):
+                if idx == None:
+                    idx = self.labels_mapping[y] = len(self.labels_mapping)
+                self.dataset[idx] = [x]
+                self._len += 1
+        
+        self.nb_examples_per_label = {k:len(v) for k, v in self.dataset.items()}
+    
+    def nb_examples_for_label(self, label):
+        """
+        Returns the number of examples there is in the dataset for the specified label.
+        """
+        return self.nb_examples_for_label[self.labels_mapping[label]]
+    
+    def __iter__(self):
+        """
+        Iterates over all labels of the dataset, returning (label, number_of_examples_for_this_label).
+        """
+        for label, idx in self.labels_mapping.items():
+            yield (label, self.nb_examples_per_label[idx])
+
+    def __getitem__(self, label_i):
+        """
+        Returns the i-th example of a given class label. Expect 2 arguments: the label and the position i of desired example. Labels can be accessed via the labels_mapping attribute or by calling iter() on the dataset.
+        """
+        label, i = label_i
+        x = self.dataset[self.labels_mapping[label]][i]
+
+        return (self.transform(x), self.target_transform(label))
+    
+    def __len__(self):
+        """
+        The len() of such a dataset is ambiguous. The len() given here is the total number of examples in the dataset, while calling len(obj.dataset) will yield the number of classes in the dataset.
+        """
+        return self._len
+
+def split_train_valid(examples, ratio):
+    m = int(ratio*len(examples))
+    print('m', m)
+    train_examples, valid_examples = [], []
+    for i, x in enumerate(examples):
+        if i < m:
+            train_examples.append(x)
+        else:
+            valid_examples.append(x)
+    return train_examples, valid_examples
+
+def prepare_data(n=15, ratio=.8, use_gpu=False):
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
     sentences = parse_conll_file('./conll/train.txt')
-    n = 15
-
-    ngrams = set(ngram for sentence in sentences for ngram in make_ngrams(sentence, n)) # Keeps only different ngrams
-
-    t = time()
-    # Creates a dictionary where each key has for value a list of [embedding, list_of_ngrams]
-    ngrams_per_token = {}
-    for ngram in ngrams:
-        focus_token = ngram[1]
-        if focus_token in ngrams_per_token:
-            ngrams_per_token[focus_token][1].append(ngram)
-        elif focus_token in train_embeddings:
-            ngrams_per_token[focus_token] = [train_embeddings[focus_token], [ngram]]
-    print(time()-t)
-
     word_to_idx, char_to_idx = make_vocab(sentences)
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
+    examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n)) # Keeps only different ngrams
+    print('nb of total examples', len(examples))
 
-    loader = KPerClassLoader(dataset=ngrams_per_token,
-                                collate_fn=collate_examples,
-                                batch_size=16,transform=vectorizer.vectorize_example,
-                                k=3)
-    print('len loader', len(loader))
-    print('len dict', len(ngrams_per_token))
-    l = iter(loader)
-    somme = 0
-    for step in range(len(loader)):
-        x, y = next(l)
-        # print(len(y))
-        somme += len(y)
-    print(step+1)
-    print(somme)
-    l = iter(loader)
-    next(l)
+    train_examples, valid_examples = split_train_valid(examples, ratio)
 
+    filter_cond = lambda x, y: y in train_embeddings
+    transform = vectorizer.vectorize_unknown_example
+    target_transform = lambda y: train_embeddings[y]
 
+    train_dataset = PerClassDataset(train_examples,
+                                    filter_cond=filter_cond,
+                                    transform=transform,
+                                    target_transform=target_transform)
+    # The filter_cond makes the dataset of different sizes each time. Should we filter before creating the dataset
 
-    # print('ngrams', ngrams[:10])
+    valid_dataset = PerClassDataset(valid_examples,
+                                    filter_cond=filter_cond,
+                                    transform=transform,
+                                    target_transform=target_transform)
+    print(len(train_dataset), len(valid_dataset))
 
-        
-    # ngrams_per_word = {}
-    # for sentence in sentences:
-    #     for ngram in make_ngrams(sentence, n):
-    #         try:
-    #             # Check in the training data if this particular ngram already exists.
-    #             if ngram not in ngrams_per_word[ngram[1]]:
-    #                 ngrams_per_word[ngram[1]].append(ngram)
-    #         except KeyError:
-    #             # If not, create the entry and create a list of ngrams
-    #             ngrams_per_word[ngram[1]] = [ngram]
+    collate_fn = lambda samples: collate_examples([(*x,y) for x, y in samples])
+    train_loader = KPerClassLoader(dataset=train_dataset,
+                                   collate_fn=collate_fn,
+                                   batch_size=16,
+                                   k=1,
+                                   use_gpu=use_gpu)
+    valid_loader = KPerClassLoader(dataset=valid_dataset,
+                                   collate_fn=collate_fn,
+                                   batch_size=16,
+                                   k=1,
+                                   use_gpu=use_gpu)
 
-    # for i, (k, n) in enumerate(ngrams_per_word.items()):
-    #     print(k, n)
-    #     if i > 3:
-    #         break
-        
-
-    training_data = [(x, train_embeddings[x[1]]) for x in ngrams if x[1] in train_embeddings]
-
-    unique_examples = set()
-    unique_training_data = list()
-    for t in training_data:
-        x = t[0]
-        k = '-'.join(x[0]) + x[1] + '-'.join(x[2])
-        if k not in unique_examples:
-            unique_training_data.append(t)
-            unique_examples.add(k)        
-
-    population_sampling = dict()
-    for t in unique_training_data:
-        target_word = t[0][1].lower()
-        if target_word not in population_sampling:
-            population_sampling[target_word] = [t]
-        else:
-            population_sampling[target_word].append(t)
-
-    k = 1
-    training_data = list()
-    for word, e in population_sampling.items():
-        if len(e) >= k:
-            training_data += random.choices(e, k=k)
-        else:
-            training_data += e
-    # training_data = training_data[:20]
-
-    # Vectorize our examples
-    word_to_idx, char_to_idx = make_vocab(sentences)
-    # x_tensor, y_tensor = collate_examples([vectorizer.vectorize_example(x, y) for x, y in training_data])
-    # dataset = TensorDataset(x_tensor, y_tensor)
-
-    train_valid_ratio = 0.8
-    m = int(len(training_data) * train_valid_ratio)
-    train_dataset, valid_dataset = random_split(training_data, [m, len(training_data) - m])
-    return train_dataset, valid_dataset, word_to_idx, char_to_idx
-
+    return train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings
 
 def main():
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     numpy.random.seed(seed)
     random.seed(seed)
+    n=15
 
+    # use_gpu = torch.cuda.is_available()
+    use_gpu = False
     # Prepare our examples
-    train_dataset, valid_dataset, word_to_idx, char_to_idx = prepare_datasets()
-    print(len(train_dataset), len(valid_dataset))
-
-    use_gpu = torch.cuda.is_available()
-
-    vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
-    train_loader = DataLoader(
-        Corpus(train_dataset, 'train', vectorizer.vectorize_example),
-        batch_size=16,
-        collate_fn=collate_examples,
-        shuffle=True,
-        use_gpu=use_gpu
-    )
-
-    valid_loader = DataLoader(
-        Corpus(valid_dataset, 'valid', vectorizer.vectorize_example),
-        batch_size=16,
-        collate_fn=collate_examples,
-        shuffle=True,
-        use_gpu=use_gpu
-    )
+    train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8, use_gpu=use_gpu)
 
     net = ContextualMimick(
         characters_vocabulary=char_to_idx,
@@ -216,16 +227,27 @@ def main():
     # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}.torch'.format(n), save_best_only=True)
-    csv_logger = CSVLogger('./train_logs/contextual_mimick_n{}.csv'.format(n))
+    model_path = './models/testing_contextual_mimick_n{}.torch'.format(n)
+    os.makedirs(model_path, exist_ok=True)
+    checkpoint = ModelCheckpoint(model_path, save_best_only=True)
+    # There is a bug in Pytoune with the CSVLogger on my computer
+    # logger_path = './train_logs/testing_contextual_mimick_n{}.csv'.format(n)
+    # os.makedirs(logger_path, exist_ok=True)
+    # csv_logger = CSVLogger(logger_path)
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
-    model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    callbacks = [lrscheduler, checkpoint, early_stopping]#, csv_logger]
+    model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=callbacks)
 
 
 if __name__ == '__main__':
-    # main()
     from time import time
-
     t = time()
-    tr, val, w, c = prepare_datasets()
+    try:
+        
+        main()
+        
+        
+    except:
+        print('Execution stopped after {:.2f} seconds.'.format(time()-t))
+        raise
     print('Execution completed in {:.2f} seconds.'.format(time()-t))
