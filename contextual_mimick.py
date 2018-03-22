@@ -22,6 +22,7 @@ class ContextualMimick(nn.Module):
         self.word_embeddings_dimension = word_embeddings_dimension
         self.num_layers = 1
         self.bidirectional = True
+        self.dropout = nn.Dropout(0.5)
 
         self.characters_embeddings = nn.Embedding(
             num_embeddings=len(self.characters_vocabulary),
@@ -123,9 +124,12 @@ class ContextualMimick(nn.Module):
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
         packed_output, (ht, ct) = self.left_to_right_lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
+        output = self.dropout(output)
         output_left = output[rev_perm_idx]
         output_left = self.left_to_right_fc(output_left)
-        output_left = F.relu(output_left)
+        # output_left = F.tanh(output_left)
+        # output_left = self.dropout(output_left)
+        # output_left = F.relu(output_left)
 
 
         ### WORDS THING HERE
@@ -142,7 +146,7 @@ class ContextualMimick(nn.Module):
         output = torch.cat([ht[0], ht[1]], dim=1)
         # output = ht[0] + ht[1]
         output_middle = output[rev_perm_idx]
-        output_middle = F.relu(output_middle)
+        # output_middle = F.tanh(output_middle)
 
         ### RIGHT THING HERE
         lengths = right_contexts.data.ne(0).sum(dim=1).long()
@@ -156,12 +160,16 @@ class ContextualMimick(nn.Module):
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
         packed_output, (ht, ct) = self.right_to_left_lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
+        output = self.dropout(output)
         output_right = output[rev_perm_idx]
         output_right = self.right_to_left_fc(output_right)
-        output_right = F.relu(output_right)
+        # output_right = F.tanh(output_right)
+        # output_right = self.dropout(output_right)
+        # output_right = F.relu(output_right)
 
         final_output = output_left + output_middle + output_right
-        final_output = F.relu(final_output)
+        # final_output = output_left + output_right
+        final_output = F.tanh(final_output)
         # final_output = torch.cat([output_left, output_middle, output_right], dim=1)
         # final_output = torch.cat([output_middle], dim=1)
         # final_output = output_middle
