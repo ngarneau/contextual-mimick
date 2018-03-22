@@ -111,14 +111,13 @@ def main():
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
-    model_file = 'testing_contextual_mimick_n{}.torch'.format(n)
+    model_file = 'contextual_mimick_n{}_v2.torch'.format(n)
     os.makedirs(model_path, exist_ok=True)
     checkpoint = ModelCheckpoint(model_path + model_file,
-                                 save_best_only=True,
-                                 temporary_filename=model_path + 'temp_' + model_file)
+                                 save_best_only=True)
     # There is a bug in Pytoune with the CSVLogger on my computer
     logger_path = './train_logs/'
-    logger_file = 'testing_contextual_mimick_n{}.csv'.format(n)
+    logger_file = 'contextual_mimick_n{}_v2.csv'.format(n)
     os.makedirs(logger_path, exist_ok=True)
     csv_logger = CSVLogger(logger_path + logger_file)
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
