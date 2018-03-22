@@ -9,7 +9,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 import numpy
 import torch
-from nltk.util import ngrams
+from utils import ngrams
 from pytoune.framework import torch_to_numpy
 
 from evaluation import evaluate_embeddings
