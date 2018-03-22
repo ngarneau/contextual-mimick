@@ -198,8 +198,27 @@ class DataLoader(DataLoader):
         self.use_gpu = use_gpu and torch.cuda.is_available()
 
     def to_cuda(self, obj):
-        return obj.cuda() if self.use_gpu else obj
+        if self.use_gpu:
+            if isinstance(obj, tuple):
+                return [o.cuda() for o in obj]
+            else:
+                return obj.cuda()
+        else:
+            return obj
 
     def __iter__(self):
         for x, y in super().__iter__():
             yield self.to_cuda(x), self.to_cuda(y)
+
+
+def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
+    sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
+
+    L = len(sequence)
+    m = n//2
+    for i, item in enumerate(sequence[1:-1]):
+        left_idx = max(0, i-m+1)
+        left_side = tuple(sequence[left_idx:i+1])
+        right_idx = min(L, i+m+2)
+        right_side = tuple(sequence[i+2:right_idx])
+        yield (left_side, item, right_side)
