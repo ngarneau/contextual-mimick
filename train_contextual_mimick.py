@@ -114,8 +114,7 @@ def main():
     model_file = 'contextual_mimick_n{}_v2.torch'.format(n)
     os.makedirs(model_path, exist_ok=True)
     checkpoint = ModelCheckpoint(model_path + model_file,
-                                 save_best_only=True,
-                                 temporary_filename=model_path + 'temp_' + model_file)
+                                 save_best_only=True)
     # There is a bug in Pytoune with the CSVLogger on my computer
     logger_path = './train_logs/'
     logger_file = 'contextual_mimick_n{}_v2.csv'.format(n)
