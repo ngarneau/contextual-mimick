@@ -80,17 +80,18 @@ def prepare_data(n=15, ratio=.8, use_gpu=False, k=1):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("n")
-    parser.add_argument("k")
-    parser.add_argument("device", default=0)
+    parser.add_argument("n", default=41, nargs='?')
+    parser.add_argument("k", default=1, nargs='?')
+    parser.add_argument("device", default=0, nargs='?')
     args = parser.parse_args()
     n = int(args.n)
     k = int(args.k)
-    cuda_device = int(args.device)
 
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         torch.cuda.set_device(cuda_device)
+        print('Using GPU')
+        cuda_device = int(args.device)
 
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
@@ -111,18 +112,26 @@ def main():
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
-    model_file = 'testing_contextual_mimick_n{}.torch'.format(n)
+    model_file = 'contextual_mimick_n{}_k{}.torch'.format(n, k)
     os.makedirs(model_path, exist_ok=True)
-    checkpoint = ModelCheckpoint(model_path + model_file,
+    ckpt_best = ModelCheckpoint('best_' + model_path + model_file,
                                  save_best_only=True,
-                                 temporary_filename=model_path + 'temp_' + model_file)
-    # There is a bug in Pytoune with the CSVLogger on my computer
+                                 temporary_filename='best_' + model_path + 'temp_' + model_file)
+
+    ckpt_last = ModelCheckpoint('last_' + model_path + model_file,
+                                 temporary_filename='last_' + model_path + 'temp_' + model_file)
+
     logger_path = './train_logs/'
-    logger_file = 'testing_contextual_mimick_n{}.csv'.format(n)
+    logger_file = 'contextual_mimick_n{}_k{}.csv'.format(n, k)
     os.makedirs(logger_path, exist_ok=True)
     csv_logger = CSVLogger(logger_path + logger_file)
-    model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
-    callbacks = [lrscheduler, checkpoint, early_stopping, csv_logger]
+
+    model = Model(model=net,
+                  optimizer=Adam(net.parameters(), lr=0.001),
+                  loss_function=square_distance,
+                  metrics=[euclidean_distance])
+    callbacks = [lrscheduler, ckpt_best, ckpt_last, early_stopping, csv_logger]
+
     model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=callbacks)
 
 
