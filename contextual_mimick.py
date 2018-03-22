@@ -182,14 +182,14 @@ class ContextualMimick(nn.Module):
         return x
 
 
-def get_contextual_mimick(char_to_idx, word_to_idx):
+def get_contextual_mimick(char_to_idx, word_to_idx, word_embedding_dim=50):
     net = ContextualMimick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
         words_hidden_state_dimension=50,
-        word_embeddings_dimension=50,
+        word_embeddings_dimension=word_embedding_dim,
         fully_connected_layer_hidden_dimension=50
     )
     return net

@@ -34,21 +34,19 @@ def split_train_valid(examples, ratio):
     return train_examples, valid_examples
 
 
-def prepare_data(n=15, ratio=.8, use_gpu=False, k=1):
-    train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
-    sentences = parse_conll_file('./conll/train.txt')
+def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
     word_to_idx, char_to_idx = make_vocab(sentences)
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
     examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
-                   ngram[1] in train_embeddings)  # Keeps only different ngrams which have a training embedding
+                   ngram[1] in embeddings)  # Keeps only different ngrams which have a training embedding
     print('Number of unique examples:', len(examples))
 
     train_examples, valid_examples = split_train_valid(examples, ratio)
 
-    # filter_cond = lambda x, y: y in train_embeddings
+    # filter_cond = lambda x, y: y in embeddings
     transform = vectorizer.vectorize_unknown_example
-    target_transform = lambda y: train_embeddings[y]
+    target_transform = lambda y: embeddings[y]
 
     train_dataset = PerClassDataset(train_examples,
                                     # filter_cond=filter_cond,
@@ -75,7 +73,7 @@ def prepare_data(n=15, ratio=.8, use_gpu=False, k=1):
                                    k=k,
                                    use_gpu=use_gpu)
 
-    return train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings
+    return train_loader, valid_loader, word_to_idx, char_to_idx
 
 
 def main():
@@ -83,48 +81,68 @@ def main():
     parser.add_argument("n", default=41, nargs='?')
     parser.add_argument("k", default=1, nargs='?')
     parser.add_argument("device", default=0, nargs='?')
+    parser.add_argument("d", default=50, nargs='?')
     args = parser.parse_args()
     n = int(args.n)
     k = int(args.k)
+    d = int(args.d)
+    if d not in [50, 100, 200, 300]:
+        raise ValueError("The embedding dimension 'd' should of 50, 100, 200 or 300.")
 
     use_gpu = torch.cuda.is_available()
     if use_gpu:
+        cuda_device = int(args.device)
         torch.cuda.set_device(cuda_device)
         print('Using GPU')
-        cuda_device = int(args.device)
 
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     numpy.random.seed(seed)
     random.seed(seed)
 
-    # Prepare our examples
-    train_loader, valid_loader, word_to_idx, char_to_idx, train_embeddings = prepare_data(n=n, ratio=.8,
-                                                                                          use_gpu=use_gpu, k=k)
+    path_embeddings = './embeddings_settings/setting2/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    try:
+        train_embeddings = load_embeddings(path_embeddings)
+    except:
+        if d == 50:
+            path_embeddings = './embeddings/train_embeddings.txt'
+            train_embeddings = load_embeddings(path_embeddings)
+        else:
+            raise
+    
+    path_sentences = './conll/train.txt'
+    sentences = parse_conll_file(path_sentences)
 
-    net = get_contextual_mimick(char_to_idx, word_to_idx)
+    # Prepare our examples
+    train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
+                                                                embeddings=train_embeddings,
+                                                                sentences=sentences,
+                                                                n=n,
+                                                                ratio=.8,
+                                                                use_gpu=use_gpu,
+                                                                k=k)
+
+    net = get_contextual_mimick(char_to_idx, word_to_idx, word_embedding_dim=d)
 
     if use_gpu:
         net.cuda()
     net.load_words_embeddings(train_embeddings)
 
-    # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
-    model_file = 'contextual_mimick_n{}_k{}.torch'.format(n, k)
+    model_name = 'comick_n{}_k{}_d{}'.format(n, k, d)
     os.makedirs(model_path, exist_ok=True)
-    ckpt_best = ModelCheckpoint('best_' + model_path + model_file,
-                                 save_best_only=True,
-                                 temporary_filename='best_' + model_path + 'temp_' + model_file)
+    ckpt_best = ModelCheckpoint(model_path + 'best_' + model_name + '.torch',
+                                save_best_only=True,
+                                temporary_filename=model_path + 'temp_best_' +model_name + '.torch')
 
-    ckpt_last = ModelCheckpoint('last_' + model_path + model_file,
-                                 temporary_filename='last_' + model_path + 'temp_' + model_file)
+    ckpt_last = ModelCheckpoint(model_path + 'last_' + model_name + '.torch',
+                                temporary_filename=model_path + 'temp_last_' + model_name + '.torch')
 
     logger_path = './train_logs/'
-    logger_file = 'contextual_mimick_n{}_k{}.csv'.format(n, k)
     os.makedirs(logger_path, exist_ok=True)
-    csv_logger = CSVLogger(logger_path + logger_file)
+    csv_logger = CSVLogger(logger_path + model_name + '.csv')
 
     model = Model(model=net,
                   optimizer=Adam(net.parameters(), lr=0.001),
