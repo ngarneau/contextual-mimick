@@ -76,22 +76,11 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
     return train_loader, valid_loader, word_to_idx, char_to_idx
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("n", default=41, nargs='?')
-    parser.add_argument("k", default=1, nargs='?')
-    parser.add_argument("device", default=0, nargs='?')
-    parser.add_argument("d", default=50, nargs='?')
-    args = parser.parse_args()
-    n = int(args.n)
-    k = int(args.k)
-    d = int(args.d)
-    if d not in [50, 100, 200, 300]:
-        raise ValueError("The embedding dimension 'd' should of 50, 100, 200 or 300.")
+def main(n=41, k=1, device=0, d=50):
 
     use_gpu = torch.cuda.is_available()
     if use_gpu:
-        cuda_device = int(args.device)
+        cuda_device = device
         torch.cuda.set_device(cuda_device)
         print('Using GPU')
 
@@ -157,7 +146,19 @@ if __name__ == '__main__':
     from time import time
     t = time()
     try:
-        main()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("n", default=41, nargs='?')
+        parser.add_argument("k", default=1, nargs='?')
+        parser.add_argument("device", default=0, nargs='?')
+        parser.add_argument("d", default=50, nargs='?')
+        args = parser.parse_args()
+        n = int(args.n)
+        k = int(args.k)
+        device = int(args.device)
+        d = int(args.d)
+        if d not in [50, 100, 200, 300]:
+            raise ValueError("The embedding dimension 'd' should of 50, 100, 200 or 300.")
+        main(n=n, k=k, device=device, d=d)
     except:
         print('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
