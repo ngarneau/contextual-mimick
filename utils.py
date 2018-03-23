@@ -1,6 +1,7 @@
 import numpy
 import torch
 from pytoune import torch_to_numpy
+from sklearn.metrics.pairwise import cosine_similarity
 from torch._utils import _accumulate
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -55,6 +56,13 @@ def euclidean_distance(y_pred_tensor, y_true_tensor):
     y_pred = torch_to_numpy(y_pred_tensor)
     y_true = torch_to_numpy(y_true_tensor)
     dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
+    return torch.FloatTensor([dist.tolist()])
+
+
+def cosine_sim(y_pred_tensor, y_true_tensor):
+    y_pred = torch_to_numpy(y_pred_tensor)
+    y_true = torch_to_numpy(y_true_tensor)
+    dist = cosine_similarity(y_true, y_pred).mean()
     return torch.FloatTensor([dist.tolist()])
 
 
