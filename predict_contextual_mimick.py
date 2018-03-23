@@ -79,17 +79,21 @@ def main():
             torch.autograd.Variable(r)
         ))
         if word in my_embeddings:  # Compute the average
-            my_embeddings[word] = (my_embeddings[word] + torch_to_numpy(prediction[0])) / 2
+            my_embeddings[word].append(torch_to_numpy(prediction[0]))
         else:
-            my_embeddings[word] = torch_to_numpy(prediction[0])
+            my_embeddings[word] = [torch_to_numpy(prediction[0])]
 
-    with open('./predicted_embeddings/contextual_mimick_n40_k1_v1.txt', 'w') as fhandle:
-        for word, embedding in my_embeddings.items():
+    averaged_embeddings = dict()
+    for word, embeddings in my_embeddings.items():
+        averaged_embeddings[word] = numpy.mean(embeddings, axis=0)
+
+    with open('./predicted_embeddings/contextual_mimick_n40_v2_dropout.txt', 'w') as fhandle:
+        for word, embedding in averaged_embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
             fhandle.write(s)
 
-    evaluate_embeddings(my_embeddings)
+    evaluate_embeddings(averaged_embeddings)
 
 if __name__ == '__main__':
     main()
