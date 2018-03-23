@@ -1,5 +1,4 @@
 import argparse
-import math
 import logging
 import os
 
@@ -9,17 +8,14 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import numpy
-import torch
-from torchvision.transforms import Lambda
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
-import random
 
 from utils import load_embeddings, parse_conll_file, cosine_sim
-from utils import euclidean_distance, square_distance
+from utils import square_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
-from utils import DataLoader, collate_examples
+from utils import collate_examples
 from per_class_dataset import *
 
 
