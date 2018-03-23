@@ -99,6 +99,7 @@ def main():
     population_sampling = group_by_target_words(unique_training_data)
 
     training_data = sample_population(population_sampling, k)
+    # training_data = training_data[:500]
 
 
     train_valid_ratio = 0.8
@@ -110,7 +111,7 @@ def main():
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     train_loader = DataLoader(
         Corpus(train_dataset, 'train', vectorizer.vectorize_example),
-        batch_size=1,
+        batch_size=16,
         collate_fn=collate_examples,
         shuffle=True,
         use_gpu=use_gpu
@@ -118,7 +119,7 @@ def main():
 
     valid_loader = DataLoader(
         Corpus(valid_dataset, 'valid', vectorizer.vectorize_example),
-        batch_size=1,
+        batch_size=16,
         collate_fn=collate_examples,
         shuffle=True,
         use_gpu=use_gpu
@@ -132,8 +133,8 @@ def main():
 
 
     # lrscheduler = MultiStepLR(milestones=[3, 6, 9])
-    lrscheduler = ReduceLROnPlateau(patience=2)
-    early_stopping = EarlyStopping(patience=10)
+    lrscheduler = ReduceLROnPlateau(patience=5)
+    early_stopping = EarlyStopping(patience=20)
     checkpoint = ModelCheckpoint('./models/contextual_mimick_n{}_k{}.torch'.format(n, k), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/contextual_mimick_n{}_k{}.csv'.format(n, k))
     model = Model(net, Adam(net.parameters(), lr=0.001), square_distance, metrics=[euclidean_distance])
