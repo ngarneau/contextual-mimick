@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset
+import random
 
 
 class PerClassDataset(Dataset):
@@ -73,6 +74,27 @@ class PerClassDataset(Dataset):
         x = self.dataset[self.labels_mapping[label]][i]
 
         return (self.transform(x), self.target_transform(label))
+
+    def split(self, ratio=.8, shuffle=True, reuse_label_mappings=False):
+        """
+        Splits the dataset in two disjoint subdatasets where labels are unique in each, according to the ratio. Labels are selected at random if shuffle is set to True.
+        """        
+        non_empty_labels = [(label, idx) for label, idx in self.labels_mapping.items() if self.nb_examples_for_label(label) > 0]
+        if shuffle: random.shuffle(non_empty_labels)
+        
+        m = int(ratio*len(self.dataset))
+        print(non_empty_labels[:m])
+        subdataset_1 = [(x, label) for label, i in non_empty_labels[:m] for x in self.dataset[i]]
+        print(len(subdataset_1))
+        subdataset_2 = [(x, label) for label, i in non_empty_labels[m:] for x in self.dataset[i]]
+
+        labels_mapping = None
+        if reuse_label_mappings:
+            labels_mapping = self.labels_mapping
+        
+        subdataset_1 = PerClassDataset(subdataset_1, transform=self.transform, target_transform=self.target_transform, labels_mapping=labels_mapping)
+        subdataset_2 = PerClassDataset(subdataset_2, transform=self.transform, target_transform=self.target_transform, labels_mapping=labels_mapping)
+        return subdataset_1, subdataset_2
 
     def __len__(self):
         """
@@ -150,6 +172,7 @@ if __name__ == '__main__':
     
     dataset = PerClassDataset(data)
     print('total number of examples:', len(dataset))
+    print('number of classes:', len(dataset.dataset))
     loader = PerClassLoader(dataset, k=-1, batch_size=16)
 
     print('len loader:', len(loader))
@@ -161,4 +184,20 @@ if __name__ == '__main__':
         n_ex += batch_size
     print('number of examples per epoch:', n_ex)
     print('number of steps:', i+1)
-    
+
+    print('\nTesting splitted datasets\n')
+    d1, d2 = dataset.split(ratio=.5, shuffle=False, reuse_label_mappings=True)
+    for dataset in [d1, d2]:
+        print('total number of examples:', len(dataset))
+        print('number of classes:', len(dataset.dataset))
+        loader = PerClassLoader(dataset, k=-1, batch_size=16)
+
+        print('len loader:', len(loader))
+
+        n_ex = 0
+        for i, batch in enumerate(loader):
+            batch_size = len(batch[0])
+            print('batch size:', batch_size)
+            n_ex += batch_size
+        print('number of examples per epoch:', n_ex)
+        print('number of steps:', i+1, '\n')
