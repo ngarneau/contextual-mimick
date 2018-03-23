@@ -83,9 +83,7 @@ class PerClassDataset(Dataset):
         if shuffle: random.shuffle(non_empty_labels)
         
         m = int(ratio*len(self.dataset))
-        print(non_empty_labels[:m])
         subdataset_1 = [(x, label) for label, i in non_empty_labels[:m] for x in self.dataset[i]]
-        print(len(subdataset_1))
         subdataset_2 = [(x, label) for label, i in non_empty_labels[m:] for x in self.dataset[i]]
 
         labels_mapping = None
