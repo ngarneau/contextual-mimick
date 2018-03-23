@@ -36,6 +36,7 @@ class ContextualMimick(nn.Module):
             embedding_dim=self.word_embeddings_dimension,
             padding_idx=0
         )
+        self.words_embeddings.weight.require_grad = False
 
         self.left_to_right_lstm = nn.LSTM(
             input_size=self.word_embeddings_dimension,

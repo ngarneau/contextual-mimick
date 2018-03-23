@@ -5,6 +5,11 @@ from torch._utils import _accumulate
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
 
+from nltk.corpus import stopwords
+
+stopWords = set(stopwords.words('english'))
+unwanted_pos = {'#', '$', '"', '``', '(', ')', ',', ':', '.', 'CC', 'DT', 'IN', 'SYM', 'TO', 'UH'}
+
 
 def load_embeddings(path):
     embeddings = {}
@@ -68,8 +73,9 @@ def parse_conll_file(filename):
         sentence = list()
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
-                token, _, _, e = line[:-1].split(' ')
-                sentence.append(token.lower())
+                token, pos, _, e = line[:-1].split(' ')
+                if token not in stopWords and pos not in unwanted_pos:
+                    sentence.append(token.lower())
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
@@ -212,13 +218,13 @@ class DataLoader(DataLoader):
 
 
 def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
-    sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
+    sequence = [left_pad_symbol] * pad_left + sequence + [right_pad_symbol] * pad_right
 
     L = len(sequence)
-    m = n//2
+    m = n // 2
     for i, item in enumerate(sequence[1:-1]):
-        left_idx = max(0, i-m+1)
-        left_side = tuple(sequence[left_idx:i+1])
-        right_idx = min(L, i+m+2)
-        right_side = tuple(sequence[i+2:right_idx])
+        left_idx = max(0, i - m + 1)
+        left_side = tuple(sequence[left_idx:i + 1])
+        right_idx = min(L, i + m + 2)
+        right_side = tuple(sequence[i + 2:right_idx])
         yield (left_side, item, right_side)
