@@ -40,20 +40,27 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
                    ngram[1] in embeddings)  # Keeps only different ngrams which have a training embedding
     print('Number of unique examples:', len(examples))
 
-    train_examples, valid_examples = split_train_valid(examples, ratio)
+    # train_examples, valid_examples = split_train_valid(examples, ratio)
 
     # filter_cond = lambda x, y: y in embeddings
     transform = vectorizer.vectorize_unknown_example
     target_transform = lambda y: embeddings[y]
 
-    train_dataset = PerClassDataset(train_examples,
-                                    transform=transform,
-                                    target_transform=target_transform)
+    dataset = PerClassDataset(
+        examples,
+        transform=transform,
+        target_transform=target_transform
+    )
+    train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
+
+    # train_dataset = PerClassDataset(train_examples,
+    #                                 transform=transform,
+    #                                 target_transform=target_transform)
     # The filter_cond makes the dataset of different sizes each time. Should we filter before creating the dataset
 
-    valid_dataset = PerClassDataset(valid_examples,
-                                    transform=transform,
-                                    target_transform=target_transform)
+    # valid_dataset = PerClassDataset(valid_examples,
+    #                                 transform=transform,
+    #                                 target_transform=target_transform)
     print('Datasets size - Train:', len(train_dataset), 'Valid:', len(valid_dataset))
     print('Datasets labels - Train:', len(train_dataset.dataset), 'Valid:', len(valid_dataset.dataset))
 
