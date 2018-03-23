@@ -81,23 +81,25 @@ class PerClassDataset(Dataset):
         return self._len
 
 
-class KPerClassLoader():
+class PerClassLoader():
     """
     This class implements a dataloader that returns exactly k examples per class per epoch.
 
     'dataset' (PerClassDataset): Collection of data to be sampled.
     'collate_fn' (Callable): Returns a concatenated version of a list of examples.
-    'k' (Integer, optional, default=1): Number of examples from each class loaded per epoch.
+    'k' (Integer, optional, default=1): Number of examples from each class loaded per epoch. If k is set to -1, all examples are loaded.
     'batch_size' (Integer, optional, default=1): Number of examples returned per batch.
     'use_gpu' (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
     """
 
-    def __init__(self, dataset, collate_fn, k=1, batch_size=1, use_gpu=False):
+    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
         self.dataset = dataset
         self.epoch = 0
         self.k = k
         self.batch_size = batch_size
         self.collate_fn = collate_fn
+        if collate_fn == None:
+            self.collate_fn = lambda batch: [*zip(*batch)]
         self.use_gpu = use_gpu
 
     def to_gpu(self, *obj):
@@ -113,19 +115,19 @@ class KPerClassLoader():
         if len(obj) == 1 and isinstance(obj[0], tuple):
             obj = obj[0]
         return tuple(self.to_gpu(o) for o in obj)
-
+    
     def __iter__(self):
-        e = self.epoch
+        if self.k == -1:
+            idx_iterator = ((label, i) for label, N in self.dataset for i in range(N))
+        else:
+            idx_iterator = ((label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0)
+        
         batch = []
-        for j in range(self.k):
-            for label, N in iter(self.dataset):
-                if N > 0:
-                    idx = (e*self.k+j) % N
-                    sample = self.dataset[label, idx]
-                    batch.append(sample)
-                    if len(batch) == self.batch_size:
-                        yield self.to_gpu(self.collate_fn(batch))
-                        batch = []
+        for label, i in idx_iterator:
+            batch.append(self.dataset[label, i])
+            if len(batch) == self.batch_size:
+                yield self.to_gpu(self.collate_fn(batch))
+                batch = []
         self.epoch += 1
         if len(batch) > 0:
             yield self.to_gpu(self.collate_fn(batch))
@@ -134,4 +136,29 @@ class KPerClassLoader():
         """
         Returns the number of minibatchs that will be produced in one epoch.
         """
-        return (self.k*len(self.dataset.dataset) + self.batch_size - 1)//self.batch_size
+        if self.k == -1:
+            length = (len(self.dataset) + self.batch_size - 1)//self.batch_size
+        else:
+            length = (self.k*len(self.dataset.dataset) + self.batch_size - 1)//self.batch_size
+        return length
+
+if __name__ == '__main__':
+    # Script to test the dataset and dataloader
+    M = 9
+    N_labels = 15
+    data = [(i,str(j)) for i in range(M) for j in range(N_labels)]
+    
+    dataset = PerClassDataset(data)
+    print('total number of examples:', len(dataset))
+    loader = PerClassLoader(dataset, k=-1, batch_size=16)
+
+    print('len loader:', len(loader))
+
+    n_ex = 0
+    for i, batch in enumerate(loader):
+        batch_size = len(batch[0])
+        print('batch size:', batch_size)
+        n_ex += batch_size
+    print('number of examples per epoch:', n_ex)
+    print('number of steps:', i+1)
+    
