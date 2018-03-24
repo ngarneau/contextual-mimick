@@ -122,7 +122,7 @@ class PerClassLoader():
             self.collate_fn = lambda batch: [*zip(*batch)]
         self.use_gpu = use_gpu
 
-    def to_gpu(self, *obj):
+    def _to_gpu(self, *obj):
         """
         Applies .cuda() on obj. Recursively unpacks the tuples of the object before applying .cuda().
         """
@@ -134,7 +134,7 @@ class PerClassLoader():
             return obj[0].cuda()
         if len(obj) == 1 and isinstance(obj[0], tuple):
             obj = obj[0]
-        return tuple(self.to_gpu(o) for o in obj)
+        return tuple(self._to_gpu(o) for o in obj)
     
     def __iter__(self):
         if self.k == -1:
@@ -146,11 +146,11 @@ class PerClassLoader():
         for label, i in idx_iterator:
             batch.append(self.dataset[label, i])
             if len(batch) == self.batch_size:
-                yield self.to_gpu(self.collate_fn(batch))
+                yield self._to_gpu(self.collate_fn(batch))
                 batch = []
         self.epoch += 1
         if len(batch) > 0:
-            yield self.to_gpu(self.collate_fn(batch))
+            yield self._to_gpu(self.collate_fn(batch))
 
     def __len__(self):
         """
