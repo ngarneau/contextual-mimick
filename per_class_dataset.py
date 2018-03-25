@@ -24,7 +24,7 @@ class PerClassDataset(Dataset):
         if self.labels_mapping == None:
             self.labels_mapping = {}
         self._len = 0
-        self.build_dataset(dataset, filter_cond)
+        self._build_dataset(dataset, filter_cond)
         self.transform = transform
         if self.transform == None:
             self.transform = lambda x: x
@@ -32,7 +32,7 @@ class PerClassDataset(Dataset):
         if self.target_transform == None:
             self.target_transform = lambda x: x
 
-    def build_dataset(self, dataset, filter_cond):
+    def _build_dataset(self, dataset, filter_cond):
         """
         Takes an iterable of examples of the form (x, y) and makes it into a dictionary {class:list_of_examples}, and filters examples not satisfying the 'filter_cond' condition.
         """
