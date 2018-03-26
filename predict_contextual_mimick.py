@@ -22,8 +22,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("n", default=41, nargs='?')
     parser.add_argument("k", default=2, nargs='?')
-    parser.add_argument("d", default=50, nargs='?')
-    parser.add_argument("model_path", default='best_comick_n41_k2_d50.torch', nargs='?')
+    parser.add_argument("d", default=100, nargs='?')
+    parser.add_argument("model_path", default='best_comick_n41_k2_d100.torch', nargs='?')
     parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting2/all_oov_setting2.txt', nargs='?')
     args = parser.parse_args()
     n = int(args.n)
@@ -46,7 +46,7 @@ def main():
     else:
         map_location = lambda storage, loc: storage
 
-    net = get_contextual_mimick(char_to_idx, word_to_idx)
+    net = get_contextual_mimick(char_to_idx, word_to_idx, word_embedding_dim=d)
 
     net.eval()
     net.load_state_dict(torch.load(model_path, map_location))
@@ -101,7 +101,7 @@ def main():
             s = "{} {}\n".format(word, str_embedding)
             fhandle.write(s)
 
-    evaluate_embeddings(averaged_embeddings)
+    evaluate_embeddings(averaged_embeddings, d)
 
 if __name__ == '__main__':
     main()
