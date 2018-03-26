@@ -1,6 +1,7 @@
 import logging
 import math
 import argparse
+import os
 
 from utils import ngrams
 
@@ -19,11 +20,15 @@ from utils import load_embeddings, pad_sequences, parse_conll_file, make_vocab, 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("n")
-    parser.add_argument("model_path")
-    parser.add_argument("path_words_to_predict")
+    parser.add_argument("n", default=41, nargs='?')
+    parser.add_argument("k", default=2, nargs='?')
+    parser.add_argument("d", default=50, nargs='?')
+    parser.add_argument("model_path", default='best_comick_n41_k2_d50.torch', nargs='?')
+    parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting2/all_oov_setting2.txt', nargs='?')
     args = parser.parse_args()
     n = int(args.n)
+    k = int(args.k)
+    d = int(args.d)
     model_path = args.model_path
     path_words_to_predict = args.path_words_to_predict
 
@@ -87,7 +92,10 @@ def main():
     for word, embeddings in my_embeddings.items():
         averaged_embeddings[word] = numpy.mean(embeddings, axis=0)
 
-    with open('./predicted_embeddings/contextual_mimick_n40_v2_dropout.txt', 'w') as fhandle:
+    filepath = './predicted_embeddings/'
+    os.makedirs(filepath, exist_ok=True)
+    filename = 'comick_pred_n{}_k{}_d{}_dropout.txt'.format(n, k, d)
+    with open(filepath + filename, 'w') as fhandle:
         for word, embedding in averaged_embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
