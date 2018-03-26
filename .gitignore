@@ -112,5 +112,7 @@ train_logs/
 
 embeddings_settings/
 
+temp.py
+
 # VSCode
 .vscode/

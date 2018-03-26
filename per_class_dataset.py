@@ -1,8 +1,13 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import Sampler
 import random
 import numpy as np
 
+"""
+AUTHOR: Jean-Samuel Leboeuf
+DATE: 2018-03-26
+"""
 
 class PerClassDataset(Dataset):
     """
@@ -71,6 +76,7 @@ class PerClassDataset(Dataset):
         """
         Returns the i-th example of a given class label. Expect 2 arguments: the label and the position i of desired example. Labels can be accessed via the labels_mapping attribute or by calling iter() on the dataset.
         """
+        if isinstance(label_i, tuple) and len(label_i) == 1: label_i = label_i[0]
         label, i = label_i
         x = self.dataset[self.labels_mapping[label]][i]
 
@@ -154,26 +160,70 @@ class PerClassDataset(Dataset):
         
         return stats
 
-class PerClassLoader():
+class PerClassSampler():
     """
-    This class implements a dataloader that returns exactly k examples per class per epoch.
-
-    'dataset' (PerClassDataset): Collection of data to be sampled.
-    'collate_fn' (Callable): Returns a concatenated version of a list of examples.
-    'k' (Integer, optional, default=1): Number of examples from each class loaded per epoch. If k is set to -1, all examples are loaded.
-    'batch_size' (Integer, optional, default=1): Number of examples returned per batch.
-    'use_gpu' (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
+    Samples iteratively exemples of a PerClassDataset, one label at a time.
     """
-
-    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
+    def __init__(self, dataset, k=-1):
+        """
+        'dataset' (PerClassDataset): Source of the data to be sampled from.
+        'k' (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test).
+        """
         self.dataset = dataset
-        self.epoch = 0
         self.k = k
+        self.epoch = 0
+
+    def __iter__(self):
+        if self.k == -1:
+            idx_iterator = ((label, i) for label, N in self.dataset for i in range(N))
+        else:
+            idx_iterator = ((label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0)
+        self.epoch += 1
+        return idx_iterator
+    
+    def __len__(self):
+        """
+        Returns the number of minibatchs that will be produced in one epoch.
+        """
+        if self.k == -1:
+            length = len(self.dataset)
+        else:
+            length = self.k*len(self.dataset.dataset)
+        return length
+
+class BatchSampler(object):
+    """
+    Wraps another sampler to yield a mini-batch of indices.
+    This class is identical to the BatchSampler of PyTorch at the exception of the index NOT casted as an integer. This is needed to be compatible with the PerClassDataset getitem.
+    """
+    def __init__(self, sampler, batch_size=1, drop_last=False):
+        self.sampler = sampler
         self.batch_size = batch_size
-        self.collate_fn = collate_fn
-        if collate_fn == None:
-            self.collate_fn = lambda batch: [*zip(*batch)]
-        self.use_gpu = use_gpu
+        self.drop_last = drop_last
+
+    def __iter__(self):
+        batch = []
+        for idx in self.sampler:
+            batch.append(idx)
+            if len(batch) == self.batch_size:
+                yield batch
+                batch = []
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+
+    def __len__(self):
+        if self.drop_last:
+            return len(self.sampler) // self.batch_size
+        else:
+            return (len(self.sampler) + self.batch_size - 1) // self.batch_size
+
+class DataLoader(DataLoader):
+    """
+    Overloads the DataLoader Class of PyTorch so that it can copy the data to the GPU if desired.
+    """
+    def __init__(self, *args, use_gpu=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.use_gpu = use_gpu and torch.cuda.is_available()
 
     def _to_gpu(self, *obj):
         """
@@ -188,45 +238,50 @@ class PerClassLoader():
         if len(obj) == 1 and isinstance(obj[0], tuple):
             obj = obj[0]
         return tuple(self._to_gpu(o) for o in obj)
-    
+
     def __iter__(self):
-        if self.k == -1:
-            idx_iterator = ((label, i) for label, N in self.dataset for i in range(N))
-        else:
-            idx_iterator = ((label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0)
-        
-        batch = []
-        for label, i in idx_iterator:
-            batch.append(self.dataset[label, i])
-            if len(batch) == self.batch_size:
-                yield self._to_gpu(self.collate_fn(batch))
-                batch = []
-        self.epoch += 1
-        if len(batch) > 0:
-            yield self._to_gpu(self.collate_fn(batch))
+        for x, y in super().__iter__():
+            yield self._to_gpu(x), self._to_gpu(y)
+
+class PerClassLoader():
+    """
+    This class implements a dataloader that returns exactly k examples per class per epoch. This is simply a pipeline of PerClassSampler -> BatchSampler -> DataLoader.
+    """
+    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
+        """
+        'dataset' (PerClassDataset): Source of the data to be sampled from.
+        'collate_fn' (Callable, optional, default=None): Returns a concatenated version of a list of examples.
+        'k' (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test for example).
+        'batch_size' (Integer, optional, default=1): Number of examples returned per batch.
+        'use_gpu' (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
+        """
+        self.dataset = dataset
+        self.sampler = PerClassSampler(dataset, k)
+        self.batch_sampler = BatchSampler(self.sampler, batch_size)
+        if collate_fn == None:
+            collate_fn = lambda batch: [*zip(*batch)]
+        self.loader = DataLoader(dataset, collate_fn=collate_fn, batch_sampler=self.batch_sampler, use_gpu=use_gpu)
+
+    def __iter__(self):
+        return iter(self.loader)
 
     def __len__(self):
-        """
-        Returns the number of minibatchs that will be produced in one epoch.
-        """
-        if self.k == -1:
-            length = (len(self.dataset) + self.batch_size - 1)//self.batch_size
-        else:
-            length = (self.k*len(self.dataset.dataset) + self.batch_size - 1)//self.batch_size
-        return length
+        return len(self.loader)
 
 if __name__ == '__main__':
     # Script to test the dataset and dataloader
     M = 9
     N_labels = 15
     data = [(i,str(j)) for i in range(M) for j in range(N_labels)]
-    
     dataset = PerClassDataset(data)
     stats = dataset.stats(9)
     for stats, value in stats.items():
         print(stats+': '+str(value))
     print('total number of examples:', len(dataset))
     print('number of classes:', len(dataset.dataset))
+    
+    
+    print('\n\nTesting with PerClassLoader')
     loader = PerClassLoader(dataset, k=-1, batch_size=16)
 
     print('len loader:', len(loader))
@@ -241,10 +296,10 @@ if __name__ == '__main__':
 
     print('\nTesting splitted datasets\n')
     d1, d2 = dataset.split(ratio=.5, shuffle=False, reuse_label_mappings=True)
-    for dataset in [d1, d2]:
-        print('total number of examples:', len(dataset))
-        print('number of classes:', len(dataset.dataset))
-        loader = PerClassLoader(dataset, k=-1, batch_size=16)
+    for d in [d1, d2]:
+        print('total number of examples:', len(d))
+        print('number of classes:', len(d.dataset))
+        loader = PerClassLoader(d, k=-1, batch_size=16)
 
         print('len loader:', len(loader))
 
@@ -255,3 +310,21 @@ if __name__ == '__main__':
             n_ex += batch_size
         print('number of examples per epoch:', n_ex)
         print('number of steps:', i+1, '\n')
+
+    print('\n\nTesting with PerClassSampler')
+    sampler = PerClassSampler(dataset=dataset, k=-1)
+    batch_sampler = BatchSampler(sampler=sampler, batch_size=16)
+    loader = DataLoader(dataset=dataset, batch_sampler=batch_sampler)
+
+    iterator = iter(loader)
+    print('len loader:', len(loader))
+    n_ex = 0
+    i = 0
+    for x, y in iterator:
+        i += 1
+        batch_size = len(y)
+        print('batch size:', batch_size)
+        n_ex += batch_size
+
+    print('number of examples per epoch:', n_ex)
+    print('number of steps:', i, '\n')
