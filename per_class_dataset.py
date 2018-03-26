@@ -164,22 +164,25 @@ class PerClassSampler():
     """
     Samples iteratively exemples of a PerClassDataset, one label at a time.
     """
-    def __init__(self, dataset, k=-1):
+    def __init__(self, dataset, k=-1, shuffle=True):
         """
         'dataset' (PerClassDataset): Source of the data to be sampled from.
         'k' (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test).
+        'shuffle' (Boolean, optional, default=False): If True, shuffle the examples sampled for each epoch.
         """
         self.dataset = dataset
         self.k = k
         self.epoch = 0
+        self.shuffle = shuffle
 
     def __iter__(self):
         if self.k == -1:
-            idx_iterator = ((label, i) for label, N in self.dataset for i in range(N))
+            indices = [(label, i) for label, N in self.dataset for i in range(N)]
         else:
-            idx_iterator = ((label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0)
+            indices = [(label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0]
         self.epoch += 1
-        return idx_iterator
+        if self.shuffle: random.shuffle(indices)
+        return (idx for idx in indices)
     
     def __len__(self):
         """
