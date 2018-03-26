@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 import random
+import numpy as np
 
 
 class PerClassDataset(Dataset):
@@ -23,7 +24,7 @@ class PerClassDataset(Dataset):
         if self.labels_mapping == None:
             self.labels_mapping = {}
         self._len = 0
-        self.build_dataset(dataset, filter_cond)
+        self._build_dataset(dataset, filter_cond)
         self.transform = transform
         if self.transform == None:
             self.transform = lambda x: x
@@ -31,7 +32,7 @@ class PerClassDataset(Dataset):
         if self.target_transform == None:
             self.target_transform = lambda x: x
 
-    def build_dataset(self, dataset, filter_cond):
+    def _build_dataset(self, dataset, filter_cond):
         """
         Takes an iterable of examples of the form (x, y) and makes it into a dictionary {class:list_of_examples}, and filters examples not satisfying the 'filter_cond' condition.
         """
@@ -99,7 +100,59 @@ class PerClassDataset(Dataset):
         The len() of such a dataset is ambiguous. The len() given here is the total number of examples in the dataset, while calling len(obj.dataset) will yield the number of classes in the dataset.
         """
         return self._len
+    
+    def stats(self, inferior_bounds=[]):
+        """
+        Compute some statistics of the dataset and returns a dictionary. A list of inclusive inferior bounds can be provided to compare the statistics below and above each bounds.
+        """
+        if isinstance(inferior_bounds, int):
+            inferior_bounds = [inferior_bounds]
 
+        stats = {}
+        stats['number of examples'] = len(self)
+        stats['number of labels'] = len(self.labels_mapping)
+        stats['number of non-empty labels'] = len(self.dataset)
+        stats['mean number of examples per labels'] = np.mean([N for N in self.nb_examples_per_label.values()])
+        stats['median number of examples per labels'] = np.median([N for N in self.nb_examples_per_label.values()])
+
+        max_N, min_N = 0, len(self)
+        max_N_labels, min_N_labels = [], []
+        nb_labels_with_N_examples = {}
+        bounds_stats = [{'bound':bound,
+                         'number of labels with less or equal examples':0,
+                         'number of examples for these labels':0} for bound in inferior_bounds]
+        for label, N in iter(self):
+            if N in nb_labels_with_N_examples:
+                nb_labels_with_N_examples[N] += 1
+            else:
+                nb_labels_with_N_examples[N] = 1
+            
+            if N > max_N:
+                max_N = N
+                max_N_labels = [label]
+            elif N == max_N:
+                max_N_labels.append(label)
+            
+            if N < min_N:
+                min_N = N
+                min_N_labels = [label]
+            elif N == min_N:
+                min_N_labels.append(label)
+            
+            for bound, bound_stats in zip(inferior_bounds, bounds_stats):
+                if N <= bound:
+                    bound_stats['number of labels with less or equal examples'] += 1
+                    bound_stats['number of examples for these labels'] += N
+
+        stats['number of labels with N examples'] = nb_labels_with_N_examples
+        # stats['least common labels'] = min_N_labels
+        stats['least common labels number of examples'] = min_N
+        # stats['most common labels'] = max_N_labels
+        stats['most common labels number of examples'] = max_N
+        if inferior_bounds != []:
+            stats['bounds statistics'] = bound_stats
+        
+        return stats
 
 class PerClassLoader():
     """
@@ -169,6 +222,9 @@ if __name__ == '__main__':
     data = [(i,str(j)) for i in range(M) for j in range(N_labels)]
     
     dataset = PerClassDataset(data)
+    stats = dataset.stats(9)
+    for stats, value in stats.items():
+        print(stats+': '+str(value))
     print('total number of examples:', len(dataset))
     print('number of classes:', len(dataset.dataset))
     loader = PerClassLoader(dataset, k=-1, batch_size=16)
