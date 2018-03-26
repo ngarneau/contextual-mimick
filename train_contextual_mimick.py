@@ -53,14 +53,10 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
     )
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
-    # train_dataset = PerClassDataset(train_examples,
-    #                                 transform=transform,
-    #                                 target_transform=target_transform)
-    # The filter_cond makes the dataset of different sizes each time. Should we filter before creating the dataset
-
-    # valid_dataset = PerClassDataset(valid_examples,
-    #                                 transform=transform,
-    #                                 target_transform=target_transform)
+    stats = dataset.stats(8)
+    for stats, value in stats.items():
+        print(stats+': '+str(value))
+    
     print('Datasets size - Train:', len(train_dataset), 'Valid:', len(valid_dataset))
     print('Datasets labels - Train:', len(train_dataset.dataset), 'Valid:', len(valid_dataset.dataset))
 
