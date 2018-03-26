@@ -1,28 +1,31 @@
+"""
+This module contains classes to manage dataset by their class for very unbalanced datasets.
+"""
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 import random
 import numpy as np
 
-"""
-AUTHOR: Jean-Samuel Leboeuf
-DATE: 2018-03-26
-"""
+__author__ = "Jean-Samuel Leboeuf"
+__date__ = "2018-03-26"
+__version__ = "0.2.0"
 
 class PerClassDataset(Dataset):
     """
     This class implements a dataset which keeps examples according to their label.
     The data are organized in a dictionary in the format {label:list_of_examples}
-    """
+
+    Arguments:
+        dataset (Iterable): Iterable of pairs of examples (x, y). 'y' must be hashable (str, tuple, etc.).
+        transform (Callable, optional, default=None): Transformation applied to x before item is returned.
+        target_transform (Callable, optional, default=None): Transformation applied to y before item is returned.
+        filter_cond (Callable, optional, default=None): Filtering condition that takes 2 arguments (x and y), and returns True or False whether or not the example should be included in the dataset. If filter_cond is None, no filtering is made.
+        labels_mapping (Dictionary, optional, default=None): A dictionary mapping each label to an index. Labels missing from this mapping will be automatically added while building the dataset. Indices of the mapping should never exceed len(labels_mapping). This is useful if the same mapping is needed for different datasets.
+        """
 
     def __init__(self, dataset, transform=None, target_transform=None, filter_cond=None, labels_mapping=None):
-        """
-        'dataset' must be an iterable of pair of elements (x, y). y must be hashable (str, tuple, etc.)
-        'transform' must be a callable applied to x before item is returned.
-        'target_transform' must be a callable applied to y before item is returned.
-        'filter_cond' is a callable which takes 2 arguments (x and y), and returns True or False whether or not this example should be included in the dataset. If filter_cond is None, no filtering will be made.
-        'labels_mapping' must be a dictionary mapping labels to an index. Labels missing from this mapping will be automatically added while building the dataset. Indices of the mapping should never exceed len(labels_mapping).
-        """
         if filter_cond == None:
             def filter_cond(x, y): return True
         self.labels_mapping = labels_mapping
@@ -163,12 +166,12 @@ class PerClassDataset(Dataset):
 class PerClassSampler():
     """
     Samples iteratively exemples of a PerClassDataset, one label at a time.
+    
+    Arguments:
+        dataset (PerClassDataset): Source of the data to be sampled from.
+        k (int, optional, default=1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test).
     """
-    def __init__(self, dataset, k=-1):
-        """
-        'dataset' (PerClassDataset): Source of the data to be sampled from.
-        'k' (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test).
-        """
+    def __init__(self, dataset, k=1):
         self.dataset = dataset
         self.k = k
         self.epoch = 0
@@ -246,15 +249,15 @@ class DataLoader(DataLoader):
 class PerClassLoader():
     """
     This class implements a dataloader that returns exactly k examples per class per epoch. This is simply a pipeline of PerClassSampler -> BatchSampler -> DataLoader.
-    """
+
+    Arguments:
+        dataset (PerClassDataset): Source of the data to be sampled from.
+        collate_fn (Callable, optional, default=None): Returns a concatenated version of a list of examples.
+        k (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test for example).
+        batch_size (Integer, optional, default=1): Number of examples returned per batch.
+        use_gpu (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
+        """
     def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
-        """
-        'dataset' (PerClassDataset): Source of the data to be sampled from.
-        'collate_fn' (Callable, optional, default=None): Returns a concatenated version of a list of examples.
-        'k' (int, optional, default=-1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test for example).
-        'batch_size' (Integer, optional, default=1): Number of examples returned per batch.
-        'use_gpu' (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
-        """
         self.dataset = dataset
         self.sampler = PerClassSampler(dataset, k)
         self.batch_sampler = BatchSampler(self.sampler, batch_size)
