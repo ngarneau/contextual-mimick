@@ -14,7 +14,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 def main():
     train_embeddings = load_embeddings('./embeddings/train_embeddings.txt')
-    test = load_vocab('./conll/all_oov.txt')
+    test = load_vocab('./conll/oov_vocab.txt')
 
     vocab = build_vocab(train_embeddings.keys())
     corpus_vectorizer = WordsVectorizer(vocab)
