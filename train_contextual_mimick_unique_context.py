@@ -38,7 +38,10 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
 
     examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
                    ngram[1] in embeddings)  # Keeps only different ngrams which have a training embedding
+    examples_without_embeds = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
+                   ngram[1] not in embeddings)  # Keeps only different ngrams which have a training embedding
     print('Number of unique examples:', len(examples))
+    print('Number of unique examples wo embeds:', len(examples_without_embeds))
 
     # train_examples, valid_examples = split_train_valid(examples, ratio)
 
@@ -51,6 +54,7 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
         transform=transform,
         target_transform=target_transform
     )
+    print(len(dataset.labels_mapping))
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
     stats = dataset.stats(8)
@@ -101,10 +105,11 @@ def main(n=41, k=1, device=0, d=50):
 
     path_sentences = './conll/train.txt'
     train_sentences = parse_conll_file(path_sentences)
-    all_sentences = train_sentences
+    all_sentences = list(train_sentences)
     all_sentences += parse_conll_file('./conll/valid.txt')
     all_sentences += parse_conll_file('./conll/test.txt')
     word_to_idx, char_to_idx = make_vocab(all_sentences)
+
 
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
@@ -156,7 +161,7 @@ if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument("n", default=7, nargs='?')
-        parser.add_argument("k", default=2, nargs='?')
+        parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
