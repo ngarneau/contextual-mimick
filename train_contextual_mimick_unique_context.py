@@ -100,15 +100,16 @@ def main(n=41, k=1, device=0, d=50):
     print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
     path_sentences = './conll/train.txt'
-    sentences = parse_conll_file(path_sentences)
-    sentences += parse_conll_file('./conll/valid.txt')
-    sentences += parse_conll_file('./conll/test.txt')
-    word_to_idx, char_to_idx = make_vocab(sentences)
+    train_sentences = parse_conll_file(path_sentences)
+    all_sentences = train_sentences
+    all_sentences += parse_conll_file('./conll/valid.txt')
+    all_sentences += parse_conll_file('./conll/test.txt')
+    word_to_idx, char_to_idx = make_vocab(all_sentences)
 
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
         embeddings=train_embeddings,
-        sentences=sentences,
+        sentences=train_sentences,
         n=n,
         ratio=.8,
         use_gpu=use_gpu,
