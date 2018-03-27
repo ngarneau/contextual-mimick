@@ -10,7 +10,7 @@ import numpy as np
 
 __author__ = "Jean-Samuel Leboeuf"
 __date__ = "2018-03-26"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 class PerClassDataset(Dataset):
     """
@@ -180,6 +180,8 @@ class PerClassSampler():
     def __iter__(self):
         if self.k == -1:
             indices = [(label, i) for label, N in self.dataset for i in range(N)]
+        elif self.shuffle:
+            indices = [(label, random.randrange(N)) for label, N in self.dataset for j in range(self.k) if N > 0]
         else:
             indices = [(label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0]
         self.epoch += 1
