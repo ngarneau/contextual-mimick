@@ -3,7 +3,7 @@ from typing import Dict
 import torch
 from torch import nn, autograd
 from torch.nn import functional as F
-from torch.nn.init import kaiming_uniform
+from torch.nn.init import kaiming_uniform, constant
 from torch.nn.utils.rnn import pack_padded_sequence
 
 
@@ -44,6 +44,8 @@ class ContextualMimickUniqueContext(nn.Module):
             batch_first=True,
             bidirectional=self.bidirectional
         )
+        # constant(self.context_lstm.bias_ih_l[0], 1)
+        # constant(self.context_lstm.bias_hh_l[0], 1)
 
         self.context_fc = nn.Linear(
             in_features=self.words_hidden_state_dimension*2,
@@ -57,6 +59,8 @@ class ContextualMimickUniqueContext(nn.Module):
             batch_first=True,
             bidirectional=self.bidirectional
         )
+        # constant(self.lstm.bias_ih_l[0], 1)
+        # constant(self.lstm.bias_hh_l[0], 1)
 
         self.output = nn.Linear(
             self.characters_hidden_state_dimension * 2,

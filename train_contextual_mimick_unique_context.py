@@ -33,8 +33,7 @@ def split_train_valid(examples, ratio):
     return train_examples, valid_examples
 
 
-def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
-    word_to_idx, char_to_idx = make_vocab(sentences)
+def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word_to_idx=None, char_to_idx=None):
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
 
     examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
@@ -64,12 +63,12 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
     collate_fn = lambda samples: collate_examples_unique_context([(*x, y) for x, y in samples])
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=16,
+                                  batch_size=1,
                                   k=k,
                                   use_gpu=use_gpu)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=16,
+                                  batch_size=1,
                                   k=-1,
                                   use_gpu=use_gpu)
 
@@ -88,7 +87,7 @@ def main(n=41, k=1, device=0, d=50):
     numpy.random.seed(seed)
     random.seed(seed)
 
-    path_embeddings = './embeddings_settings/setting2/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         train_embeddings = load_embeddings(path_embeddings)
     except:
@@ -102,6 +101,9 @@ def main(n=41, k=1, device=0, d=50):
 
     path_sentences = './conll/train.txt'
     sentences = parse_conll_file(path_sentences)
+    sentences += parse_conll_file('./conll/valid.txt')
+    sentences += parse_conll_file('./conll/test.txt')
+    word_to_idx, char_to_idx = make_vocab(sentences)
 
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
@@ -110,7 +112,10 @@ def main(n=41, k=1, device=0, d=50):
         n=n,
         ratio=.8,
         use_gpu=use_gpu,
-        k=k)
+        k=k,
+        word_to_idx=word_to_idx,
+        char_to_idx=char_to_idx
+    )
 
     net = get_contextual_mimick_unique_context(char_to_idx, word_to_idx, word_embedding_dim=d)
 
@@ -150,7 +155,7 @@ if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument("n", default=7, nargs='?')
-        parser.add_argument("k", default=5, nargs='?')
+        parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
