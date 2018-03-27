@@ -13,9 +13,6 @@ def load_embeddings(path):
     i = 0
     with open(path, 'r') as embeddings_file:
         for line in embeddings_file:
-            if i > 100000:
-                break
-            i += 1
             fields = line.strip().split(' ')
             word = fields[0]
             vector = numpy.asarray(fields[1:], dtype='float32')
@@ -146,6 +143,16 @@ class WordsInContextVectorizer:
             vectorized_right_context
         )
 
+    def vectorize_unknown_example_merged_context(self, x):
+        left_context, word, right_context = x
+        context = left_context + right_context
+        vectorized_context = self.vectorize_sequence(context, self.words_to_idx)
+        vectorized_word = self.vectorize_sequence(word, self.chars_to_idx)
+        return (
+            vectorized_context,
+            vectorized_word,
+        )
+
 
 class Corpus:
     def __init__(self, examples, name, f=lambda x: x):
@@ -183,6 +190,25 @@ def collate_examples(samples):
             padded_left_contexts,
             padded_words,
             padded_right_contexts
+        ),
+        labels
+    )
+
+def collate_examples_unique_context(samples):
+    contexts, words, labels = list(zip(*samples))
+
+    contexts_lengths = torch.LongTensor([len(s) for s in contexts])
+    padded_contexts = pad_sequences(contexts, contexts_lengths)
+
+    seq_lengths = torch.LongTensor([len(s) for s in words])
+    padded_words = pad_sequences(words, seq_lengths)
+
+    labels = torch.FloatTensor(numpy.array(labels))
+
+    return (
+        (
+            padded_contexts,
+            padded_words,
         ),
         labels
     )
