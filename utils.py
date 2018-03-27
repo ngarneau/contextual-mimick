@@ -13,9 +13,6 @@ def load_embeddings(path):
     i = 0
     with open(path, 'r') as embeddings_file:
         for line in embeddings_file:
-            if i > 100000:
-                break
-            i += 1
             fields = line.strip().split(' ')
             word = fields[0]
             vector = numpy.asarray(fields[1:], dtype='float32')
