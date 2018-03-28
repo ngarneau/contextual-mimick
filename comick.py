@@ -100,7 +100,10 @@ class Context(MultiStream):
 		return outputs
 
 
-class Comick(Module):
+class LRComick(Module):
+	"""
+	This is a re-implementation of our original Comick with right and left context.
+	"""
 	def __init__(self,
 				 characters_vocabulary: Dict[str, int],
 				 words_vocabulary: Dict[str, int],
@@ -130,9 +133,11 @@ class Comick(Module):
 
 		self.fc1 = nn.Linear(in_features=2*characters_hidden_state_dimension,
 							 out_features=fully_connected_layer_hidden_dimension)
+		kaiming_uniform(self.fc1.weight)
 
 		self.fc2 = nn.Linear(in_features=fully_connected_layer_hidden_dimension,
 							 out_features=word_embeddings_dimension)
+		kaiming_uniform(self.fc2.weight)
 
 	def load_words_embeddings(self, words_embeddings):
 		for word, embedding in words_embeddings.items():
@@ -149,5 +154,56 @@ class Comick(Module):
 
 		output = self.fc1(F.tanh(hidden_rep))
 		output = self.fc2(F.tanh(output))
+
+		return output
+
+
+class Comick(Module):
+	"""
+	This is our new architecture with only one context.
+	"""
+	def __init__(self,
+				 characters_vocabulary: Dict[str, int],
+				 words_vocabulary: Dict[str, int],
+				 characters_embedding_dimension=20,
+				 characters_hidden_state_dimension=50,
+				 word_embeddings_dimension=50,
+				 words_hidden_state_dimension=50,
+				 words_embeddings=None,
+				 freeze_word_embeddings=False,
+				 ):
+		super().__init__()
+		
+		self.words_vocabulary = words_vocabulary
+		self.characters_vocabulary = characters_vocabulary
+		
+		self.context = Context(hidden_state_dim=words_hidden_state_dimension,											output_dim=2*characters_hidden_state_dimension,
+								num_embeddings=len(self.words_vocabulary),
+								embedding_dim=word_embeddings_dimension,
+								freeze_embeddings=freeze_word_embeddings)
+		if words_embeddings != None: self.load_words_embeddings(words_embeddings)
+
+		self.mimick = MultiStream(num_embeddings=len(self.characters_vocabulary),
+								  embedding_dim=characters_embedding_dimension,
+								  hidden_state_dim=characters_hidden_state_dimension)
+
+		self.fc = nn.Linear(in_features=2*characters_hidden_state_dimension,
+							 out_features=word_embeddings_dimension)
+		kaiming_uniform(self.fc.weight)
+
+	def load_words_embeddings(self, words_embeddings):
+		for word, embedding in words_embeddings.items():
+			if word in self.words_vocabulary:
+				idx = self.words_vocabulary[word]
+				self.context.set_item_embedding(idx, embedding)
+
+	def forward(self, x):
+		context, word = x
+
+		context_rep = self.context(context)
+		hidden_word_rep = self.mimick(word)
+		hidden_rep = context_rep + hidden_word_rep
+
+		output = self.fc(F.tanh(hidden_rep))
 
 		return output
