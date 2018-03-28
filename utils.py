@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch._utils import _accumulate
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
-
+import re
 
 def load_embeddings(path):
     embeddings = {}
@@ -77,13 +77,55 @@ def parse_conll_file(filename):
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
                 token, _, _, e = line[:-1].split(' ')
-                sentence.append(token.lower())
+                sentence.append(preprocess_token(token))
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
                 sentence = list()
     return sentences
 
+
+def preprocess_token(token):
+    """
+    Modifies a token in a particular format to a unique predefined format.
+    """
+    date_re = re.compile(r'\d{2}(\d{2})?[/-]\d{2}[/-]\d{2}')
+    float_re = re.compile(r'(\d+,)*\d+\.\d*')
+    int_re = re.compile(r'(\d+,)*\d{3,}')
+    time_re = re.compile(r'\d{1,2}:\d{2}(\.\d*)?')
+    code_re = re.compile(r'\d+(-\d+){3,}')
+
+    if date_re.fullmatch(token):
+        token = "<DATE>"
+    elif float_re.fullmatch(token):
+        token = "<FLOAT>"
+    elif int_re.fullmatch(token):
+        token = "<INT>"
+    elif time_re.fullmatch(token):
+        token = "<TIME>"
+    elif code_re.fullmatch(token):
+        token = "<CODE>"
+    else:
+        token = token.lower()
+    return token
+
+def test_preprocessing():
+    for token in ['1998/08/01',
+                '1998-08-01',
+                '98/08/01',
+                '98-08-01',
+                '10.',
+                '10.3232',
+                '10,10.',
+                '10,10.3232',
+                '10,100,100.3232',
+                '10',
+                '10,002',
+                '10:10',
+                '10:10.3232',
+                '10-10-10-10']:
+        t = preprocess_token(token)
+        # print(t)
 
 def make_vocab(sentences):
     vocab = set()
@@ -266,3 +308,7 @@ def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_
         right_idx = min(L, i+m+2)
         right_side = tuple(sequence[i+2:right_idx])
         yield (left_side, item, right_side)
+
+
+if __name__ == '__main__':
+    test_preprocessing()
