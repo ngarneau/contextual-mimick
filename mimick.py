@@ -72,9 +72,8 @@ class Mimick(nn.Module):
         embeds = self.characters_embeddings(x)
 
         # LSTM thing
-        self.hidden = self.init_hidden(len(x))
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (ht, ct) = self.lstm(packed_input, self.hidden)
+        packed_output, (ht, ct) = self.lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output = output[rev_perm_idx]
 

@@ -188,7 +188,7 @@ def main(d):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("d", default=50, nargs='?')
+    parser.add_argument("d", default=100, nargs='?')
     args = parser.parse_args()
     d = int(args.d)
     if d not in [50, 100, 200, 300]:
