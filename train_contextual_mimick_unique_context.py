@@ -45,18 +45,18 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
 
     # train_examples, valid_examples = split_train_valid(examples, ratio)
 
-    # filter_cond = lambda x, y: y in embeddings
     transform = vectorizer.vectorize_unknown_example_merged_context
     target_transform = lambda y: embeddings[y]
 
     dataset = PerClassDataset(
         examples,
         transform=transform,
-        target_transform=target_transform
+        target_transform=target_transform,
     )
+    dataset.filter_labels(lambda label, n: n < 80)
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
-    stats = dataset.stats(8)
+    stats = dataset.stats(80)
     for stats, value in stats.items():
         print(stats+': '+str(value))
     
@@ -72,7 +72,7 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=1,
-                                  k=k,
+                                  k=1,
                                   use_gpu=use_gpu)
 
     return train_loader, valid_loader, word_to_idx, char_to_idx

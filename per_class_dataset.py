@@ -40,6 +40,14 @@ class PerClassDataset(Dataset):
         if self.target_transform == None:
             self.target_transform = lambda x: x
 
+    def filter_labels(self, condition):
+        for label, n in self:
+            if not condition(label, n):
+                del self.dataset[self.labels_mapping[label]]
+        self.nb_examples_per_label = {
+            k: len(v) for k, v in self.dataset.items()}
+
+
     def _build_dataset(self, dataset, filter_cond):
         """
         Takes an iterable of examples of the form (x, y) and makes it into a dictionary {class:list_of_examples}, and filters examples not satisfying the 'filter_cond' condition.

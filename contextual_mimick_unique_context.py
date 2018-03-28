@@ -123,7 +123,7 @@ class ContextualMimickUniqueContext(nn.Module):
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_middle = output[rev_perm_idx]
 
-        final_output = output_middle + output_context
+        final_output = output_middle #+ output_context
         final_output = F.tanh(final_output)
 
         # Map to word embedding dim
