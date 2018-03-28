@@ -17,6 +17,7 @@ class ContextualMimickUniqueContext(nn.Module):
                  fully_connected_layer_hidden_dimension: int,
                  freeze_word_embeddings=False):
         super().__init__()
+        self.freeze_word_embeddings = freeze_word_embeddings
         self.words_hidden_state_dimension = words_hidden_state_dimension
         self.words_vocabulary = words_vocabulary
         self.fully_connected_layer_hidden_dimension = fully_connected_layer_hidden_dimension
