@@ -66,6 +66,9 @@ def cosine_sim(y_pred_tensor, y_true_tensor):
 def square_distance(input, target):
     return F.pairwise_distance(input, target).mean()
 
+def cosine_distance(input, target):
+    return 1.0 - F.cosine_similarity(input, target).mean()
+
 
 def parse_conll_file(filename):
     sentences = list()
@@ -115,7 +118,14 @@ class WordsInContextVectorizer:
     def vectorize_sequence(self, word, to_idx):
         if 'UNK' in to_idx:
             unknown_index = to_idx['UNK']
-            return [to_idx.get(char, unknown_index) for char in word]
+            v = list()
+            for char in word:
+                if char not in to_idx:
+                    print("Unknown word: {}".format(char))
+                    v.append(to_idx['UNK'])
+                else:
+                    v.append(to_idx[char])
+            return v
         else:
             return [to_idx[char] for char in word]
 
