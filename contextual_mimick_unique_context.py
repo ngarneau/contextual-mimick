@@ -8,10 +8,14 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class ContextualMimickUniqueContext(nn.Module):
-    def __init__(self, characters_vocabulary: Dict[str, int], characters_embedding_dimension: int,
-                 characters_hidden_state_dimension: int, word_embeddings_dimension: int,
-                 words_vocabulary: Dict[str, int], words_hidden_state_dimension: int,
-                 fully_connected_layer_hidden_dimension: int):
+    def __init__(self, characters_vocabulary: Dict[str, int],
+                 characters_embedding_dimension: int,
+                 characters_hidden_state_dimension: int,
+                 word_embeddings_dimension: int,
+                 words_vocabulary: Dict[str, int],
+                 words_hidden_state_dimension: int,
+                 fully_connected_layer_hidden_dimension: int,
+                 freeze_word_embeddings=False):
         super().__init__()
         self.words_hidden_state_dimension = words_hidden_state_dimension
         self.words_vocabulary = words_vocabulary
@@ -37,6 +41,8 @@ class ContextualMimickUniqueContext(nn.Module):
             embedding_dim=self.word_embeddings_dimension,
             padding_idx=0
         )
+        if self.freeze_word_embeddings:
+            for param in self.words_embeddings.parameters(): param.requires_grad = False
 
         self.context_lstm = nn.LSTM(
             input_size=self.word_embeddings_dimension,
@@ -122,9 +128,15 @@ class ContextualMimickUniqueContext(nn.Module):
         # Map to word embedding dim
         x = self.output(final_output)
         return x
+    
+    def parameters(self):
+        """
+        Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
+        """
+        return (param for param in super().parameters() if param.requires_grad)
 
 
-def get_contextual_mimick_unique_context(char_to_idx, word_to_idx, word_embedding_dim=50):
+def get_contextual_mimick_unique_context(char_to_idx, word_to_idx, word_embedding_dim=50, freeze_word_embeddings=False):
     net = ContextualMimickUniqueContext(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
@@ -132,6 +144,7 @@ def get_contextual_mimick_unique_context(char_to_idx, word_to_idx, word_embeddin
         characters_hidden_state_dimension=50,
         words_hidden_state_dimension=50,
         word_embeddings_dimension=word_embedding_dim,
-        fully_connected_layer_hidden_dimension=50
+        fully_connected_layer_hidden_dimension=50,
+        freeze_word_embeddings=freeze_word_embeddings
     )
     return net
