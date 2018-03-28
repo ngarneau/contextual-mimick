@@ -13,7 +13,7 @@ from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
 
-from utils import load_embeddings, parse_conll_file, cosine_sim, collate_examples_unique_context
+from utils import load_embeddings, parse_conll_file, cosine_sim, collate_examples_unique_context, cosine_distance
 from utils import square_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_examples
@@ -54,7 +54,6 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
         transform=transform,
         target_transform=target_transform
     )
-    print(len(dataset.labels_mapping))
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
     stats = dataset.stats(8)
@@ -73,7 +72,7 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=1,
-                                  k=-1,
+                                  k=k,
                                   use_gpu=use_gpu)
 
     return train_loader, valid_loader, word_to_idx, char_to_idx

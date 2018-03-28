@@ -27,7 +27,8 @@ class ContextualMimickUniqueContext(nn.Module):
         self.characters_embeddings = nn.Embedding(
             num_embeddings=len(self.characters_vocabulary),
             embedding_dim=self.characters_embedding_dimension,
-            padding_idx=0
+            padding_idx=0,
+            max_norm=5
         )
         kaiming_uniform(self.characters_embeddings.weight)
 
@@ -129,7 +130,7 @@ def get_contextual_mimick_unique_context(char_to_idx, word_to_idx, word_embeddin
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
-        words_hidden_state_dimension=100,
+        words_hidden_state_dimension=50,
         word_embeddings_dimension=word_embedding_dim,
         fully_connected_layer_hidden_dimension=50
     )
