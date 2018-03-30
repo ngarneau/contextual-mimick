@@ -9,8 +9,8 @@ import random
 import numpy as np
 
 __author__ = "Jean-Samuel Leboeuf"
-__date__ = "2018-03-26"
-__version__ = "0.2.1"
+__date__ = "2018-03-30"
+__version__ = "0.2.2"
 
 class PerClassDataset(Dataset):
     """
@@ -41,12 +41,15 @@ class PerClassDataset(Dataset):
             self.target_transform = lambda x: x
 
     def filter_labels(self, condition):
-        for label, n in self:
-            if not condition(label, n):
-                del self.dataset[self.labels_mapping[label]]
-        self.nb_examples_per_label = {
-            k: len(v) for k, v in self.dataset.items()}
-
+        """
+        Filters the examples of the dataset according to their label. 'condition' must be a callable of 2 arguments, 'label' and 'N', the label and the number of examples for this label. If 'condition' is True, the label if kept, else the label and all its examples are removed from the dataset.
+        """
+        for label, N in self:
+            if not condition(label, N):
+                idx = self.labels_mapping[label]
+                del self.dataset[idx]
+                del self.nb_examples_per_label[idx]
+        # self.nb_examples_per_label = {k: len(v) for k, v in self.dataset.items()}
 
     def _build_dataset(self, dataset, filter_cond):
         """
