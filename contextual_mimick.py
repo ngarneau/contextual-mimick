@@ -28,7 +28,7 @@ class ContextualMimick(nn.Module):
         self.num_layers = 1
         self.bidirectional = True
         self.freeze_word_embeddings = freeze_word_embeddings
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.25)
 
         self.characters_embeddings = nn.Embedding(
             num_embeddings=len(self.characters_vocabulary),

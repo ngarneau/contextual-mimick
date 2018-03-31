@@ -45,7 +45,7 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
     for example in examples:
         sws = similar_words[example[1]]
         for sw in sws:
-            if sw[0] not in train_embeddings.keys():
+            if sw[0] not in train_embeddings.keys() and sw[1] >= 0.5:
                 new_example = ((example[0][0], sw[0], example[0][2]), sw[0])
                 new_examples.add(new_example)
 
@@ -77,12 +77,12 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word
     collate_fn = lambda samples: collate_examples([(*x, y) for x, y in samples])
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=16,
+                                  batch_size=1,
                                   k=k,
                                   use_gpu=use_gpu)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=16,
+                                  batch_size=1,
                                   k=k,
                                   use_gpu=use_gpu)
 
@@ -177,9 +177,9 @@ if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument("n", default=41, nargs='?')
-        parser.add_argument("k", default=1, nargs='?')
+        parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
-        parser.add_argument("d", default=50, nargs='?')
+        parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
         n = int(args.n)
         k = int(args.k)
