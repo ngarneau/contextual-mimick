@@ -121,7 +121,7 @@ class WordsInContextVectorizer:
             v = list()
             for char in word:
                 if char not in to_idx:
-                    print("Unknown word: {}".format(char))
+                    # print("Unknown word: {}".format(char))
                     v.append(to_idx['UNK'])
                 else:
                     v.append(to_idx[char])
