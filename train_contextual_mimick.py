@@ -1,3 +1,4 @@
+import pickle
 import argparse
 import logging
 import os
@@ -32,12 +33,24 @@ def split_train_valid(examples, ratio):
     return train_examples, valid_examples
 
 
-def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
-    word_to_idx, char_to_idx = make_vocab(sentences)
+def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1, word_to_idx=None, char_to_idx=None):
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
+    similar_words = pickle.load(open('similar_words.p', 'rb'))
 
     examples = set((ngram, ngram[1]) for sentence in sentences for ngram in ngrams(sentence, n) if
                    ngram[1] in embeddings)  # Keeps only different ngrams which have a training embedding
+
+    train_embeddings = load_embeddings('./embeddings_settings/setting2/1_glove_embeddings/glove.6B.50d.txt')
+    new_examples = set()
+    for example in examples:
+        sws = similar_words[example[1]]
+        for sw in sws:
+            if sw[0] not in train_embeddings.keys():
+                new_example = ((example[0][0], sw[0], example[0][2]), sw[0])
+                new_examples.add(new_example)
+
+    print("Number of unique examples before:", len(examples))
+    examples = examples.union(new_examples)
     print('Number of unique examples:', len(examples))
 
     # train_examples, valid_examples = split_train_valid(examples, ratio)
@@ -51,6 +64,7 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
         transform=transform,
         target_transform=target_transform
     )
+    dataset.filter_labels(lambda label, n: n < 80)
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
     stats = dataset.stats(8)
@@ -63,13 +77,13 @@ def prepare_data(embeddings, sentences, n=15, ratio=.8, use_gpu=False, k=1):
     collate_fn = lambda samples: collate_examples([(*x, y) for x, y in samples])
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=1,
+                                  batch_size=16,
                                   k=k,
                                   use_gpu=use_gpu)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=1,
-                                  k=-1,
+                                  batch_size=16,
+                                  k=k,
                                   use_gpu=use_gpu)
 
     return train_loader, valid_loader, word_to_idx, char_to_idx
@@ -87,7 +101,7 @@ def main(n=41, k=1, device=0, d=50):
     numpy.random.seed(seed)
     random.seed(seed)
 
-    path_embeddings = './embeddings_settings/setting2/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         train_embeddings = load_embeddings(path_embeddings)
     except:
@@ -100,16 +114,24 @@ def main(n=41, k=1, device=0, d=50):
     print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
     path_sentences = './conll/train.txt'
-    sentences = parse_conll_file(path_sentences)
+    train_sentences = parse_conll_file(path_sentences)
+    # train_sentences = train_sentences[:100]
+    all_sentences = list(train_sentences)
+    all_sentences += parse_conll_file('./conll/valid.txt')
+    all_sentences += parse_conll_file('./conll/test.txt')
+    word_to_idx, char_to_idx = make_vocab(all_sentences)
 
     # Prepare our examples
     train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
         embeddings=train_embeddings,
-        sentences=sentences,
+        sentences=train_sentences,
         n=n,
         ratio=.8,
         use_gpu=use_gpu,
-        k=k)
+        k=k,
+        word_to_idx=word_to_idx,
+        char_to_idx=char_to_idx
+    )
 
     net = get_contextual_mimick(char_to_idx, word_to_idx, word_embedding_dim=d)
 
@@ -117,7 +139,7 @@ def main(n=41, k=1, device=0, d=50):
         net.cuda()
     net.load_words_embeddings(train_embeddings)
 
-    lrscheduler = ReduceLROnPlateau(patience=2)
+    lrscheduler = ReduceLROnPlateau(patience=10)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
     model_name = 'comick_n{}_k{}_d{}'.format(n, k, d)
@@ -137,7 +159,13 @@ def main(n=41, k=1, device=0, d=50):
                   optimizer=Adam(net.parameters(), lr=0.001),
                   loss_function=square_distance,
                   metrics=[cosine_sim])
-    callbacks = [lrscheduler, ckpt_best, ckpt_last, early_stopping, csv_logger]
+    callbacks = [
+        lrscheduler,
+        ckpt_best,
+        ckpt_last,
+        # early_stopping,
+        csv_logger
+    ]
 
     model.fit_generator(train_loader, valid_loader, epochs=1000, callbacks=callbacks)
 
