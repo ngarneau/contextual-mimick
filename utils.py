@@ -2,16 +2,14 @@ import numpy
 import torch
 from pytoune import torch_to_numpy
 from sklearn.metrics.pairwise import cosine_similarity
-from torch._utils import _accumulate
 from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
 import re
 
 def load_embeddings(path):
     embeddings = {}
     # First we read the embeddings from the file, only keeping vectors for the words we need.
     i = 0
-    with open(path, 'r') as embeddings_file:
+    with open(path, 'r', encoding='utf8') as embeddings_file:
         for line in embeddings_file:
             fields = line.strip().split(' ')
             word = fields[0]
@@ -28,25 +26,6 @@ def pad_sequences(vectorized_seqs, seq_lengths):
     for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
         seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
     return seq_tensor
-
-
-class Subset(Dataset):
-    def __init__(self, dataset, indices):
-        self.dataset = dataset
-        self.indices = indices
-
-    def __getitem__(self, idx):
-        return self.dataset[self.indices[idx]]
-
-    def __len__(self):
-        return len(self.indices)
-
-
-def random_split(dataset, lengths):
-    if sum(lengths) != len(dataset):
-        raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
-    indices = torch.randperm(sum(lengths))
-    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(_accumulate(lengths), lengths)]
 
 
 def euclidean_distance(y_pred_tensor, y_true_tensor):
@@ -206,23 +185,6 @@ class WordsInContextVectorizer:
         )
 
 
-class Corpus:
-    def __init__(self, examples, name, f=lambda x: x):
-        self.examples = examples
-        self.name = name
-        self.transform = f
-
-    def __iter__(self):
-        for e in self.examples:
-            yield self.transform(e)
-
-    def __getitem__(self, item):
-        return self.transform(self.examples[item])
-
-    def __len__(self):
-        return len(self.examples)
-
-
 def collate_examples(samples):
     left_contexts, words, right_contexts, labels = list(zip(*samples))
 
@@ -246,6 +208,7 @@ def collate_examples(samples):
         labels
     )
 
+
 def collate_examples_unique_context(samples):
     contexts, words, labels = list(zip(*samples))
 
@@ -265,6 +228,19 @@ def collate_examples_unique_context(samples):
         labels
     )
 
+def collate_fn(batch):
+    batch = [(*x, y) for x, y in batch] # Unwraps the batch
+    *x, y = list(zip(*batch))
+    
+    padded_x = []
+    for x_part in x:
+        x_lengths = torch.LongTensor([len(item) for item in x_part])
+        padded_x.append(pad_sequences(x_part, x_lengths))
+    
+    y = torch.FloatTensor(numpy.array(y))
+
+    return (tuple(padded_x), y)
+
 
 def load_vocab(path):
     vocab = set()
@@ -274,39 +250,16 @@ def load_vocab(path):
     return vocab
 
 
-class DataLoader(DataLoader):
-    """
-    Overloads the DataLoader Class of PyTorch so that it can copy the data and target to the GPU if desired.
-    """
-
-    def __init__(self, *args, use_gpu=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.use_gpu = use_gpu and torch.cuda.is_available()
-
-    def to_cuda(self, obj):
-        if self.use_gpu:
-            if isinstance(obj, tuple):
-                return [o.cuda() for o in obj]
-            else:
-                return obj.cuda()
-        else:
-            return obj
-
-    def __iter__(self):
-        for x, y in super().__iter__():
-            yield self.to_cuda(x), self.to_cuda(y)
-
-
 def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
     sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
 
     L = len(sequence)
     m = n//2
-    for i, item in enumerate(sequence[1:-1]):
-        left_idx = max(0, i-m+1)
-        left_side = tuple(sequence[left_idx:i+1])
-        right_idx = min(L, i+m+2)
-        right_side = tuple(sequence[i+2:right_idx])
+    for i, item in enumerate(sequence[pad_left:-pad_right]):
+        left_idx = max(0, i-m+pad_left)
+        left_side = tuple(sequence[left_idx:i+pad_left])
+        right_idx = min(L, i+m+pad_left+pad_right)
+        right_side = tuple(sequence[i+pad_left+pad_right:right_idx])
         yield (left_side, item, right_side)
 
 
