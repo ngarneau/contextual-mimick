@@ -102,7 +102,7 @@ def prepare_data(embeddings,
 def train(model_name, char_to_idx, word_to_idx, train_embeddings, d, train_loader, valid_loader, use_gpu=False, freeze_word_embeddings=False, debug_mode=False):
     
     # Create the model
-    net = Comick(characters_vocabulary=char_to_idx,
+    net = LRComick(characters_vocabulary=char_to_idx,
                  words_vocabulary=word_to_idx,
                  characters_embedding_dimension=20,
                  characters_hidden_state_dimension=50,
@@ -212,7 +212,7 @@ def main(n=41, k=1, device=0, d=50):
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -227,7 +227,7 @@ def main(n=41, k=1, device=0, d=50):
 
     # Prepare our examples
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
-    vectorizer = vectorizer.vectorize_unknown_example_merged_context
+    vectorizer = vectorizer.vectorize_unknown_example
     train_loader, valid_loader = prepare_data(
         embeddings=train_embeddings,
         sentences=train_sentences,
