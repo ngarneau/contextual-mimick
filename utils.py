@@ -152,7 +152,7 @@ class WordsInContextVectorizer:
             v = list()
             for char in word:
                 if char not in to_idx:
-                    print("Unknown word: {}".format(char))
+                    # print("Unknown word: {}".format(char))
                     v.append(to_idx['UNK'])
                 else:
                     v.append(to_idx[char])
@@ -192,6 +192,7 @@ class WordsInContextVectorizer:
         return (
             vectorized_context,
             vectorized_word,
+            len(left_context)
         )
 
 
@@ -220,7 +221,7 @@ def collate_examples(samples):
 
 
 def collate_examples_unique_context(samples):
-    contexts, words, labels = list(zip(*samples))
+    contexts, words, idxs, labels = list(zip(*samples))
 
     contexts_lengths = torch.LongTensor([len(s) for s in contexts])
     padded_contexts = pad_sequences(contexts, contexts_lengths)
@@ -228,12 +229,15 @@ def collate_examples_unique_context(samples):
     seq_lengths = torch.LongTensor([len(s) for s in words])
     padded_words = pad_sequences(words, seq_lengths)
 
+    idxs = torch.LongTensor([idxs])
+
     labels = torch.FloatTensor(numpy.array(labels))
 
     return (
         (
             padded_contexts,
             padded_words,
+            idxs
         ),
         labels
     )

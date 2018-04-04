@@ -8,7 +8,7 @@ from pytoune.framework.callbacks import *
 
 from mimick import Mimick
 from per_class_dataset import PerClassDataset, PerClassLoader
-from utils import load_embeddings, pad_sequences, random_split, euclidean_distance, square_distance, cosine_sim, \
+from utils import load_embeddings, pad_sequences, euclidean_distance, square_distance, cosine_sim, \
     parse_conll_file, WordsInContextVectorizer, make_vocab, ngrams
 
 import logging
@@ -115,7 +115,7 @@ def main(d):
     torch.manual_seed(seed)
     numpy.random.seed(seed)
 
-    path_embeddings = './embeddings_settings/setting2/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         train_embeddings = load_embeddings(path_embeddings)
     except:
@@ -127,47 +127,47 @@ def main(d):
             raise
     print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
-    path_sentences = './conll/train.txt'
-    sentences = parse_conll_file(path_sentences)
+    # path_sentences = './conll/train.txt'
+    # sentences = parse_conll_file(path_sentences)
 
-    train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
-        embeddings=train_embeddings,
-        sentences=sentences,
-        n=1,
-        ratio=.8,
-        use_gpu=False,
-        k=1)
+    # train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
+    #     embeddings=train_embeddings,
+    #     sentences=sentences,
+    #     n=1,
+    #     ratio=.8,
+    #     use_gpu=False,
+    #     k=1)
 
     # sum = 0.0
     # for embedding in train_embeddings.values():
     #     sum += numpy.linalg.norm(embedding)
     # print(sum / len(train_embeddings))
     #
-    # vocab = build_vocab(train_embeddings.keys())
-    # corpus_vectorizer = WordsVectorizer(vocab)
+    char_to_idx = build_vocab(train_embeddings.keys())
+    corpus_vectorizer = WordsVectorizer(char_to_idx)
 
     # Train dataset
-    # x_tensor, y_tensor = collate_examples(
-    #     [corpus_vectorizer.vectorize_example(word, embedding) for word, embedding in train_embeddings.items()])
-    # dataset = TensorDataset(x_tensor, y_tensor)
-    #
-    # train_valid_ratio = 0.8
-    # m = int(len(dataset) * train_valid_ratio)
-    # train_dataset, valid_dataset = random_split(dataset, [m, len(dataset) - m])
-    #
-    # print(len(train_dataset), len(valid_dataset))
-    #
-    # train_loader = DataLoader(
-    #     train_dataset,
-    #     batch_size=1,
-    #     shuffle=True
-    # )
-    #
-    # valid_loader = DataLoader(
-    #     valid_dataset,
-    #     batch_size=1,
-    #     shuffle=True
-    # )
+    x_tensor, y_tensor = collate_examples(
+        [corpus_vectorizer.vectorize_example(word, embedding) for word, embedding in train_embeddings.items()])
+    dataset = TensorDataset(x_tensor, y_tensor)
+
+    train_valid_ratio = 0.8
+    m = int(len(dataset) * train_valid_ratio)
+    train_dataset, valid_dataset = random_split(dataset, [m, len(dataset) - m])
+
+    print(len(train_dataset), len(valid_dataset))
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=8,
+        shuffle=True
+    )
+
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=8,
+        shuffle=True
+    )
 
     net = Mimick(
         characters_vocabulary=char_to_idx,
