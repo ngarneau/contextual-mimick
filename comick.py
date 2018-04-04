@@ -101,7 +101,7 @@ class Context(MultiLSTM):
         outputs = []
         for x, fc in zip(xs, self.fcs):
             outputs.append(fc(self.dropout(x)))
-        return outputs
+        return outputs if len(outputs) > 1 else outputs[0]
 
 
 class LRComick(Module):
