@@ -9,8 +9,8 @@ import random
 import numpy as np
 
 __author__ = "Jean-Samuel Leboeuf"
-__date__ = "2018-03-30"
-__version__ = "0.2.2"
+__date__ = "2018-04-04"
+__version__ = "0.2.3"
 
 class PerClassDataset(Dataset):
     """
@@ -49,7 +49,7 @@ class PerClassDataset(Dataset):
                 idx = self.labels_mapping[label]
                 del self.dataset[idx]
                 del self.nb_examples_per_label[idx]
-        # self.nb_examples_per_label = {k: len(v) for k, v in self.dataset.items()}
+                self._len -= N
 
     def _build_dataset(self, dataset, filter_cond):
         """
@@ -174,6 +174,7 @@ class PerClassDataset(Dataset):
         
         return stats
 
+
 class PerClassSampler():
     """
     Samples iteratively exemples of a PerClassDataset, one label at a time.
@@ -209,6 +210,7 @@ class PerClassSampler():
             length = self.k*len(self.dataset.dataset)
         return length
 
+
 class BatchSampler(object):
     """
     Wraps another sampler to yield a mini-batch of indices.
@@ -234,6 +236,7 @@ class BatchSampler(object):
             return len(self.sampler) // self.batch_size
         else:
             return (len(self.sampler) + self.batch_size - 1) // self.batch_size
+
 
 class DataLoader(DataLoader):
     """
@@ -285,6 +288,7 @@ class PerClassLoader():
 
     def __len__(self):
         return len(self.loader)
+
 
 if __name__ == '__main__':
     # Script to test the dataset and dataloader
