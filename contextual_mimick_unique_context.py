@@ -4,7 +4,7 @@ import torch
 from torch import nn, autograd
 from torch.nn import functional as F
 from torch.nn.init import kaiming_uniform, constant
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class ContextualMimickUniqueContext(nn.Module):
@@ -89,7 +89,7 @@ class ContextualMimickUniqueContext(nn.Module):
 
     def forward(self, x):
         # Pre processing
-        contexts, words = x
+        contexts, words, idxs = x
 
         ### CONTEXT THING HERE
         lengths = contexts.data.ne(0).sum(dim=1).long()
@@ -103,7 +103,11 @@ class ContextualMimickUniqueContext(nn.Module):
         # Initialize hidden to zero
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
         packed_output, (ht, ct) = self.context_lstm(packed_input)
-        output = torch.cat([ht[0], ht[1]], dim=1)
+        out, lengths = pad_packed_sequence(packed_output, batch_first=True)
+        near_word_hidden_states = out[0][idxs[0] - 1] + out[0][idxs[0]]
+        global_states = torch.cat([ct[0], ct[1]], dim=1)
+        output = near_word_hidden_states + global_states
+        # output = torch.cat([ht[0], ht[1]], dim=1)
         output = self.dropout(output)
         output_context = output[rev_perm_idx]
         output_context = self.context_fc(output_context)
@@ -123,7 +127,7 @@ class ContextualMimickUniqueContext(nn.Module):
         output = torch.cat([ht[0], ht[1]], dim=1)
         output_middle = output[rev_perm_idx]
 
-        final_output = output_middle #+ output_context
+        final_output = output_middle + output_context
         final_output = F.tanh(final_output)
 
         # Map to word embedding dim

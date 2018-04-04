@@ -159,7 +159,7 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=7, nargs='?')
+        parser.add_argument("n", default=9, nargs='?')
         parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')

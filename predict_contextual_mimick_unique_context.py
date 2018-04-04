@@ -22,11 +22,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("n", default=9, nargs='?')
-    parser.add_argument("k", default=2, nargs='?')
+    parser.add_argument("n", default=7, nargs='?')
+    parser.add_argument("k", default=1, nargs='?')
     parser.add_argument("d", default=100, nargs='?')
-    parser.add_argument("model_path", default='models/best_comick_n9_k2_d100_unique_context.torch', nargs='?')
-    parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting1/all_oov_setting1.txt', nargs='?')
+    parser.add_argument("model_path", default='models/best_comick_n7_k1_d100_unique_context.torch', nargs='?')
+    parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting2/all_oov_setting2.txt', nargs='?')
     args = parser.parse_args()
     n = int(args.n)
     k = int(args.k)
