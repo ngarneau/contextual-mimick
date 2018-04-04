@@ -8,7 +8,7 @@ from pytoune.framework.callbacks import *
 
 from mimick import Mimick
 from per_class_dataset import PerClassDataset, PerClassLoader
-from utils import load_embeddings, pad_sequences, random_split, euclidean_distance, square_distance, cosine_sim, \
+from utils import load_embeddings, pad_sequences, euclidean_distance, square_distance, cosine_sim, \
     parse_conll_file, WordsInContextVectorizer, make_vocab, ngrams
 
 import logging
