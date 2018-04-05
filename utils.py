@@ -85,7 +85,7 @@ def preprocess_token(token):
     elif code_re.fullmatch(token):
         token = "<CODE>"
     else:
-        token = token.lower()
+        token = token
     return token
 
 def test_preprocessing():
@@ -141,11 +141,16 @@ class WordsInContextVectorizer:
             unknown_index = to_idx['UNK']
             v = list()
             for char in word:
-                if char not in to_idx:
-                    # print("Unknown word: {}".format(char))
-                    v.append(to_idx['UNK'])
-                else:
+                if char in to_idx:
                     v.append(to_idx[char])
+                elif char.capitalize() in to_idx:
+                    v.append(to_idx[char.capitalize()])
+                elif char.upper() in to_idx:
+                    v.append(to_idx[char.upper()])
+                elif char.lower() in to_idx:
+                    v.append(to_idx[char.lower()])
+                else:
+                    v.append(to_idx['UNK'])
             return v
         else:
             return [to_idx[char] for char in word]
