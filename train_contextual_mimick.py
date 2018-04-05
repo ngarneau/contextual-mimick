@@ -13,7 +13,7 @@ from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
 
-from utils import load_embeddings, parse_conll_file, cosine_sim
+from utils import load_embeddings, parse_conll_file, cosine_sim, cosine_distance
 from utils import square_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_examples
@@ -158,7 +158,7 @@ def main(n=41, k=1, device=0, d=50):
     model = Model(model=net,
                   optimizer=Adam(net.parameters(), lr=0.001),
                   loss_function=square_distance,
-                  metrics=[cosine_sim])
+                  metrics=[cosine_distance])
     callbacks = [
         lrscheduler,
         ckpt_best,
