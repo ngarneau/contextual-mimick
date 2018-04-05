@@ -95,6 +95,9 @@ class PerClassDataset(Dataset):
         x = self.dataset[self.labels_mapping[label]][i]
 
         return (self.transform(x), self.target_transform(label))
+    
+    def __contains__(self, label):
+        return label in self.dataset
 
     def split(self, ratio=.8, shuffle=True, reuse_label_mappings=False):
         """
