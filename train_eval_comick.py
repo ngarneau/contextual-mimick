@@ -66,31 +66,43 @@ def prepare_data(embeddings,
         transform=transform,
         target_transform=target_transform,
     )
-    if over_population_threshold != None:
-        dataset.filter_labels(lambda label, N: N <= over_population_threshold)
 
     train_dataset, valid_dataset = dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
 
+    filter_labels_cond = None
+    if over_population_threshold != None:
+        filter_labels_cond = lambda label, N: N <= over_population_threshold
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=1,
                                   k=k,
-                                  use_gpu=use_gpu)
+                                  use_gpu=use_gpu,
+                                  filter_labels_cond=filter_labels_cond)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=16,
                                   k=-1,
-                                  use_gpu=use_gpu)
+                                  use_gpu=use_gpu,
+                                  filter_labels_cond=filter_labels_cond)
 
     if verbose:
         print('Number of unique examples:', len(examples))
         print('Number of unique examples wo embeds:', len(examples_without_embeds))
+
+        print('\nGlobal statistics:')
         stats = dataset.stats()
         for stats, value in stats.items():
             print(stats+': '+str(value))
-    
-        print('Datasets size - Train:', len(train_dataset), 'Valid:', len(valid_dataset))
-        print('Datasets labels - Train:', len(train_dataset.dataset), 'Valid:', len(valid_dataset.dataset))
+        
+        print('\nStatistics on the training dataset:')
+        stats = train_dataset.stats(over_population_threshold)
+        for stats, value in stats.items():
+            print(stats+': '+str(value))
+        
+        print('\nStatistics on the validation dataset:')
+        stats = valid_dataset.stats(over_population_threshold)
+        for stats, value in stats.items():
+            print(stats+': '+str(value))
 
     return train_loader, valid_loader
 
@@ -182,7 +194,7 @@ def main(n=41, k=1, device=0, d=50):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
