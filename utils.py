@@ -46,7 +46,7 @@ def square_distance(input, target):
     return F.pairwise_distance(input, target).mean()
 
 def cosine_distance(input, target):
-    return 1.0 - F.cosine_similarity(input, target).mean()
+    return F.cosine_similarity(input, target).mean()
 
 
 def parse_conll_file(filename):
