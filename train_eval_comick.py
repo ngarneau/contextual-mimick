@@ -4,7 +4,7 @@ import logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import Comick, LRComick
+from comick import ComickUniqueContext, LRComick, ComickDev
 from utils import load_embeddings, save_embeddings, parse_conll_file
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
@@ -225,11 +225,11 @@ def main(n=41, k=1, device=0, d=50):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -278,15 +278,22 @@ def main(n=41, k=1, device=0, d=50):
         epochs = 1
         
     # Create the model
-    net = LRComick(
+    # net = LRComick(
+    #     characters_vocabulary=char_to_idx,
+    #     words_vocabulary=word_to_idx,
+    #     characters_embedding_dimension=20,
+    #     characters_hidden_state_dimension=50,
+    #     word_embeddings_dimension=d,
+    #     words_hidden_state_dimension=50,
+    #     words_embeddings=embeddings,
+    #     freeze_word_embeddings=freeze_word_embeddings,
+    # )
+    net = ComickDev(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
-        characters_hidden_state_dimension=50,
         word_embeddings_dimension=d,
-        words_hidden_state_dimension=50,
         words_embeddings=embeddings,
-        freeze_word_embeddings=freeze_word_embeddings,
     )
     model = Model(
         model=net,
