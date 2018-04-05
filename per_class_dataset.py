@@ -127,6 +127,8 @@ class PerClassDataset(Dataset):
         """
         if isinstance(inferior_bounds, int):
             inferior_bounds = [inferior_bounds]
+        elif inferior_bounds == None:
+            inferior_bounds = []
 
         stats = {}
         stats['number of examples'] = len(self)
@@ -164,7 +166,7 @@ class PerClassDataset(Dataset):
                     bound_stats['number of labels with less or equal examples'] += 1
                     bound_stats['number of examples for these labels'] += N
 
-        stats['number of labels with N examples'] = nb_labels_with_N_examples
+        # stats['number of labels with N examples'] = nb_labels_with_N_examples
         # stats['least common labels'] = min_N_labels
         stats['least common labels number of examples'] = min_N
         # stats['most common labels'] = max_N_labels
