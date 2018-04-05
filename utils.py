@@ -4,6 +4,7 @@ from pytoune import torch_to_numpy
 from sklearn.metrics.pairwise import cosine_similarity
 from torch.nn import functional as F
 import re
+import os
 
 def load_embeddings(path):
     embeddings = {}
@@ -16,6 +17,15 @@ def load_embeddings(path):
             vector = numpy.asarray(fields[1:], dtype='float32')
             embeddings[word] = vector
     return embeddings
+
+
+def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
+    os.makedirs(path, exist_ok=True)
+    with open(path + filename, 'w') as fhandle:
+        for word, embedding in embeddings.items():
+            str_embedding = ' '.join([str(i) for i in embedding])
+            s = "{} {}\n".format(word, str_embedding)
+            fhandle.write(s)
 
 
 def pad_sequences(vectorized_seqs, seq_lengths):

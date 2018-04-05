@@ -9,8 +9,8 @@ import random
 import numpy as np
 
 __author__ = "Jean-Samuel Leboeuf"
-__date__ = "2018-03-30"
-__version__ = "0.2.2"
+__date__ = "2018-04-04"
+__version__ = "0.2.3"
 
 class PerClassDataset(Dataset):
     """
@@ -49,7 +49,7 @@ class PerClassDataset(Dataset):
                 idx = self.labels_mapping[label]
                 del self.dataset[idx]
                 del self.nb_examples_per_label[idx]
-        # self.nb_examples_per_label = {k: len(v) for k, v in self.dataset.items()}
+                self._len -= N
 
     def _build_dataset(self, dataset, filter_cond):
         """
@@ -127,6 +127,8 @@ class PerClassDataset(Dataset):
         """
         if isinstance(inferior_bounds, int):
             inferior_bounds = [inferior_bounds]
+        elif inferior_bounds == None:
+            inferior_bounds = []
 
         stats = {}
         stats['number of examples'] = len(self)
@@ -164,7 +166,7 @@ class PerClassDataset(Dataset):
                     bound_stats['number of labels with less or equal examples'] += 1
                     bound_stats['number of examples for these labels'] += N
 
-        stats['number of labels with N examples'] = nb_labels_with_N_examples
+        # stats['number of labels with N examples'] = nb_labels_with_N_examples
         # stats['least common labels'] = min_N_labels
         stats['least common labels number of examples'] = min_N
         # stats['most common labels'] = max_N_labels
@@ -174,6 +176,7 @@ class PerClassDataset(Dataset):
         
         return stats
 
+
 class PerClassSampler():
     """
     Samples iteratively exemples of a PerClassDataset, one label at a time.
@@ -181,33 +184,46 @@ class PerClassSampler():
     Arguments:
         dataset (PerClassDataset): Source of the data to be sampled from.
         k (int, optional, default=1): Number of examples per class to be sampled in each epoch. If k=-1, all examples are sampled per epoch, without any up- or downsampling (this is useful for validation or test).
+        shuffle (Boolean, optional, default=False): If False, examples are sampled in a cyclic way, else they are selected randomly (with replacement if k != -1 and without replacement if k=-1).
+        filter_labels_cond (Callable, optional, default=None): A callable which takes 2 arguments: label, N (the label and an int denoting the number of examples available for this label) and returns whether or not this class should be sampled.
     """
-    def __init__(self, dataset, k=-1, shuffle=True):
+    def __init__(self, dataset, k=-1, shuffle=True, filter_labels_cond=None):
         self.dataset = dataset
         self.k = k
         self.epoch = 0
         self.shuffle = shuffle
+        self.cond = filter_labels_cond
+        if self.cond == None:
+            self.cond = lambda label, N: True
+        self._len = len(self._generate_indices(reset_epoch=True))
+    
+    def _generate_indices(self, reset_epoch=False):
+        if self.k == -1:
+            indices = [(label, i) for label, N in self.dataset for i in range(N) if self.cond(label, N)]
+        elif self.shuffle:
+            indices = [(label, random.randrange(N)) for label, N in self.dataset for j in range(self.k) if N > 0 and self.cond(label, N)]
+        else:
+            indices = [(label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0 and self.cond(label, N)]
+
+        if self.shuffle:
+            random.shuffle(indices)
+        
+        self.epoch += 1
+        if reset_epoch:
+            self.epoch = 0
+        
+        return indices
 
     def __iter__(self):
-        if self.k == -1:
-            indices = [(label, i) for label, N in self.dataset for i in range(N)]
-        elif self.shuffle:
-            indices = [(label, random.randrange(N)) for label, N in self.dataset for j in range(self.k) if N > 0]
-        else:
-            indices = [(label, (self.epoch*self.k+j)%N) for label, N in self.dataset for j in range(self.k) if N > 0]
-        self.epoch += 1
-        if self.shuffle: random.shuffle(indices)
+        indices = self._generate_indices()
         return (idx for idx in indices)
     
     def __len__(self):
         """
         Returns the number of minibatchs that will be produced in one epoch.
         """
-        if self.k == -1:
-            length = len(self.dataset)
-        else:
-            length = self.k*len(self.dataset.dataset)
-        return length
+        return self._len
+
 
 class BatchSampler(object):
     """
@@ -234,6 +250,7 @@ class BatchSampler(object):
             return len(self.sampler) // self.batch_size
         else:
             return (len(self.sampler) + self.batch_size - 1) // self.batch_size
+
 
 class DataLoader(DataLoader):
     """
@@ -272,9 +289,9 @@ class PerClassLoader():
         batch_size (Integer, optional, default=1): Number of examples returned per batch.
         use_gpu (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
         """
-    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
+    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k)
+        self.sampler = PerClassSampler(dataset, k, filter_labels_cond)
         self.batch_sampler = BatchSampler(self.sampler, batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
@@ -285,6 +302,7 @@ class PerClassLoader():
 
     def __len__(self):
         return len(self.loader)
+
 
 if __name__ == '__main__':
     # Script to test the dataset and dataloader
