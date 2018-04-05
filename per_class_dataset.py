@@ -287,9 +287,9 @@ class PerClassLoader():
         batch_size (Integer, optional, default=1): Number of examples returned per batch.
         use_gpu (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
         """
-    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False):
+    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k)
+        self.sampler = PerClassSampler(dataset, k, filter_labels_cond)
         self.batch_sampler = BatchSampler(self.sampler, batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
