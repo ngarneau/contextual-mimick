@@ -12,6 +12,7 @@ from utils import collate_fn
 from per_class_dataset import *
 
 import numpy as np
+import pickle as pkl
 from sklearn.metrics.pairwise import cosine_similarity
 from pytoune import torch_to_numpy, tensors_to_variables
 from pytoune.framework import Model
@@ -39,6 +40,21 @@ def load_data(d, verbose=True):
     return train_embeddings, (train_sentences, valid_sentences, test_sentences)
 
 
+def augment_data(examples, embeddings):
+    labels = set(label for x, label in examples)
+    similar_words = pkl.load(open('similar_words.p', 'rb'))
+
+    new_examples = set()
+    for (left_context, word, right_context), label in examples:
+        sim_words = similar_words[label]
+        for sim_word, cos_sim in sim_words:
+            if sim_word not in labels and cos_sim >= 0.6: # Add new labels, not new examples to already existing labels.
+                new_example = ((left_context, sim_word, right_context), sim_word)
+                new_examples.add(new_example)
+
+    return new_examples
+
+
 def prepare_data(embeddings,
                  sentences,
                  vectorizer,
@@ -47,7 +63,8 @@ def prepare_data(embeddings,
                  use_gpu=False,
                  k=1,
                  over_population_threshold=None,
-                 verbose=True):
+                 verbose=True,
+                 data_augmentation=False):
 
     examples = set()
     examples_without_embeds = set()
@@ -57,6 +74,11 @@ def prepare_data(embeddings,
                 examples.add((ngram, ngram[1])) # Keeps only different ngrams which have a training embeddings
             else:
                 examples_without_embeds.add((ngram, ngram[1]))
+
+    if data_augmentation:
+        augmented_examples = augment_data(examples, embeddings)
+        if verbose: print("Number of non-augmented examples:", len(examples))
+        examples |= augmented_examples # Union
 
     transform = vectorizer
     target_transform = lambda y: embeddings[y]
@@ -142,13 +164,13 @@ def predict(model, generator):
     return np.concatenate(pred)
 
 
-def evaluate(model, test_sentences, train_sentences, test_embeddings, vectorizer, n=15, use_gpu=False, save=True, model_name=None):
+def evaluate(model, test_sentences, train_sentences, test_embeddings, vectorizer, n=15, d=50, use_gpu=False, save=True, model_name=None):
     
     train_labels = set(token for sentence in train_sentences for token in sentence)
     test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] not in train_labels)
 
     test_dataset = PerClassDataset(dataset=test_examples,
-                                   target_transform=lambda y: np.array([0]*50),
+                                   target_transform=lambda y: np.array([0]*d),
                                    transform=vectorizer)
 
     loader = PerClassLoader(dataset=test_dataset,
@@ -227,6 +249,7 @@ def main(n=41, k=1, device=0, d=50):
         use_gpu=use_gpu,
         k=k,
         over_population_threshold=80,
+        data_augmentation=True,
         verbose=verbose,
     )
     
@@ -275,6 +298,7 @@ def main(n=41, k=1, device=0, d=50):
         test_embeddings=train_embeddings,
         vectorizer=vectorizer,
         n=n,
+        d=d,
         use_gpu=use_gpu,
         save=save,
         model_name=model_name + '.txt'
