@@ -18,7 +18,7 @@ from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
 
-def load_data(d, verbose=True, debug_mode=False):
+def load_data(d, verbose=True):
     path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         train_embeddings = load_embeddings(path_embeddings)
@@ -36,12 +36,8 @@ def load_data(d, verbose=True, debug_mode=False):
     if verbose:
         print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
-    if debug_mode:
-        train_sentences = train_sentences[:100]
-        valid_sentences = valid_sentences[:100]
-        test_sentences = test_sentences[:100]
-
     return train_embeddings, (train_sentences, valid_sentences, test_sentences)
+
 
 def prepare_data(embeddings,
                  sentences,
@@ -99,29 +95,7 @@ def prepare_data(embeddings,
     return train_loader, valid_loader
 
 
-def train(model_name, char_to_idx, word_to_idx, train_embeddings, d, train_loader, valid_loader, use_gpu=False, freeze_word_embeddings=False, debug_mode=False):
-    
-    # Create the model
-    net = LRComick(characters_vocabulary=char_to_idx,
-                 words_vocabulary=word_to_idx,
-                 characters_embedding_dimension=20,
-                 characters_hidden_state_dimension=50,
-                 word_embeddings_dimension=d,
-                 words_hidden_state_dimension=50,
-                 words_embeddings=train_embeddings,
-                 freeze_word_embeddings=freeze_word_embeddings)
-
-    model = Model(model=net,
-                  optimizer=Adam(net.parameters(), lr=0.001),
-                  loss_function=square_distance,
-                  metrics=[cosine_sim])
-
-    if use_gpu:
-        model.cuda()
-    if debug_mode:
-        epochs = 1
-    else:
-        epochs = 1000
+def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=2)
@@ -145,8 +119,6 @@ def train(model_name, char_to_idx, word_to_idx, train_embeddings, d, train_loade
 
     # Fit the model
     model.fit_generator(train_loader, valid_loader, epochs=epochs, callbacks=callbacks)
-
-    return model
 
 
 def predict(model, generator):
@@ -203,31 +175,38 @@ def evaluate(model, test_sentences, train_sentences, test_embeddings, vectorizer
 
             
 def main(n=41, k=1, device=0, d=50):
+    # Control of randomization
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
-    debug_mode = False
+    # Global parameters
+    debug_mode = True
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
         print('Using GPU')
 
     # Load data
-    train_embeddings, sentences = load_data(d, verbose, debug_mode)
+    train_embeddings, sentences = load_data(d, verbose)
     train_sentences, valid_sentences, test_sentences = sentences
-    all_sentences = sentences[0] + sentences[1] + sentences[2]
+    if debug_mode:
+        train_sentences = train_sentences[:100]
+        valid_sentences = valid_sentences[:100]
+        test_sentences = test_sentences[:100]
+    all_sentences = train_sentences + valid_sentences + test_sentences
 
+    # Prepare vectorizer
     word_to_idx, char_to_idx = make_vocab(all_sentences)
-
-    # Prepare our examples
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     vectorizer = vectorizer.vectorize_unknown_example
+
+    # Prepare examples
     train_loader, valid_loader = prepare_data(
         embeddings=train_embeddings,
         sentences=train_sentences,
@@ -239,18 +218,42 @@ def main(n=41, k=1, device=0, d=50):
         verbose=verbose,
     )
     
-    # Create and train the model
+    # Initialize training parameters
     model_name = 'comick_n{}_k{}_d{}_unique_context'.format(n, k, d)
+    epochs = 1000
+    lr = 0.001
+    freeze_word_embeddings = False
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
-    model = train(
-        model_name, char_to_idx, word_to_idx, train_embeddings,
-        train_loader=train_loader, valid_loader=valid_loader,
-        d=d,
-        use_gpu=use_gpu,
-        debug_mode=debug_mode,
-        freeze_word_embeddings=False,
+        epochs = 1
+        
+    # Create the model
+    net = LRComick(
+        characters_vocabulary=char_to_idx,
+        words_vocabulary=word_to_idx,
+        characters_embedding_dimension=20,
+        characters_hidden_state_dimension=50,
+        word_embeddings_dimension=d,
+        words_hidden_state_dimension=50,
+        words_embeddings=train_embeddings,
+        freeze_word_embeddings=freeze_word_embeddings,
+    )
+    model = Model(
+        model=net,
+        optimizer=Adam(net.parameters(), lr=lr),
+        loss_function=square_distance,
+        metrics=[cosine_sim],
+    )
+    if use_gpu:
+        model.cuda()
+
+    # Set up the callbacks and train
+    train(
+        model, model_name,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        epochs=epochs,
     )
     
     evaluate(
