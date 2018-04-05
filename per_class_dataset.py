@@ -83,7 +83,7 @@ class PerClassDataset(Dataset):
         """
         Iterates over all labels of the dataset, returning (label, number_of_examples_for_this_label).
         """
-        for label, idx in self.labels_mapping.items():
+        for label in self.labels_mapping:
             yield (label, self.nb_examples_for_label(label))
 
     def __getitem__(self, label_i):
