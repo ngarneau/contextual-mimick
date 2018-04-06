@@ -4,7 +4,7 @@ import logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import Comick, LRComick
+from comick import ComickUniqueContext, LRComick, ComickDev
 from utils import load_embeddings, save_embeddings, parse_conll_file
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
@@ -19,8 +19,10 @@ from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
 
+
 def load_data(d, verbose=True):
-    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(
+        d)
     try:
         embeddings = load_embeddings(path_embeddings)
     except:
@@ -48,8 +50,10 @@ def augment_data(examples, embeddings):
     for (left_context, word, right_context), label in examples:
         sim_words = similar_words[label]
         for sim_word, cos_sim in sim_words:
-            if sim_word not in labels and cos_sim >= 0.6: # Add new labels, not new examples to already existing labels.
-                new_example = ((left_context, sim_word, right_context), sim_word)
+            # Add new labels, not new examples to already existing labels.
+            if sim_word not in labels and cos_sim >= 0.6:
+                new_example = (
+                    (left_context, sim_word, right_context), sim_word)
                 new_examples.add(new_example)
 
     return new_examples
@@ -73,17 +77,20 @@ def prepare_data(embeddings,
     for sentence in train_sentences:
         for ngram in ngrams(sentence, n):
             if ngram[1] in embeddings:
-                examples.add((ngram, ngram[1])) # Keeps only different ngrams which have a training embeddings
+                # Keeps only different ngrams which have a training embeddings
+                examples.add((ngram, ngram[1]))
             else:
                 examples_without_embeds.add((ngram, ngram[1]))
 
     if data_augmentation:
         augmented_examples = augment_data(examples, embeddings)
-        if verbose: print("Number of non-augmented examples:", len(examples))
-        examples |= augmented_examples # Union
+        if verbose:
+            print("Number of non-augmented examples:", len(examples))
+        examples |= augmented_examples  # Union
 
     transform = vectorizer
-    target_transform = lambda y: embeddings[y]
+
+    def target_transform(y): return embeddings[y]
 
     train_valid_dataset = PerClassDataset(
         examples,
@@ -91,11 +98,12 @@ def prepare_data(embeddings,
         target_transform=target_transform,
     )
 
-    train_dataset, valid_dataset = train_valid_dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
+    train_dataset, valid_dataset = train_valid_dataset.split(
+        ratio=.8, shuffle=True, reuse_label_mappings=False)
 
     filter_labels_cond = None
     if over_population_threshold != None:
-        filter_labels_cond = lambda label, N: N <= over_population_threshold
+        def filter_labels_cond(label, N): return N <= over_population_threshold
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=1,
@@ -110,7 +118,8 @@ def prepare_data(embeddings,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] not in train_valid_dataset)
+    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(
+        sentence, n) if ngram[1] not in train_valid_dataset)
 
     test_dataset = PerClassDataset(dataset=test_examples,
                                    transform=vectorizer)
@@ -123,18 +132,19 @@ def prepare_data(embeddings,
 
     if verbose:
         print('Number of unique examples:', len(examples))
-        print('Number of unique examples wo embeds:', len(examples_without_embeds))
+        print('Number of unique examples wo embeds:',
+              len(examples_without_embeds))
 
         print('\nGlobal statistics:')
         stats = train_valid_dataset.stats()
         for stats, value in stats.items():
             print(stats+': '+str(value))
-        
+
         print('\nStatistics on the training dataset:')
         stats = train_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
             print(stats+': '+str(value))
-        
+
         print('\nStatistics on the validation dataset:')
         stats = valid_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
@@ -171,7 +181,8 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
     callbacks = [lrscheduler, ckpt_best, ckpt_last, early_stopping, csv_logger]
 
     # Fit the model
-    model.fit_generator(train_loader, valid_loader, epochs=epochs, callbacks=callbacks)
+    model.fit_generator(train_loader, valid_loader,
+                        epochs=epochs, callbacks=callbacks)
 
 
 def predict_mean_embeddings(model, loader):
@@ -188,22 +199,28 @@ def predict_mean_embeddings(model, loader):
 
     mean_pred_embeddings = {}
     for label in predicted_embeddings.keys():
-        mean_pred_embeddings[label] = np.mean(np.array(predicted_embeddings[label]), axis=0)
+        mean_pred_embeddings[label] = np.mean(
+            np.array(predicted_embeddings[label]), axis=0)
     return mean_pred_embeddings
 
 
 def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
-    
+
     mean_pred_embeddings = predict_mean_embeddings(model, test_loader)
-    
+
     if save:
-        if model_name == None: raise ValueError('A filename should be provided.')
+        if model_name == None:
+            raise ValueError('A filename should be provided.')
         save_embeddings(mean_pred_embeddings, model_name)
 
     predicted_results = {}
-    norm = lambda y_true, y_pred: np.linalg.norm(y_pred.reshape(1,-1)-y_true.reshape(1,-1))
+
+    def norm(y_true, y_pred): return np.linalg.norm(
+        y_pred.reshape(1, -1)-y_true.reshape(1, -1))
     sum_norm = 0
-    cos_sim = lambda y_true, y_pred: float(cosine_similarity(y_pred.reshape(1, -1), y_true.reshape(1,-1)))
+
+    def cos_sim(y_true, y_pred): return float(
+        cosine_similarity(y_pred.reshape(1, -1), y_true.reshape(1, -1)))
     sum_cos_sim = 0
     nb_of_pred = 0
     for label, idx in test_loader.dataset.labels_mapping.items():
@@ -213,10 +230,11 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
             sum_norm += norm(y_true, y_pred)
             sum_cos_sim += cos_sim(y_true, y_pred)
             nb_of_pred += 1
-    
-    print('mean euclidean dist:', sum_norm/nb_of_pred, 'mean cosine sim:', sum_cos_sim/nb_of_pred)
 
-            
+    print('mean euclidean dist:', sum_norm/nb_of_pred,
+          'mean cosine sim:', sum_cos_sim/nb_of_pred)
+
+
 def main(n=41, k=1, device=0, d=50):
     # Control of randomization
     seed = 299792458  # "Seed" of light
@@ -225,11 +243,11 @@ def main(n=41, k=1, device=0, d=50):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -257,7 +275,7 @@ def main(n=41, k=1, device=0, d=50):
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         train_sentences=train_sentences,
-        test_sentences=valid_sentences,#+test_sentences
+        test_sentences=valid_sentences,  # +test_sentences
         vectorizer=vectorizer,
         n=n,
         use_gpu=use_gpu,
@@ -266,7 +284,7 @@ def main(n=41, k=1, device=0, d=50):
         data_augmentation=data_augmentation,
         verbose=verbose,
     )
-    
+
     # Initialize training parameters
     model_name = 'comick_n{}_k{}_d{}_unique_context'.format(n, k, d)
     epochs = 1000
@@ -276,17 +294,24 @@ def main(n=41, k=1, device=0, d=50):
         model_name = 'testing_' + model_name
         save = False
         epochs = 1
-        
+
     # Create the model
-    net = LRComick(
+    # net = LRComick(
+    #     characters_vocabulary=char_to_idx,
+    #     words_vocabulary=word_to_idx,
+    #     characters_embedding_dimension=20,
+    #     characters_hidden_state_dimension=50,
+    #     word_embeddings_dimension=d,
+    #     words_hidden_state_dimension=50,
+    #     words_embeddings=embeddings,
+    #     freeze_word_embeddings=freeze_word_embeddings,
+    # )
+    net = ComickDev(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
-        characters_hidden_state_dimension=50,
         word_embeddings_dimension=d,
-        words_hidden_state_dimension=50,
         words_embeddings=embeddings,
-        freeze_word_embeddings=freeze_word_embeddings,
     )
     model = Model(
         model=net,
@@ -304,7 +329,7 @@ def main(n=41, k=1, device=0, d=50):
         valid_loader=valid_loader,
         epochs=epochs,
     )
-    
+
     evaluate(
         model,
         test_loader=test_loader,
@@ -330,7 +355,8 @@ if __name__ == '__main__':
         device = int(args.device)
         d = int(args.d)
         if d not in [50, 100, 200, 300]:
-            raise ValueError("The embedding dimension 'd' should of 50, 100, 200 or 300.")
+            raise ValueError(
+                "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         main(n=n, k=k, device=device, d=d)
     except:
         print('Execution stopped after {:.2f} seconds.'.format(time() - t))
