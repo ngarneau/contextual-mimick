@@ -13,15 +13,15 @@ class Module(nn.Module):
 
     def parameters(self):
         """
-		Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
-		"""
+        Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
+        """
         return (param for param in super().parameters() if param.requires_grad)
 
 
 class MultiLSTM(Module):
     """
-	Module that converts multiple sequences of items into their common embeddings, then applies a bidirectional LSTM on each sequence. The outputs are the concatenations of the two final hidden states.
-	"""
+    Module that converts multiple sequences of items into their common embeddings, then applies a bidirectional LSTM on each sequence. The outputs are the concatenations of the two final hidden states.
+    """
 
     def __init__(self,
                  num_embeddings,
@@ -55,8 +55,8 @@ class MultiLSTM(Module):
 
     def forward(self, *xs):
         """
-		xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
-		"""
+        xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
+        """
         outputs = []
         for x, lstm in zip(xs, self.lstms):
             lengths = x.data.ne(0).sum(dim=1).long()
@@ -81,8 +81,8 @@ class MultiLSTM(Module):
 
 class Context(MultiLSTM):
     """
-	This Context module adds dropout and a fully connected layer to a MultiStream class.
-	"""
+    This Context module adds dropout and a fully connected layer to a MultiStream class.
+    """
 
     def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
         super().__init__(*args, hidden_state_dim=hidden_state_dim, n_lstms=n_contexts, **kwargs)
@@ -106,8 +106,8 @@ class Context(MultiLSTM):
 
 class LRComick(Module):
     """
-	This is a re-implementation of our original Comick with right and left context.
-	"""
+    This is a re-implementation of our original Comick with right and left context.
+    """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
@@ -166,8 +166,8 @@ class LRComick(Module):
 
 class ComickUniqueContext(Module):
     """
-	This is the architecture with only one context.
-	"""
+    This is the architecture with only one context.
+    """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
@@ -219,8 +219,8 @@ class ComickUniqueContext(Module):
 
 class ComickDev(Module):
     """
-	This is the architecture in development.
-	"""
+    This is the architecture in development.
+    """
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -247,12 +247,14 @@ class ComickDev(Module):
                                 hidden_state_dim=word_embeddings_dimension)
 
         self.fc1 = nn.Linear(in_features=4*word_embeddings_dimension,
-                             out_features=2*word_embeddings_dimension)
+                             out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc1.weight)
 
-        self.fc2 = nn.Linear(in_features=2*word_embeddings_dimension,
+        self.fc2 = nn.Linear(in_features=word_embeddings_dimension,
                              out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc2.weight)
+
+        self.dropout = nn.Dropout(p=0.3)
 
     def load_words_embeddings(self, words_embeddings):
         for word, embedding in words_embeddings.items():
@@ -267,8 +269,11 @@ class ComickDev(Module):
         context_rep = left_rep + right_rep
         word_hidden_rep = self.mimick(word)
         hidden_rep = torch.cat((context_rep, word_hidden_rep), dim=1)
-
-        output = self.fc1(hidden_rep)
-        output = self.fc2(F.relu(output))
+        output = self.dropout(hidden_rep)
+        output = F.relu(output)
+        output = self.fc1(output)
+        output = self.dropout(output)
+        output = F.relu(output)
+        output = self.fc2(output)
 
         return output

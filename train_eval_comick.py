@@ -268,7 +268,7 @@ def main(n=41, k=1, device=0, d=50):
     )
     
     # Initialize training parameters
-    model_name = 'comick_n{}_k{}_d{}_unique_context'.format(n, k, d)
+    model_name = 'comick_dev_n{}_k{}_d{}'.format(n, k, d)
     epochs = 1000
     lr = 0.001
     freeze_word_embeddings = False
