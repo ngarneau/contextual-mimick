@@ -294,8 +294,8 @@ class PerClassLoader():
         """
     def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k, filter_labels_cond)
-        self.batch_sampler = BatchSampler(self.sampler, batch_size)
+        self.sampler = PerClassSampler(dataset, k=k, filter_labels_cond=filter_labels_cond)
+        self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
         self.loader = DataLoader(dataset, collate_fn=collate_fn, batch_sampler=self.batch_sampler, use_gpu=use_gpu)
