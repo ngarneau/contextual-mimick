@@ -247,7 +247,7 @@ class ComickDev(Module):
         if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
 
-        self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
+        self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
                                 embedding_dim=characters_embedding_dimension,
                                 hidden_state_dim=word_embeddings_dimension)
 
@@ -272,13 +272,14 @@ class ComickDev(Module):
 
         left_rep, right_rep = self.contexts(left_context, right_context)
         context_rep = left_rep + right_rep
-        word_hidden_rep = self.mimick(word)
-        hidden_rep = torch.cat((context_rep, word_hidden_rep), dim=1)
-        output = self.dropout(hidden_rep)
-        output = F.relu(output)
+        word_hidden_rep = self.mimick_lstm(word)
+        output = word_hidden_rep
+        # output = torch.cat((context_rep, word_hidden_rep), dim=1)
+        # output = self.dropout(output)
+        # output = F.tanh(output)
         output = self.fc1(output)
-        output = self.dropout(output)
-        output = F.relu(output)
+        # output = self.dropout(output)
+        output = F.tanh(output)
         output = self.fc2(output)
 
         return output
