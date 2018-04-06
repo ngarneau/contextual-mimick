@@ -83,7 +83,7 @@ class PerClassDataset(Dataset):
         """
         Iterates over all labels of the dataset, returning (label, number_of_examples_for_this_label).
         """
-        for label, idx in self.labels_mapping.items():
+        for label in self.labels_mapping:
             yield (label, self.nb_examples_for_label(label))
 
     def __getitem__(self, label_i):
@@ -95,6 +95,9 @@ class PerClassDataset(Dataset):
         x = self.dataset[self.labels_mapping[label]][i]
 
         return (self.transform(x), self.target_transform(label))
+    
+    def __contains__(self, label):
+        return label in self.dataset
 
     def split(self, ratio=.8, shuffle=True, reuse_label_mappings=False):
         """
@@ -291,8 +294,8 @@ class PerClassLoader():
         """
     def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k, filter_labels_cond)
-        self.batch_sampler = BatchSampler(self.sampler, batch_size)
+        self.sampler = PerClassSampler(dataset, k=k, filter_labels_cond=filter_labels_cond)
+        self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
         self.loader = DataLoader(dataset, collate_fn=collate_fn, batch_sampler=self.batch_sampler, use_gpu=use_gpu)

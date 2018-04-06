@@ -27,7 +27,7 @@ class MultiLSTM(Module):
                  num_embeddings,
                  embedding_dim,
                  hidden_state_dim,
-                 n_streams=1,
+                 n_lstms=1,
                  padding_idx=0,
                  freeze_embeddings=False):
         super().__init__()
@@ -43,7 +43,7 @@ class MultiLSTM(Module):
                 param.requires_grad = False
 
         self.lstms = []
-        for i in range(n_streams):
+        for i in range(n_lstms):
             lstm = nn.LSTM(
                 input_size=embedding_dim,
                 hidden_size=hidden_state_dim,
@@ -55,7 +55,7 @@ class MultiLSTM(Module):
 
     def forward(self, *xs):
         """
-		xs is a tuple of sequences of items. Must be the same length as 'n_streams'. Returns a list of outputs if there is more than one stream
+		xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
 		"""
         outputs = []
         for x, lstm in zip(xs, self.lstms):
@@ -67,7 +67,8 @@ class MultiLSTM(Module):
             embeddings = self.embeddings(x)
 
             # Initialize hidden to zero
-            packed_input = pack_padded_sequence(embeddings, list(seq_lengths), batch_first=True)
+            packed_input = pack_padded_sequence(
+                embeddings, list(seq_lengths), batch_first=True)
             packed_output, (hidden_states, cell_states) = lstm(packed_input)
             output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
             output = output[rev_perm_idx]
@@ -85,7 +86,7 @@ class Context(MultiLSTM):
 	"""
 
     def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
-        super().__init__(*args, hidden_state_dim=hidden_state_dim, n_streams=n_contexts, **kwargs)
+        super().__init__(*args, hidden_state_dim=hidden_state_dim, n_lstms=n_contexts, **kwargs)
 
         self.fcs = []
         for i in range(n_contexts):
@@ -131,7 +132,8 @@ class LRComick(Module):
                                 embedding_dim=word_embeddings_dimension,
                                 n_contexts=2,
                                 freeze_embeddings=freeze_word_embeddings)
-        if words_embeddings != None: self.load_words_embeddings(words_embeddings)
+        if words_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
 
         self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
                                 embedding_dim=characters_embedding_dimension,
@@ -155,8 +157,8 @@ class LRComick(Module):
         left_context, word, right_context = x
 
         left_rep, right_rep = self.contexts(left_context, right_context)
-        hidden_word_rep = self.mimick(word)
-        hidden_rep = left_rep + hidden_word_rep + right_rep
+        word_hidden_rep = self.mimick(word)
+        hidden_rep = left_rep + word_hidden_rep + right_rep
 
         output = self.fc1(F.tanh(hidden_rep))
         output = self.fc2(F.tanh(output))
@@ -164,9 +166,9 @@ class LRComick(Module):
         return output
 
 
-class Comick(Module):
+class ComickUniqueContext(Module):
     """
-	This is our new architecture with only one context.
+	This is the architecture with only one context.
 	"""
 
     def __init__(self,
@@ -189,7 +191,8 @@ class Comick(Module):
                                num_embeddings=len(self.words_vocabulary),
                                embedding_dim=word_embeddings_dimension,
                                freeze_embeddings=freeze_word_embeddings)
-        if words_embeddings != None: self.load_words_embeddings(words_embeddings)
+        if words_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
 
         self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
                                 embedding_dim=characters_embedding_dimension,
@@ -209,9 +212,74 @@ class Comick(Module):
         context, word = x
 
         context_rep = self.context(context)
-        hidden_word_rep = self.mimick(word)
+        word_hidden_rep = self.mimick(word)
         hidden_rep = context_rep + hidden_word_rep
 
         output = self.fc(F.tanh(hidden_rep))
+
+        return output
+
+
+class ComickDev(Module):
+    """
+	This is the architecture in development.
+	"""
+
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 words_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 word_embeddings_dimension=50,
+                 words_embeddings=None,
+                 freeze_word_embeddings=True,
+                 ):
+        super().__init__()
+
+        self.words_vocabulary = words_vocabulary
+        self.characters_vocabulary = characters_vocabulary
+
+        self.contexts = MultiLSTM(num_embeddings=len(self.words_vocabulary),
+                                  embedding_dim=word_embeddings_dimension,
+                                  hidden_state_dim=word_embeddings_dimension,
+                                  n_lstms=2,
+                                  freeze_embeddings=freeze_word_embeddings)
+
+        if words_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
+
+        self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
+                                embedding_dim=characters_embedding_dimension,
+                                hidden_state_dim=word_embeddings_dimension)
+
+        self.fc1 = nn.Linear(in_features=4*word_embeddings_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc1.weight)
+
+        self.fc2 = nn.Linear(in_features=word_embeddings_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc2.weight)
+
+        self.dropout = nn.Dropout(p=0.3)
+
+    def load_words_embeddings(self, words_embeddings):
+        for word, embedding in words_embeddings.items():
+            if word in self.words_vocabulary:
+                idx = self.words_vocabulary[word]
+                self.contexts.set_item_embedding(idx, embedding)
+
+    def forward(self, x):
+        left_context, word, right_context = x
+
+        left_rep, right_rep = self.contexts(left_context, right_context)
+        context_rep = left_rep + right_rep
+        word_hidden_rep = self.mimick_lstm(word)
+        output = word_hidden_rep
+        # output = torch.cat((context_rep, word_hidden_rep), dim=1)
+        # output = self.dropout(output)
+        # output = F.tanh(output)
+        output = self.fc1(output)
+        # output = self.dropout(output)
+        output = F.tanh(output)
+        output = self.fc2(output)
 
         return output
