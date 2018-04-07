@@ -8,12 +8,13 @@ from comick import ComickUniqueContext, LRComick, ComickDev
 from utils import load_embeddings, save_embeddings, parse_conll_file
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
-from utils import collate_fn
+from utils import collate_fn, collate_fn_test
 from per_class_dataset import *
 
 import numpy as np
 import pickle as pkl
 from sklearn.metrics.pairwise import cosine_similarity
+import torch.nn.functional as F
 from pytoune import torch_to_numpy, tensors_to_variables
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
@@ -88,10 +89,8 @@ def prepare_data(embeddings,
             print("Number of non-augmented examples:", len(examples))
         examples |= augmented_examples  # Union
 
-    transform = vectorizer
-
+    transform = vectorizer.vectorize_unknown_example
     def target_transform(y): return embeddings[y]
-
     train_valid_dataset = PerClassDataset(
         examples,
         transform=transform,
@@ -106,26 +105,26 @@ def prepare_data(embeddings,
         def filter_labels_cond(label, N): return N <= over_population_threshold
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=1,
+                                  batch_size=64,
                                   k=k,
                                   use_gpu=use_gpu,
                                   filter_labels_cond=filter_labels_cond)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=64,
-                                  k=-1,
+                                  k=k,
                                   use_gpu=use_gpu,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(
-        sentence, n) if ngram[1] not in train_valid_dataset)
+    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] not in train_valid_dataset)
 
+    target_transform = lambda label: vectorizer.words_to_idx[label]
     test_dataset = PerClassDataset(dataset=test_examples,
-                                   transform=vectorizer)
-
+                                   transform=transform,
+                                   target_transform=target_transform)
     test_loader = PerClassLoader(dataset=test_dataset,
-                                 collate_fn=collate_fn,
+                                 collate_fn=collate_fn_test,
                                  k=-1,
                                  batch_size=64,
                                  use_gpu=use_gpu)
@@ -154,6 +153,8 @@ def prepare_data(embeddings,
         stats = test_dataset.stats()
         for stats, value in stats.items():
             print(stats+': '+str(value))
+        
+        print('\nFor training, loading '+str(k)+' examples per label per epoch.')
 
     return train_loader, valid_loader, test_loader
 
@@ -191,16 +192,16 @@ def predict_mean_embeddings(model, loader):
     for x, y in loader:
         x = tensors_to_variables(x)
         embeddings = torch_to_numpy(model.model(x))
-        for label, embedding in zip(y, embeddings):
-            if label in predicted_embeddings:
-                predicted_embeddings[label].append(embedding)
+        for idx, embedding in zip(y, embeddings):
+            if idx in predicted_embeddings:
+                predicted_embeddings[idx].append(embedding)
             else:
-                predicted_embeddings[label] = [embedding]
+                predicted_embeddings[idx] = [embedding]
 
     mean_pred_embeddings = {}
-    for label in predicted_embeddings.keys():
-        mean_pred_embeddings[label] = np.mean(
-            np.array(predicted_embeddings[label]), axis=0)
+    for idx in predicted_embeddings:
+        mean_pred_embeddings[idx] = np.mean(
+            np.array(predicted_embeddings[idx]), axis=0)
     return mean_pred_embeddings
 
 
@@ -215,27 +216,27 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
 
     predicted_results = {}
 
-    def norm(y_true, y_pred): return np.linalg.norm(
-        y_pred.reshape(1, -1)-y_true.reshape(1, -1))
+    def norm(y_true, y_pred): return np.linalg.norm(y_pred-y_true)
     sum_norm = 0
 
-    def cos_sim(y_true, y_pred): return float(
-        cosine_similarity(y_pred.reshape(1, -1), y_true.reshape(1, -1)))
+    def cos_sim(y_true, y_pred): return float(cosine_similarity(y_pred, y_true))
     sum_cos_sim = 0
     nb_of_pred = 0
     for label, idx in test_loader.dataset.labels_mapping.items():
         if label in test_embeddings and idx in mean_pred_embeddings:
-            y_true = test_embeddings[label]
-            y_pred = mean_pred_embeddings[idx]
+            y_true = test_embeddings[label].reshape(1,-1)
+            y_pred = mean_pred_embeddings[idx].reshape(1,-1)
             sum_norm += norm(y_true, y_pred)
             sum_cos_sim += cos_sim(y_true, y_pred)
             nb_of_pred += 1
 
-    print('mean euclidean dist:', sum_norm/nb_of_pred,
-          'mean cosine sim:', sum_cos_sim/nb_of_pred)
+    print('\nResults on the test:')
+    print('Mean euclidean dist:', sum_norm/nb_of_pred)
+    print('Mean cosine sim:', sum_cos_sim/nb_of_pred)
+    print('Number of labels evaluated:', nb_of_pred)
 
 
-def main(n=41, k=1, device=0, d=50):
+def main(n=41, k=1, device=0, d=100):
     # Control of randomization
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
@@ -257,21 +258,22 @@ def main(n=41, k=1, device=0, d=50):
     embeddings, sentences = load_data(d, verbose)
     train_sentences, valid_sentences, test_sentences = sentences
     if debug_mode:
-        train_sentences = train_sentences[:100]
+        train_sentences = train_sentences[:50]
         valid_sentences = valid_sentences[:100]
-        test_sentences = test_sentences[:100]
+        test_sentences = []
     all_sentences = train_sentences + valid_sentences + test_sentences
 
     # Prepare vectorizer
     word_to_idx, char_to_idx = make_vocab(all_sentences)
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
-    vectorizer = vectorizer.vectorize_unknown_example
+    vectorizer = vectorizer
 
     # Prepare examples
     over_population_threshold = 80
     data_augmentation = True
     if debug_mode:
         data_augmentation = False
+        over_population_threshold = None
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         train_sentences=train_sentences,
@@ -287,13 +289,13 @@ def main(n=41, k=1, device=0, d=50):
 
     # Initialize training parameters
     model_name = 'comick_dev_n{}_k{}_d{}'.format(n, k, d)
-    epochs = 1000
+    epochs = 100
     lr = 0.001
     freeze_word_embeddings = False
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
-        epochs = 1
+        epochs = 3
 
     # Create the model
     # net = LRComick(
@@ -345,10 +347,10 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=7, nargs='?')
-        parser.add_argument("k", default=1, nargs='?')
+        parser.add_argument("n", default=21, nargs='?')
+        parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
-        parser.add_argument("d", default=50, nargs='?')
+        parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
         n = int(args.n)
         k = int(args.k)

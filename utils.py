@@ -45,15 +45,13 @@ def euclidean_distance(y_pred_tensor, y_true_tensor):
     return torch.FloatTensor([dist.tolist()])
 
 
-def cosine_sim(y_pred_tensor, y_true_tensor):
-    y_pred = torch_to_numpy(y_pred_tensor)
-    y_true = torch_to_numpy(y_true_tensor)
-    dist = cosine_similarity(y_true, y_pred).mean()
-    return torch.FloatTensor([dist.tolist()])
+def cosine_sim(y_pred, y_true):
+    return F.cosine_similarity(y_true, y_pred).mean()
 
 
 def square_distance(input, target):
     return F.pairwise_distance(input, target).mean()
+
 
 def cosine_distance(input, target):
     return 1.0 - F.cosine_similarity(input, target).mean()
@@ -243,6 +241,14 @@ def collate_examples_unique_context(samples):
     )
 
 def collate_fn(batch):
+    x, y = collate_x(batch)
+    return (x, torch.FloatTensor(numpy.array(y)))
+
+def collate_fn_test(batch):
+    x, y = collate_x(batch)
+    return (x, torch.LongTensor(numpy.array(y)))
+
+def collate_x(batch):
     batch = [(*x, y) for x, y in batch] # Unwraps the batch
     *x, y = list(zip(*batch))
     
@@ -250,8 +256,6 @@ def collate_fn(batch):
     for x_part in x:
         x_lengths = torch.LongTensor([len(item) for item in x_part])
         padded_x.append(pad_sequences(x_part, x_lengths))
-    
-    y = torch.FloatTensor(numpy.array(y))
 
     return (tuple(padded_x), y)
 

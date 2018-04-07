@@ -64,7 +64,7 @@ class MultiLSTM(Module):
             _, rev_perm_idx = perm_idx.sort(0)
 
             # Embed
-            embeddings = self.embeddings(x)
+            embeddings = self.embeddings(x[perm_idx])
 
             # Initialize hidden to zero
             packed_input = pack_padded_sequence(
@@ -82,7 +82,7 @@ class MultiLSTM(Module):
 
 class Context(MultiLSTM):
     """
-    This Context module adds dropout and a fully connected layer to a MultiStream class.
+    This Context module adds dropout and a fully connected layer to a MultiLSTM class.
     """
 
     def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
@@ -250,13 +250,17 @@ class ComickDev(Module):
                                 embedding_dim=characters_embedding_dimension,
                                 hidden_state_dim=word_embeddings_dimension)
 
-        self.fc1 = nn.Linear(in_features=4*word_embeddings_dimension,
-                             out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc1.weight)
+        self.fc_context = nn.Linear(in_features=2*word_embeddings_dimension,
+                                    out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_context.weight)
 
-        self.fc2 = nn.Linear(in_features=word_embeddings_dimension,
-                             out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc2.weight)
+        self.fc_word = nn.Linear(in_features=2*word_embeddings_dimension,
+                                 out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_word.weight)
+
+        self.fc_output = nn.Linear(in_features=2*word_embeddings_dimension,
+                                   out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_output.weight)
 
         self.dropout = nn.Dropout(p=0.3)
 
@@ -270,15 +274,11 @@ class ComickDev(Module):
         left_context, word, right_context = x
 
         left_rep, right_rep = self.contexts(left_context, right_context)
-        context_rep = left_rep + right_rep
-        word_hidden_rep = self.mimick_lstm(word)
-        output = word_hidden_rep
-        # output = torch.cat((context_rep, word_hidden_rep), dim=1)
-        # output = self.dropout(output)
-        # output = F.tanh(output)
-        output = self.fc1(output)
-        # output = self.dropout(output)
+        context_rep = self.fc_context(left_rep + right_rep)
+        word_hidden_rep = self.fc_word(self.mimick_lstm(word))
+        output = torch.cat((context_rep, word_hidden_rep), dim=1)
+        output = self.dropout(output)
         output = F.tanh(output)
-        output = self.fc2(output)
+        output = self.fc_output(output)
 
         return output
