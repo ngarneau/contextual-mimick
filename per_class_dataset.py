@@ -136,7 +136,7 @@ class PerClassDataset(Dataset):
         stats = {}
         stats['number of examples'] = len(self)
         stats['number of labels'] = len(self.labels_mapping)
-        stats['number of non-empty labels'] = len(self.dataset)
+        # stats['number of non-empty labels'] = len(self.dataset)
         stats['mean number of examples per labels'] = np.mean([N for N in self.nb_examples_per_label.values()])
         stats['median number of examples per labels'] = np.median([N for N in self.nb_examples_per_label.values()])
 
@@ -171,7 +171,7 @@ class PerClassDataset(Dataset):
 
         # stats['number of labels with N examples'] = nb_labels_with_N_examples
         # stats['least common labels'] = min_N_labels
-        stats['least common labels number of examples'] = min_N
+        # stats['least common labels number of examples'] = min_N
         # stats['most common labels'] = max_N_labels
         stats['most common labels number of examples'] = max_N
         if inferior_bounds != []:
@@ -271,11 +271,23 @@ class DataLoader(DataLoader):
             if len(obj) == 1:
                 obj = obj[0]
             return obj
-        if len(obj) == 1 and not isinstance(obj[0], tuple):
-            return obj[0].cuda()
-        if len(obj) == 1 and isinstance(obj[0], tuple):
-            obj = obj[0]
-        return tuple(self._to_gpu(o) for o in obj)
+
+        if len(obj) == 1:
+            obj = obj[0] # Unpacks sequences of 1 object
+        if torch.is_tensor(obj):
+            return obj.cuda()
+        elif isinstance(obj, (tuple, list)):
+            return type(obj)(self._to_gpu(o) for o in obj)
+        else:
+            return obj
+
+
+
+        # if len(obj) == 1 and isinstance(obj[0], torch.Tensor):
+        #     return obj[0].cuda()
+        # if len(obj) == 1 and isinstance(obj[0], tuple):
+        #     obj = obj[0]
+        # return tuple(self._to_gpu(o) for o in obj)
 
     def __iter__(self):
         for x, y in super().__iter__():
@@ -321,7 +333,7 @@ if __name__ == '__main__':
     
     
     print('\n\nTesting with PerClassLoader')
-    loader = PerClassLoader(dataset, k=-1, batch_size=16)
+    loader = PerClassLoader(dataset, k=-1, batch_size=16, use_gpu=True)
 
     print('len loader:', len(loader))
 
