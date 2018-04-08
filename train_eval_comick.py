@@ -112,7 +112,7 @@ def prepare_data(embeddings,
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=64,
-                                  k=k,
+                                  k=-1,
                                   use_gpu=use_gpu,
                                   filter_labels_cond=filter_labels_cond)
 

@@ -83,15 +83,15 @@ def preprocess_token(token):
     code_re = re.compile(r'\d+(-\d+){3,}')
 
     if date_re.fullmatch(token):
-        token = "<DATE>"
+        token = "2000-01-01"
     elif float_re.fullmatch(token):
-        token = "<FLOAT>"
+        token = "0.0"
     elif int_re.fullmatch(token):
-        token = "<INT>"
+        token = "0"
     elif time_re.fullmatch(token):
-        token = "<TIME>"
+        token = "00:00"
     elif code_re.fullmatch(token):
-        token = "<CODE>"
+        token = "00-00-00-00"
     else:
         token = token.lower()
     return token
