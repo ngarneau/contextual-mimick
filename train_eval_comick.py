@@ -215,22 +215,24 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
     predicted_results = {}
 
     def norm(y_true, y_pred): return np.linalg.norm(y_pred-y_true)
-    sum_norm = 0
+    euclidean_distances = []
 
     def cos_sim(y_true, y_pred): return float(cosine_similarity(y_pred, y_true))
-    sum_cos_sim = 0
+    cos_sims = []
     nb_of_pred = 0
     for label in mean_pred_embeddings:
         if label in test_embeddings:
             y_pred = mean_pred_embeddings[label].reshape(1,-1)
             y_true = test_embeddings[label].reshape(1,-1)
-            sum_norm += norm(y_true, y_pred)
-            sum_cos_sim += cos_sim(y_true, y_pred)
+            euclidean_distances.append(norm(y_true, y_pred))
+            cos_sims.append(cos_sim(y_true, y_pred))
             nb_of_pred += 1
 
     print('\nResults on the test:')
-    print('Mean euclidean dist:', sum_norm/nb_of_pred)
-    print('Mean cosine sim:', sum_cos_sim/nb_of_pred)
+    print('Mean euclidean dist:', np.mean(euclidean_distances))
+    print('Variance of euclidean dist:', np.std(euclidean_distances))
+    print('Mean cosine sim:', np.mean(cos_sims))
+    print('Variance of cosine sim:', np.std(cos_sims))
     print('Number of labels evaluated:', nb_of_pred)
 
 
