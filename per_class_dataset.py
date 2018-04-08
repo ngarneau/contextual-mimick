@@ -281,14 +281,6 @@ class DataLoader(DataLoader):
         else:
             return obj
 
-
-
-        # if len(obj) == 1 and isinstance(obj[0], torch.Tensor):
-        #     return obj[0].cuda()
-        # if len(obj) == 1 and isinstance(obj[0], tuple):
-        #     obj = obj[0]
-        # return tuple(self._to_gpu(o) for o in obj)
-
     def __iter__(self):
         for x, y in super().__iter__():
             yield self._to_gpu(x), self._to_gpu(y)
