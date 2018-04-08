@@ -15,6 +15,7 @@ from pytoune.framework import torch_to_numpy
 
 from evaluation import evaluate_embeddings
 from contextual_mimick import ContextualMimick, get_contextual_mimick
+from comick import ComickDev
 from utils import load_embeddings, pad_sequences, parse_conll_file, make_vocab, WordsInContextVectorizer, load_vocab
 
 
@@ -23,7 +24,7 @@ def main():
     parser.add_argument("n", default=41, nargs='?')
     parser.add_argument("k", default=2, nargs='?')
     parser.add_argument("d", default=100, nargs='?')
-    parser.add_argument("model_path", default='best_comick_n41_k2_d100.torch', nargs='?')
+    parser.add_argument("model_path", default='models/best_comick_dev_n41_k2_d100.torch', nargs='?')
     parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting2/all_oov_setting2.txt', nargs='?')
     args = parser.parse_args()
     n = int(args.n)
@@ -34,6 +35,8 @@ def main():
 
     # Prepare our examples
     sentences = parse_conll_file('./conll/train.txt')
+    sentences += parse_conll_file('./conll/valid.txt')
+    sentences += parse_conll_file('./conll/test.txt')
 
     word_to_idx, char_to_idx = make_vocab(sentences)
 
@@ -46,7 +49,12 @@ def main():
     else:
         map_location = lambda storage, loc: storage
 
-    net = get_contextual_mimick(char_to_idx, word_to_idx, word_embedding_dim=d)
+    net = ComickDev(
+        characters_vocabulary=char_to_idx,
+        words_vocabulary=word_to_idx,
+        characters_embedding_dimension=20,
+        word_embeddings_dimension=d,
+    )
 
     net.eval()
     net.load_state_dict(torch.load(model_path, map_location))
@@ -94,7 +102,7 @@ def main():
 
     filepath = './predicted_embeddings/'
     os.makedirs(filepath, exist_ok=True)
-    filename = 'comick_pred_n{}_k{}_d{}_dropout.txt'.format(n, k, d)
+    filename = 'comick_dev_pred_n{}_k{}_d{}_dropout.txt'.format(n, k, d)
     with open(filepath + filename, 'w') as fhandle:
         for word, embedding in averaged_embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])

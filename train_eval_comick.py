@@ -22,20 +22,20 @@ from torch.optim import Adam
 
 
 def load_data(d, verbose=True):
-    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(
+    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(
         d)
     try:
         embeddings = load_embeddings(path_embeddings)
     except:
         if d == 50:
-            path_embeddings = './embeddings/train_embeddings.txt'
+            path_embeddings = './data/embeddings/train_embeddings.txt'
             embeddings = load_embeddings(path_embeddings)
         else:
             raise
 
-    train_sentences = parse_conll_file('./conll/train.txt')
-    valid_sentences = parse_conll_file('./conll/valid.txt')
-    test_sentences = parse_conll_file('./conll/test.txt')
+    train_sentences = parse_conll_file('./data/conll/train.txt')
+    valid_sentences = parse_conll_file('./data/conll/valid.txt')
+    test_sentences = parse_conll_file('./data/conll/test.txt')
 
     if verbose:
         print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
@@ -45,7 +45,7 @@ def load_data(d, verbose=True):
 
 def augment_data(examples, embeddings):
     labels = set(label for x, label in examples)
-    similar_words = pkl.load(open('similar_words.p', 'rb'))
+    similar_words = pkl.load(open('./data/similar_words.p', 'rb'))
 
     new_examples = set()
     for (left_context, word, right_context), label in examples:
@@ -242,7 +242,7 @@ def main(n=41, k=1, device=0, d=100):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
