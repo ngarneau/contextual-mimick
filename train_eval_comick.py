@@ -8,7 +8,7 @@ from comick import ComickUniqueContext, LRComick, ComickDev
 from utils import load_embeddings, save_embeddings, parse_conll_file
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
-from utils import collate_fn, collate_fn_test
+from utils import collate_fn, collate_x
 from per_class_dataset import *
 
 import numpy as np
@@ -119,12 +119,10 @@ def prepare_data(embeddings,
     # Test part
     test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] not in train_valid_dataset)
 
-    target_transform = lambda label: vectorizer.words_to_idx[label]
     test_dataset = PerClassDataset(dataset=test_examples,
-                                   transform=transform,
-                                   target_transform=target_transform)
+                                   transform=transform)
     test_loader = PerClassLoader(dataset=test_dataset,
-                                 collate_fn=collate_fn_test,
+                                 collate_fn=collate_x,
                                  k=-1,
                                  batch_size=64,
                                  use_gpu=use_gpu)
@@ -192,16 +190,16 @@ def predict_mean_embeddings(model, loader):
     for x, y in loader:
         x = tensors_to_variables(x)
         embeddings = torch_to_numpy(model.model(x))
-        for idx, embedding in zip(y, embeddings):
-            if idx in predicted_embeddings:
-                predicted_embeddings[idx].append(embedding)
+        for label, embedding in zip(y, embeddings):
+            if label in predicted_embeddings:
+                predicted_embeddings[label].append(embedding)
             else:
-                predicted_embeddings[idx] = [embedding]
+                predicted_embeddings[label] = [embedding]
 
     mean_pred_embeddings = {}
-    for idx in predicted_embeddings:
-        mean_pred_embeddings[idx] = np.mean(
-            np.array(predicted_embeddings[idx]), axis=0)
+    for label in predicted_embeddings:
+        mean_pred_embeddings[label] = np.mean(
+            np.array(predicted_embeddings[label]), axis=0)
     return mean_pred_embeddings
 
 
@@ -222,10 +220,10 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
     def cos_sim(y_true, y_pred): return float(cosine_similarity(y_pred, y_true))
     sum_cos_sim = 0
     nb_of_pred = 0
-    for label, idx in test_loader.dataset.labels_mapping.items():
-        if label in test_embeddings and idx in mean_pred_embeddings:
+    for label in mean_pred_embeddings:
+        if label in test_embeddings:
+            y_pred = mean_pred_embeddings[label].reshape(1,-1)
             y_true = test_embeddings[label].reshape(1,-1)
-            y_pred = mean_pred_embeddings[idx].reshape(1,-1)
             sum_norm += norm(y_true, y_pred)
             sum_cos_sim += cos_sim(y_true, y_pred)
             nb_of_pred += 1
@@ -259,7 +257,7 @@ def main(n=41, k=1, device=0, d=100):
     train_sentences, valid_sentences, test_sentences = sentences
     if debug_mode:
         train_sentences = train_sentences[:50]
-        valid_sentences = valid_sentences[:100]
+        valid_sentences = valid_sentences[:20]
         test_sentences = []
     all_sentences = train_sentences + valid_sentences + test_sentences
 
