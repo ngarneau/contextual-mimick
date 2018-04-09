@@ -112,6 +112,8 @@ train_logs/
 
 embeddings_settings/
 
+data/
+
 temp.py
 test.py
 

@@ -13,15 +13,15 @@ class Module(nn.Module):
 
     def parameters(self):
         """
-		Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
-		"""
+        Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
+        """
         return (param for param in super().parameters() if param.requires_grad)
 
 
 class MultiLSTM(Module):
     """
-	Module that converts multiple sequences of items into their common embeddings, then applies a bidirectional LSTM on each sequence. The outputs are the concatenations of the two final hidden states.
-	"""
+    Module that converts multiple sequences of items into their common embeddings, then applies a bidirectional LSTM on each sequence. The outputs are the concatenations of the two final hidden states.
+    """
 
     def __init__(self,
                  num_embeddings,
@@ -55,8 +55,8 @@ class MultiLSTM(Module):
 
     def forward(self, *xs):
         """
-		xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
-		"""
+        xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
+        """
         outputs = []
         for x, lstm in zip(xs, self.lstms):
             lengths = x.data.ne(0).sum(dim=1).long()
@@ -64,7 +64,7 @@ class MultiLSTM(Module):
             _, rev_perm_idx = perm_idx.sort(0)
 
             # Embed
-            embeddings = self.embeddings(x)
+            embeddings = self.embeddings(x[perm_idx])
 
             # Initialize hidden to zero
             packed_input = pack_padded_sequence(
@@ -82,8 +82,8 @@ class MultiLSTM(Module):
 
 class Context(MultiLSTM):
     """
-	This Context module adds dropout and a fully connected layer to a MultiStream class.
-	"""
+    This Context module adds dropout and a fully connected layer to a MultiLSTM class.
+    """
 
     def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
         super().__init__(*args, hidden_state_dim=hidden_state_dim, n_lstms=n_contexts, **kwargs)
@@ -107,8 +107,8 @@ class Context(MultiLSTM):
 
 class LRComick(Module):
     """
-	This is a re-implementation of our original Comick with right and left context.
-	"""
+    This is a re-implementation of our original Comick with right and left context.
+    """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
@@ -168,8 +168,8 @@ class LRComick(Module):
 
 class ComickUniqueContext(Module):
     """
-	This is the architecture with only one context.
-	"""
+    This is the architecture with only one context.
+    """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
@@ -222,9 +222,8 @@ class ComickUniqueContext(Module):
 
 class ComickDev(Module):
     """
-	This is the architecture in development.
-	"""
-
+    This is the architecture in development.
+    """
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -278,7 +277,7 @@ class ComickDev(Module):
         context_rep = self.fc_context(left_rep + right_rep)
         word_hidden_rep = self.fc_word(self.mimick_lstm(word))
         output = torch.cat((context_rep, word_hidden_rep), dim=1)
-        # output = self.dropout(output)
+        output = self.dropout(output)
         output = F.tanh(output)
         output = self.fc_output(output)
 
