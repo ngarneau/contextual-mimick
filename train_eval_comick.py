@@ -7,7 +7,7 @@ logging.getLogger().setLevel(logging.INFO)
 from comick import ComickUniqueContext, LRComick, ComickDev
 from utils import load_embeddings, save_embeddings, parse_conll_file
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
-from utils import make_vocab, WordsInContextVectorizer, ngrams
+from utils import make_vocab, load_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_fn, collate_x
 from per_class_dataset import *
 
@@ -22,16 +22,8 @@ from torch.optim import Adam
 
 
 def load_data(d, verbose=True):
-    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(
-        d)
-    try:
-        embeddings = load_embeddings(path_embeddings)
-    except:
-        if d == 50:
-            path_embeddings = './data/embeddings/train_embeddings.txt'
-            embeddings = load_embeddings(path_embeddings)
-        else:
-            raise
+    path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(d)
+    embeddings = load_embeddings(path_embeddings)
 
     train_sentences = parse_conll_file('./data/conll/train.txt')
     valid_sentences = parse_conll_file('./data/conll/valid.txt')
@@ -278,7 +270,7 @@ def main(n=41, k=1, device=0, d=100):
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         train_sentences=train_sentences,
-        test_sentences=valid_sentences,  # +test_sentences
+        test_sentences=all_sentences,
         vectorizer=vectorizer,
         n=n,
         use_gpu=use_gpu,
@@ -332,11 +324,12 @@ def main(n=41, k=1, device=0, d=100):
         valid_loader=valid_loader,
         epochs=epochs,
     )
-
+    test_vocabs = load_vocab('./data/conll_embeddings_settings/setting2/glove/oov.txt')
+    test_embeddings = {word:embed for word, embed in embeddings.items() if word in test_vocabs}
     evaluate(
         model,
         test_loader=test_loader,
-        test_embeddings=embeddings,
+        test_embeddings=test_embeddings,
         save=save,
         model_name=model_name + '.txt'
     )

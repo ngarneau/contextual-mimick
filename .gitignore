@@ -106,13 +106,11 @@ predicted_embeddings/
 
 models/
 
-embeddings/glove-embeddings-6B-50D.txt
-
 train_logs/
 
-embeddings_settings/
-
-data/
+data/conll/
+data/conll_embeddings_settings/
+data/glove_embeddings/
 
 temp.py
 test.py
