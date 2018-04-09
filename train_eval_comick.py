@@ -307,6 +307,8 @@ def main(n=41, k=1, device=0, d=100):
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
+        context_dropout_p=0.3,
+        fc_dropout_p=0.5
     )
     model = Model(
         model=net,
