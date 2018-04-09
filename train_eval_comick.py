@@ -112,7 +112,7 @@ def prepare_data(embeddings,
                                   filter_labels_cond=filter_labels_cond)
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
-                                  batch_size=64,
+                                  batch_size=1,
                                   k=-1,
                                   use_gpu=use_gpu,
                                   filter_labels_cond=filter_labels_cond)
@@ -127,7 +127,7 @@ def prepare_data(embeddings,
     test_loader = PerClassLoader(dataset=test_dataset,
                                  collate_fn=collate_fn,
                                  k=-1,
-                                 batch_size=64,
+                                 batch_size=1,
                                  use_gpu=use_gpu)
 
     if verbose:
@@ -243,11 +243,11 @@ def main(n=41, k=1, device=0, d=50):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -257,7 +257,7 @@ def main(n=41, k=1, device=0, d=50):
     embeddings, sentences = load_data(d, verbose)
     train_sentences, valid_sentences, test_sentences = sentences
     if debug_mode:
-        train_sentences = train_sentences[:100]
+        train_sentences = train_sentences[:200]
         valid_sentences = valid_sentences[:100]
         test_sentences = test_sentences[:100]
     all_sentences = train_sentences + valid_sentences + test_sentences
@@ -272,6 +272,7 @@ def main(n=41, k=1, device=0, d=50):
     data_augmentation = True
     if debug_mode:
         data_augmentation = False
+        over_population_threshold = 800000
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         train_sentences=train_sentences,
@@ -293,7 +294,7 @@ def main(n=41, k=1, device=0, d=50):
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
-        epochs = 1
+        epochs = 3
 
     # Create the model
     # net = LRComick(
@@ -348,7 +349,7 @@ if __name__ == '__main__':
         parser.add_argument("n", default=7, nargs='?')
         parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
-        parser.add_argument("d", default=50, nargs='?')
+        parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
         n = int(args.n)
         k = int(args.k)
