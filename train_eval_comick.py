@@ -49,13 +49,14 @@ def augment_data(examples, embeddings):
 
     new_examples = set()
     for (left_context, word, right_context), label in examples:
-        sim_words = similar_words[label]
-        for sim_word, cos_sim in sim_words:
-            # Add new labels, not new examples to already existing labels.
-            if sim_word not in labels and cos_sim >= 0.6:
-                new_example = (
-                    (left_context, sim_word, right_context), sim_word)
-                new_examples.add(new_example)
+        if label in similar_words:
+            sim_words = similar_words[label]
+            for sim_word, cos_sim in sim_words:
+                # Add new labels, not new examples to already existing labels.
+                if sim_word not in labels and cos_sim >= 0.6:
+                    new_example = (
+                        (left_context, sim_word, right_context), sim_word)
+                    new_examples.add(new_example)
 
     return new_examples
 
@@ -272,7 +273,7 @@ def main(n=41, k=1, device=0, d=100):
     over_population_threshold = 80
     data_augmentation = True
     if debug_mode:
-        data_augmentation = False
+        # data_augmentation = False
         over_population_threshold = None
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
