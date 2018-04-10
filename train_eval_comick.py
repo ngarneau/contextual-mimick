@@ -5,7 +5,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from comick import ComickUniqueContext, LRComick, ComickDev
-from utils import load_embeddings, save_embeddings, parse_conll_file
+from utils import load_embeddings, save_embeddings, parse_conll_file, load_vocab
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_fn, collate_x
@@ -22,8 +22,7 @@ from torch.optim import Adam
 
 
 def load_data(d, verbose=True):
-    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(
-        d)
+    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         embeddings = load_embeddings(path_embeddings)
     except:
@@ -245,7 +244,7 @@ def main(n=41, k=1, device=0, d=100):
     random.seed(seed)
 
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     use_gpu = torch.cuda.is_available()
@@ -278,7 +277,7 @@ def main(n=41, k=1, device=0, d=100):
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         train_sentences=train_sentences,
-        test_sentences=valid_sentences,  # +test_sentences
+        test_sentences=all_sentences,  # +test_sentences
         vectorizer=vectorizer,
         n=n,
         use_gpu=use_gpu,
@@ -333,10 +332,13 @@ def main(n=41, k=1, device=0, d=100):
         epochs=epochs,
     )
 
+    test_path_oov = './data/embeddings_settings/setting2/all_oov_setting2.txt'
+    test_vocabs = load_vocab(test_path_oov)
+    test_embeddings = {k: v for k, v in embeddings.items() if k in test_vocabs}
     evaluate(
         model,
         test_loader=test_loader,
-        test_embeddings=embeddings,
+        test_embeddings=test_embeddings,
         save=save,
         model_name=model_name + '.txt'
     )
