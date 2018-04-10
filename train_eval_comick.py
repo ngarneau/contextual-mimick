@@ -22,15 +22,8 @@ from torch.optim import Adam
 
 
 def load_data(d, verbose=True):
-    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
-    try:
-        embeddings = load_embeddings(path_embeddings)
-    except:
-        if d == 50:
-            path_embeddings = './data/embeddings/train_embeddings.txt'
-            embeddings = load_embeddings(path_embeddings)
-        else:
-            raise
+    path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(d)
+    embeddings = load_embeddings(path_embeddings)
 
     train_sentences = parse_conll_file('./data/conll/train.txt')
     valid_sentences = parse_conll_file('./data/conll/valid.txt')
@@ -314,6 +307,8 @@ def main(n=41, k=1, device=0, d=100):
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
+        context_dropout_p=0.3,
+        fc_dropout_p=0.5
     )
     model = Model(
         model=net,

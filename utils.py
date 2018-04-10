@@ -28,35 +28,6 @@ def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
             fhandle.write(s)
 
 
-def pad_sequences(vectorized_seqs, seq_lengths):
-    """
-    Pads vectorized ngrams so that they occupy the same space in a LongTensor.
-    """
-    seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
-    for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
-        seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
-    return seq_tensor
-
-
-def euclidean_distance(y_pred_tensor, y_true_tensor):
-    y_pred = torch_to_numpy(y_pred_tensor)
-    y_true = torch_to_numpy(y_true_tensor)
-    dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
-    return torch.FloatTensor([dist.tolist()])
-
-
-def cosine_sim(y_pred, y_true):
-    return F.cosine_similarity(y_true, y_pred).mean()
-
-
-def square_distance(input, target):
-    return F.pairwise_distance(input, target).mean()
-
-
-def cosine_distance(input, target):
-    return F.cosine_similarity(input, target).mean()
-
-
 def parse_conll_file(filename):
     sentences = list()
     with open(filename) as fhandler:
@@ -64,55 +35,13 @@ def parse_conll_file(filename):
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
                 token, _, _, e = line[:-1].split(' ')
-                sentence.append(preprocess_token(token))
+                sentence.append(token.lower())
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
                 sentence = list()
     return sentences
 
-
-def preprocess_token(token):
-    """
-    Modifies a token in a particular format to a unique predefined format.
-    """
-    date_re = re.compile(r'\d{2}(\d{2})?[/-]\d{2}[/-]\d{2}')
-    float_re = re.compile(r'(\d+,)*\d+\.\d*')
-    int_re = re.compile(r'(\d+,)*\d{3,}')
-    time_re = re.compile(r'\d{1,2}:\d{2}(\.\d*)?')
-    code_re = re.compile(r'\d+(-\d+){3,}')
-
-    if date_re.fullmatch(token):
-        token = "2000-01-01"
-    elif float_re.fullmatch(token):
-        token = "0.0"
-    elif int_re.fullmatch(token):
-        token = "0"
-    elif time_re.fullmatch(token):
-        token = "00:00"
-    elif code_re.fullmatch(token):
-        token = "00-00-00-00"
-    else:
-        token = token
-    return token
-
-def test_preprocessing():
-    for token in ['1998/08/01',
-                '1998-08-01',
-                '98/08/01',
-                '98-08-01',
-                '10.',
-                '10.3232',
-                '10,10.',
-                '10,10.3232',
-                '10,100,100.3232',
-                '10',
-                '10,002',
-                '10:10',
-                '10:10.3232',
-                '10-10-10-10']:
-        t = preprocess_token(token)
-        # print(t)
 
 def make_vocab(sentences):
     vocab = set()
@@ -137,6 +66,14 @@ def make_vocab(sentences):
     for w in sorted(char_vocab):
         char_to_idx[w] = len(char_to_idx)
     return word_to_idx, char_to_idx
+
+
+def load_vocab(path):
+    vocab = set()
+    with open(path) as fhandle:
+        for line in fhandle:
+            vocab.add(line[:-1])
+    return vocab
 
 
 class WordsInContextVectorizer:
@@ -165,19 +102,12 @@ class WordsInContextVectorizer:
 
     def vectorize_example(self, example):
         x, y = example
-        left_context, word, right_context = x
-        vectorized_left_context = self.vectorize_sequence(left_context, self.words_to_idx)
-        vectorized_word = self.vectorize_sequence(word, self.chars_to_idx)
-        vectorized_right_context = self.vectorize_sequence(right_context, self.words_to_idx)
-        return (
-            vectorized_left_context,
-            vectorized_word,
-            vectorized_right_context,
-            y
-        )
+        x = self.vectorize_unknown_example(x)
+        return x + (y,)
 
     def vectorize_unknown_example(self, x):
         left_context, word, right_context = x
+        word = self.preprocess_token(word)
         vectorized_left_context = self.vectorize_sequence(left_context, self.words_to_idx)
         vectorized_word = self.vectorize_sequence(word, self.chars_to_idx)
         vectorized_right_context = self.vectorize_sequence(right_context, self.words_to_idx)
@@ -187,71 +117,32 @@ class WordsInContextVectorizer:
             vectorized_right_context
         )
 
-    def vectorize_unknown_example_merged_context(self, x):
-        left_context, word, right_context = x
-        context = left_context + right_context
-        vectorized_context = self.vectorize_sequence(context, self.words_to_idx)
-        vectorized_word = self.vectorize_sequence(word, self.chars_to_idx)
-        return (
-            vectorized_context,
-            vectorized_word,
-            len(left_context)
-        )
+    def preprocess_token(self, token):
+        """
+        Modifies a token in a particular format to a unique predefined format.
+        """
+        date_re = re.compile(r'\d{2}(\d{2})?[/-]\d{2}[/-]\d{2}')
+        float_re = re.compile(r'(\d+,)*\d+\.\d*')
+        int_re = re.compile(r'(\d+,)*\d{3,}')
+        time_re = re.compile(r'\d{1,2}:\d{2}(\.\d*)?')
+        code_re = re.compile(r'\d+(-\d+){3,}')
 
+        if date_re.fullmatch(token):
+            token = "2000-01-01"
+        elif float_re.fullmatch(token):
+            token = "0.0"
+        elif int_re.fullmatch(token):
+            token = "0"
+        elif time_re.fullmatch(token):
+            token = "00:00"
+        elif code_re.fullmatch(token):
+            token = "00-00-00-00"
+        return token
 
-def collate_examples(samples):
-    left_contexts, words, right_contexts, labels = list(zip(*samples))
-
-    left_contexts_lengths = torch.LongTensor([len(s) for s in left_contexts])
-    padded_left_contexts = pad_sequences(left_contexts, left_contexts_lengths)
-
-    seq_lengths = torch.LongTensor([len(s) for s in words])
-    padded_words = pad_sequences(words, seq_lengths)
-
-    right_contexts_lengths = torch.LongTensor([len(s) for s in right_contexts])
-    padded_right_contexts = pad_sequences(right_contexts, right_contexts_lengths)
-
-    labels = torch.FloatTensor(numpy.array(labels))
-
-    return (
-        (
-            padded_left_contexts,
-            padded_words,
-            padded_right_contexts
-        ),
-        labels
-    )
-
-
-def collate_examples_unique_context(samples):
-    contexts, words, idxs, labels = list(zip(*samples))
-
-    contexts_lengths = torch.LongTensor([len(s) for s in contexts])
-    padded_contexts = pad_sequences(contexts, contexts_lengths)
-
-    seq_lengths = torch.LongTensor([len(s) for s in words])
-    padded_words = pad_sequences(words, seq_lengths)
-
-    idxs = torch.LongTensor([idxs])
-
-    labels = torch.FloatTensor(numpy.array(labels))
-
-    return (
-        (
-            padded_contexts,
-            padded_words,
-            idxs
-        ),
-        labels
-    )
 
 def collate_fn(batch):
     x, y = collate_x(batch)
     return (x, torch.FloatTensor(numpy.array(y)))
-
-def collate_fn_test(batch):
-    x, y = collate_x(batch)
-    return (x, torch.LongTensor(numpy.array(y)))
 
 def collate_x(batch):
     batch = [(*x, y) for x, y in batch] # Unwraps the batch
@@ -265,12 +156,15 @@ def collate_x(batch):
     return (tuple(padded_x), y)
 
 
-def load_vocab(path):
-    vocab = set()
-    with open(path) as fhandle:
-        for line in fhandle:
-            vocab.add(line[:-1])
-    return vocab
+def pad_sequences(vectorized_seqs, seq_lengths):
+    """
+    Pads vectorized ngrams so that they occupy the same space in a LongTensor.
+    """
+    seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
+    for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
+        seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
+    
+    return seq_tensor
 
 
 def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
@@ -284,6 +178,25 @@ def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_
         right_idx = min(L, i+m+pad_left+pad_right)
         right_side = tuple(sequence[i+pad_left+pad_right:right_idx])
         yield (left_side, item, right_side)
+
+
+def euclidean_distance(y_pred_tensor, y_true_tensor):
+    y_pred = torch_to_numpy(y_pred_tensor)
+    y_true = torch_to_numpy(y_true_tensor)
+    dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
+    return torch.FloatTensor([dist.tolist()])
+
+
+def cosine_sim(y_pred, y_true):
+    return F.cosine_similarity(y_true, y_pred).mean()
+
+
+def square_distance(input, target):
+    return F.pairwise_distance(input, target).mean()
+
+
+def cosine_distance(input, target):
+    return F.cosine_similarity(input, target).mean()
 
 
 if __name__ == '__main__':

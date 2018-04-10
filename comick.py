@@ -29,7 +29,8 @@ class MultiLSTM(Module):
                  hidden_state_dim,
                  n_lstms=1,
                  padding_idx=0,
-                 freeze_embeddings=False):
+                 freeze_embeddings=False,
+                 dropout=0):
         super().__init__()
 
         self.embeddings = nn.Embedding(
@@ -49,7 +50,8 @@ class MultiLSTM(Module):
                 hidden_size=hidden_state_dim,
                 num_layers=1,
                 batch_first=True,
-                bidirectional=True)
+                bidirectional=True,
+                dropout=dropout)
             setattr(self, 'lstm' + str(i), lstm)  # To support 'parameters()'
             self.lstms.append(lstm)
 
@@ -231,6 +233,8 @@ class ComickDev(Module):
                  word_embeddings_dimension=50,
                  words_embeddings=None,
                  freeze_word_embeddings=True,
+                 context_dropout_p=0,
+                 fc_dropout_p=0.5,
                  ):
         super().__init__()
 
@@ -241,7 +245,8 @@ class ComickDev(Module):
                                   embedding_dim=word_embeddings_dimension,
                                   hidden_state_dim=word_embeddings_dimension,
                                   n_lstms=2,
-                                  freeze_embeddings=freeze_word_embeddings)
+                                  freeze_embeddings=freeze_word_embeddings,
+                                  dropout=context_dropout_p)
 
         if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
@@ -262,7 +267,7 @@ class ComickDev(Module):
                                    out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_output.weight)
 
-        self.dropout = nn.Dropout(p=0.3)
+        self.dropout = nn.Dropout(p=fc_dropout_p)
 
     def load_words_embeddings(self, words_embeddings):
         for word, embedding in words_embeddings.items():

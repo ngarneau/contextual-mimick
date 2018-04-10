@@ -150,11 +150,11 @@ def main(d):
     # x_tensor, y_tensor = collate_examples(
     #     [corpus_vectorizer.vectorize_example(word, embedding) for word, embedding in train_embeddings.items()])
     # dataset = TensorDataset(x_tensor, y_tensor)
-    #
+
     # train_valid_ratio = 0.8
     # m = int(len(dataset) * train_valid_ratio)
     # train_dataset, valid_dataset = random_split(dataset, [m, len(dataset) - m])
-    #
+
     # print(len(train_dataset), len(valid_dataset))
 
     # train_loader = DataLoader(
@@ -162,7 +162,7 @@ def main(d):
     #     batch_size=8,
     #     shuffle=True
     # )
-    #
+
     # valid_loader = DataLoader(
     #     valid_dataset,
     #     batch_size=8,
