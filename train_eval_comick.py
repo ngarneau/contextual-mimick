@@ -327,7 +327,7 @@ def main(n=41, k=1, device=0, d=100):
         epochs=epochs,
     )
     test_vocabs = load_vocab('./data/conll_embeddings_settings/setting2/glove/oov.txt')
-    test_embeddings = {word:embed for word, embed in embeddings.items() if word in test_vocabs}
+    test_embeddings = {word:embeddings[word] for word in test_vocabs if word in embeddings}
     evaluate(
         model,
         test_loader=test_loader,
