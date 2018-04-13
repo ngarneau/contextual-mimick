@@ -1,49 +1,43 @@
+import pickle
+import numpy as np
 from pytoune.framework import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, Model
 from sklearn.model_selection import train_test_split
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from torch.nn import CrossEntropyLoss
 
-from downstream_task.models import LSTMTagger
-from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx, f1
+from downstream_task.models import LSTMClassifier
+from downstream_task.sequence_classification import acc, collate_examples 
+from downstream_task.utils import make_vocab_and_idx
 from utils import load_embeddings
 
 
-def parse_conll_file(filename):
+
+def parse_pickle_file(filename):
+    data, target_mapping = pickle.load(open(filename, 'rb'))
     sentences = list()
-    targets = list()
-    with open(filename) as fhandler:
-        sentence = list()
-        tags = list()
-        for line in fhandler:
-            if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
-                token, pos, chunk, e = line[:-1].split(' ')
-                sentence.append(token)
-                tags.append(e)
-            else:
-                if len(sentence) > 0:
-                    sentences.append(sentence)
-                    targets.append(tags)
-                sentence = list()
-                tags = list()
-    return sentences, targets
+    labels = list()
+    for sentence, label in data:
+        sentences.append(sentence)
+        labels.append(int(np.argmax(label)))
+    return sentences, labels
+
 
 
 def train(embeddings_path):
-    train_sentences, train_tags = parse_conll_file('./data/conll/train.txt')
-    valid_sentences, valid_tags = parse_conll_file('./data/conll/valid.txt')
-    test_sentences, test_tags = parse_conll_file('./data/conll/test.txt')
+    train_sentences, train_tags = parse_pickle_file('./data/sentiment/train.pickle')
+    valid_sentences, valid_tags = parse_pickle_file('./data/sentiment/dev.pickle')
+    test_sentences, test_tags = parse_pickle_file('./data/sentiment/test.pickle')
 
     words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
-    tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
+    tags_to_idx = {
+        0: 0,
+        1: 1
+    }
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
-    train_tags = [[tags_to_idx[word] for word in sentence] for sentence in train_tags]
-
     valid_sentences = [[words_to_idx[word] for word in sentence] for sentence in valid_sentences]
-    valid_tags = [[tags_to_idx[word] for word in sentence] for sentence in valid_tags]
-
     test_sentences = [[words_to_idx[word] for word in sentence] for sentence in test_sentences]
-    test_tags = [[tags_to_idx[word] for word in sentence] for sentence in test_tags]
 
 
     train_dataset = list(zip(train_sentences, train_tags))
@@ -73,7 +67,7 @@ def train(embeddings_path):
 
     train_embeddings = load_embeddings(embeddings_path)
 
-    net = LSTMTagger(
+    net = LSTMClassifier(
         100,
         50,
         words_to_idx,
@@ -85,7 +79,8 @@ def train(embeddings_path):
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/ner.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/ner.csv')
-    model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
+    loss = CrossEntropyLoss()
+    model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     print(model.evaluate_generator(test_loader))
 

@@ -83,8 +83,7 @@ def train(embeddings_path):
     checkpoint = ModelCheckpoint('./models/pos.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/pos.csv')
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
-    model.fit_generator(train_loader, valid_loader, epochs=1,
-                        callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     print(model.evaluate_generator(test_loader))
 
 
