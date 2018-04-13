@@ -115,19 +115,19 @@ def main(d):
     torch.manual_seed(seed)
     numpy.random.seed(seed)
 
-    path_embeddings = './embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
+    path_embeddings = './data/embeddings_settings/setting1/1_glove_embeddings/glove.6B.{}d.txt'.format(d)
     try:
         train_embeddings = load_embeddings(path_embeddings)
     except:
         if d == 50:
-            path_embeddings = './embeddings/train_embeddings.txt'
+            path_embeddings = './data/embeddings/train_embeddings.txt'
             train_embeddings = load_embeddings(path_embeddings)
             print('Loading {}d embeddings from: "' + path_embeddings + '"'.format(d))
         else:
             raise
     print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
-    path_sentences = './conll/train.txt'
+    path_sentences = './data/conll/train.txt'
     sentences = parse_conll_file(path_sentences)
 
     train_loader, valid_loader, word_to_idx, char_to_idx = prepare_data(
@@ -146,7 +146,7 @@ def main(d):
     # char_to_idx = build_vocab(train_embeddings.keys())
     # corpus_vectorizer = WordsVectorizer(char_to_idx)
 
-    # # Train dataset
+    # Train dataset
     # x_tensor, y_tensor = collate_examples(
     #     [corpus_vectorizer.vectorize_example(word, embedding) for word, embedding in train_embeddings.items()])
     # dataset = TensorDataset(x_tensor, y_tensor)
@@ -174,7 +174,7 @@ def main(d):
         characters_embedding_dimension=20,
         characters_hidden_state_dimension=50,
         word_embeddings_dimension=d,
-        fully_connected_layer_hidden_dimension=50
+        fully_connected_layer_hidden_dimension=100
     )
 
     lrscheduler = ReduceLROnPlateau(patience=2)
