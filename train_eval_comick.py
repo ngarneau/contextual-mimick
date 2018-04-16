@@ -1,15 +1,21 @@
 import argparse
 import os
 import logging
+
+from data_loaders import CoNLLDataLoader, SentimentDataLoader
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from comick import ComickUniqueContext, LRComick, ComickDev
-from utils import load_embeddings, save_embeddings, parse_conll_file, load_vocab
+from utils import load_embeddings, save_embeddings, parse_conll_file, load_vocab, preprocess_token
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_fn, collate_x
 from per_class_dataset import *
+from downstream_task.part_of_speech.train import train as train_pos
+from downstream_task.named_entity_recognition.train import train as train_ner
+from downstream_task.sentiment_classification.train import train as train_sent
 
 import numpy as np
 import pickle as pkl
@@ -21,7 +27,7 @@ from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelC
 from torch.optim import Adam
 
 
-def load_data(d, verbose=True):
+def load_data(d, corpus, verbose=True):
     path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(d)
     embeddings = load_embeddings(path_embeddings)
 
@@ -53,7 +59,19 @@ def augment_data(examples, embeddings):
     return new_examples
 
 
+def preprocess_examples(examples):
+    preprocessed_examples = list()
+    for (left_context, word, right_context), label in examples:
+        preprocessed_word = preprocess_token(word)
+        preprocessed_examples.append((
+            (left_context, preprocessed_word, right_context),
+            label
+        ))
+    return preprocessed_examples
+
+
 def prepare_data(embeddings,
+                 test_vocabs,
                  train_sentences,
                  test_sentences,
                  vectorizer,
@@ -64,7 +82,6 @@ def prepare_data(embeddings,
                  over_population_threshold=None,
                  verbose=True,
                  data_augmentation=False):
-
     # Train-validation part
     examples = set()
     examples_without_embeds = set()
@@ -81,9 +98,14 @@ def prepare_data(embeddings,
         if verbose:
             print("Number of non-augmented examples:", len(examples))
         examples |= augmented_examples  # Union
+    examples = preprocess_examples(examples)
+
 
     transform = vectorizer.vectorize_unknown_example
-    def target_transform(y): return embeddings[y]
+
+    def target_transform(y):
+        return embeddings[y]
+
     train_valid_dataset = PerClassDataset(
         examples,
         transform=transform,
@@ -105,12 +127,14 @@ def prepare_data(embeddings,
     valid_loader = PerClassLoader(dataset=valid_dataset,
                                   collate_fn=collate_fn,
                                   batch_size=64,
-                                  k=-1,
+                                  k=k,
                                   use_gpu=use_gpu,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] not in train_valid_dataset)
+    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if
+                        ngram[1] in test_vocabs)
+    test_examples = preprocess_examples(test_examples)
 
     test_dataset = PerClassDataset(dataset=test_examples,
                                    transform=transform)
@@ -128,30 +152,29 @@ def prepare_data(embeddings,
         print('\nGlobal statistics:')
         stats = train_valid_dataset.stats()
         for stats, value in stats.items():
-            print(stats+': '+str(value))
+            print(stats + ': ' + str(value))
 
         print('\nStatistics on the training dataset:')
         stats = train_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
-            print(stats+': '+str(value))
+            print(stats + ': ' + str(value))
 
         print('\nStatistics on the validation dataset:')
         stats = valid_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
-            print(stats+': '+str(value))
+            print(stats + ': ' + str(value))
 
         print('\nStatistics on the test dataset:')
         stats = test_dataset.stats()
         for stats, value in stats.items():
-            print(stats+': '+str(value))
-        
-        print('\nFor training, loading '+str(k)+' examples per label per epoch.')
+            print(stats + ': ' + str(value))
+
+        print('\nFor training, loading ' + str(k) + ' examples per label per epoch.')
 
     return train_loader, valid_loader, test_loader
 
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
-
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=10)
@@ -197,7 +220,6 @@ def predict_mean_embeddings(model, loader):
 
 
 def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
-
     mean_pred_embeddings = predict_mean_embeddings(model, test_loader)
 
     if save:
@@ -207,16 +229,20 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
 
     predicted_results = {}
 
-    def norm(y_true, y_pred): return np.linalg.norm(y_pred-y_true)
+    def norm(y_true, y_pred):
+        return np.linalg.norm(y_pred - y_true)
+
     euclidean_distances = []
 
-    def cos_sim(y_true, y_pred): return float(cosine_similarity(y_pred, y_true))
+    def cos_sim(y_true, y_pred):
+        return float(cosine_similarity(y_pred, y_true))
+
     cos_sims = []
     nb_of_pred = 0
     for label in mean_pred_embeddings:
         if label in test_embeddings:
-            y_pred = mean_pred_embeddings[label].reshape(1,-1)
-            y_true = test_embeddings[label].reshape(1,-1)
+            y_pred = mean_pred_embeddings[label].reshape(1, -1)
+            y_true = test_embeddings[label].reshape(1, -1)
             euclidean_distances.append(norm(y_true, y_pred))
             cos_sims.append(cos_sim(y_true, y_pred))
             nb_of_pred += 1
@@ -227,9 +253,17 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
     print('Mean cosine sim:', np.mean(cos_sims))
     print('Variance of cosine sim:', np.std(cos_sims))
     print('Number of labels evaluated:', nb_of_pred)
+    return mean_pred_embeddings
 
 
-def main(n=41, k=1, device=0, d=100):
+def get_data_loader(task, debug_mode, embedding_dimension):
+    if task == 'ner':
+        return CoNLLDataLoader(debug_mode, embedding_dimension)
+    else:
+        raise NotImplementedError("Task {} as no suitable data loader".format(task))
+
+
+def main(task_config, n=41, k=1, device=0, d=100):
     # Control of randomization
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
@@ -240,20 +274,35 @@ def main(n=41, k=1, device=0, d=100):
     debug_mode = False
     verbose = True
     save = True
+    freeze_word_embeddings = False
+    over_population_threshold = 80
+    data_augmentation = True
+    if debug_mode:
+        data_augmentation = False
+        over_population_threshold = None
+
+    logging.info("Task name: {}".format(task_config['name']))
+    logging.info("Debug mode: {}".format(debug_mode))
+    logging.info("Verbose: {}".format(verbose))
+    logging.info("Freeze word embeddings: {}".format(freeze_word_embeddings))
+    logging.info("Over population threshold: {}".format(over_population_threshold))
+    logging.info("Data augmentation: {}".format(data_augmentation))
+
     use_gpu = torch.cuda.is_available()
     # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
-        print('Using GPU')
+        logging.info('Using GPU')
 
     # Load data
-    embeddings, sentences = load_data(d, verbose)
-    train_sentences, valid_sentences, test_sentences = sentences
-    if debug_mode:
-        train_sentences = train_sentences[:50]
-        valid_sentences = valid_sentences[:20]
-        test_sentences = []
+    dataloader = task_config['dataloader'](debug_mode, d)
+    train_sentences = dataloader.get_train_sentences
+    valid_sentences = dataloader.get_valid_sentences
+    test_sentences = dataloader.get_test_sentences
+    embeddings = dataloader.get_embeddings
+    test_embeddings = dataloader.get_test_embeddings
+    test_vocabs = dataloader.get_test_vocab
     all_sentences = train_sentences + valid_sentences + test_sentences
 
     # Prepare vectorizer
@@ -262,15 +311,12 @@ def main(n=41, k=1, device=0, d=100):
     vectorizer = vectorizer
 
     # Prepare examples
-    over_population_threshold = 80
-    data_augmentation = True
-    if debug_mode:
-        # data_augmentation = False
-        over_population_threshold = None
+
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
+        test_vocabs=test_vocabs,
         train_sentences=train_sentences,
-        test_sentences=all_sentences,  # +test_sentences
+        test_sentences=all_sentences,
         vectorizer=vectorizer,
         n=n,
         use_gpu=use_gpu,
@@ -282,9 +328,8 @@ def main(n=41, k=1, device=0, d=100):
 
     # Initialize training parameters
     model_name = 'comick_dev_n{}_k{}_d{}'.format(n, k, d)
-    epochs = 100
+    epochs = 1
     lr = 0.001
-    freeze_word_embeddings = False
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
@@ -307,8 +352,9 @@ def main(n=41, k=1, device=0, d=100):
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
-        context_dropout_p=0.3,
-        fc_dropout_p=0.5
+        context_dropout_p=0.5,
+        fc_dropout_p=0.5,
+        freeze_word_embeddings=freeze_word_embeddings
     )
     model = Model(
         model=net,
@@ -326,15 +372,43 @@ def main(n=41, k=1, device=0, d=100):
         valid_loader=valid_loader,
         epochs=epochs,
     )
-    test_vocabs = load_vocab('./data/conll_embeddings_settings/setting2/glove/oov.txt')
-    test_embeddings = {word:embeddings[word] for word in test_vocabs if word in embeddings}
-    evaluate(
+
+    predicted_evaluation_embeddings = evaluate(
         model,
         test_loader=test_loader,
         test_embeddings=test_embeddings,
         save=save,
         model_name=model_name + '.txt'
     )
+
+    # Override embeddings with the training ones
+    # Make sure we only have embeddings from the corpus data
+    logging.info("Evaluating embeddings...")
+    predicted_evaluation_embeddings.update(embeddings)
+
+    logging.info("Using predicted embeddings on {} task...".format(task_config['name']))
+    task = task_config['task_script']
+    task(predicted_evaluation_embeddings)
+
+
+def get_tasks_configs():
+    return [
+        {
+            'name': 'sent',
+            'dataloader': SentimentDataLoader,
+            'task_script': train_sent
+        },
+        {
+            'name': 'ner',
+            'dataloader': CoNLLDataLoader,
+            'task_script': train_ner
+        },
+        {
+            'name': 'pos',
+            'dataloader': CoNLLDataLoader,
+            'task_script': train_pos
+        },
+    ]
 
 
 if __name__ == '__main__':
@@ -347,15 +421,18 @@ if __name__ == '__main__':
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
+        parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
         n = int(args.n)
         k = int(args.k)
         device = int(args.device)
         d = int(args.d)
+        task = args.t
         if d not in [50, 100, 200, 300]:
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
-        main(n=n, k=k, device=device, d=d)
+        for task_config in get_tasks_configs():
+            main(task_config, n=n, k=k, device=device, d=d)
     except:
         print('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise

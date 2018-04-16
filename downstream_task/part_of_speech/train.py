@@ -28,7 +28,7 @@ def parse_pos_file(filename):
     return sentences, targets
 
 
-def train(embeddings_path):
+def train(embeddings):
     train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
@@ -70,25 +70,23 @@ def train(embeddings_path):
         collate_fn=collate_examples
     )
 
-    train_embeddings = load_embeddings(embeddings_path)
-
     net = LSTMTagger(
         100,
         50,
         words_to_idx,
         len(tags_to_idx)
     )
-    net.load_words_embeddings(train_embeddings)
+    net.load_words_embeddings(embeddings)
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
     checkpoint = ModelCheckpoint('./models/pos.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/pos.csv')
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
-    import pdb; pdb.set_trace()
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     print(model.evaluate_generator(test_loader))
 
 
 if __name__ == '__main__':
-    train('./data/glove_embeddings/glove.6B.100d.txt')
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+    train(embeddings)

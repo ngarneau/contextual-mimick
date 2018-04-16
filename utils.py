@@ -6,6 +6,7 @@ from torch.nn import functional as F
 import re
 import os
 
+
 def load_embeddings(path):
     embeddings = {}
     # First we read the embeddings from the file, only keeping vectors for the words we need.
@@ -107,7 +108,6 @@ class WordsInContextVectorizer:
 
     def vectorize_unknown_example(self, x):
         left_context, word, right_context = x
-        word = self.preprocess_token(word)
         vectorized_left_context = self.vectorize_sequence(left_context, self.words_to_idx)
         vectorized_word = self.vectorize_sequence(word, self.chars_to_idx)
         vectorized_right_context = self.vectorize_sequence(right_context, self.words_to_idx)
@@ -117,37 +117,39 @@ class WordsInContextVectorizer:
             vectorized_right_context
         )
 
-    def preprocess_token(self, token):
-        """
-        Modifies a token in a particular format to a unique predefined format.
-        """
-        date_re = re.compile(r'\d{2}(\d{2})?[/-]\d{2}[/-]\d{2}')
-        float_re = re.compile(r'(\d+,)*\d+\.\d*')
-        int_re = re.compile(r'(\d+,)*\d{3,}')
-        time_re = re.compile(r'\d{1,2}:\d{2}(\.\d*)?')
-        code_re = re.compile(r'\d+(-\d+){3,}')
 
-        if date_re.fullmatch(token):
-            token = "2000-01-01"
-        elif float_re.fullmatch(token):
-            token = "0.0"
-        elif int_re.fullmatch(token):
-            token = "0"
-        elif time_re.fullmatch(token):
-            token = "00:00"
-        elif code_re.fullmatch(token):
-            token = "00-00-00-00"
-        return token
+def preprocess_token(token):
+    """
+    Modifies a token in a particular format to a unique predefined format.
+    """
+    date_re = re.compile(r'\d{2}(\d{2})?[/-]\d{2}[/-]\d{2}')
+    float_re = re.compile(r'(\d+,)*\d+\.\d*')
+    int_re = re.compile(r'(\d+,)*\d{3,}')
+    time_re = re.compile(r'\d{1,2}:\d{2}(\.\d*)?')
+    code_re = re.compile(r'\d+(-\d+){3,}')
+
+    if date_re.fullmatch(token):
+        token = "2000-01-01"
+    elif float_re.fullmatch(token):
+        token = "0.0"
+    elif int_re.fullmatch(token):
+        token = "0"
+    elif time_re.fullmatch(token):
+        token = "00:00"
+    elif code_re.fullmatch(token):
+        token = "00-00-00-00"
+    return token
 
 
 def collate_fn(batch):
     x, y = collate_x(batch)
     return (x, torch.FloatTensor(numpy.array(y)))
 
+
 def collate_x(batch):
-    batch = [(*x, y) for x, y in batch] # Unwraps the batch
+    batch = [(*x, y) for x, y in batch]  # Unwraps the batch
     *x, y = list(zip(*batch))
-    
+
     padded_x = []
     for x_part in x:
         x_lengths = torch.LongTensor([len(item) for item in x_part])
@@ -163,20 +165,20 @@ def pad_sequences(vectorized_seqs, seq_lengths):
     seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
     for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
         seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
-    
+
     return seq_tensor
 
 
 def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
-    sequence = [left_pad_symbol]*pad_left + sequence + [right_pad_symbol]*pad_right
+    sequence = [left_pad_symbol] * pad_left + sequence + [right_pad_symbol] * pad_right
 
     L = len(sequence)
-    m = n//2
+    m = n // 2
     for i, item in enumerate(sequence[pad_left:-pad_right]):
-        left_idx = max(0, i-m+pad_left)
-        left_side = tuple(sequence[left_idx:i+pad_left])
-        right_idx = min(L, i+m+pad_left+pad_right)
-        right_side = tuple(sequence[i+pad_left+pad_right:right_idx])
+        left_idx = max(0, i - m + pad_left)
+        left_side = tuple(sequence[left_idx:i + pad_left])
+        right_idx = min(L, i + m + pad_left + pad_right)
+        right_side = tuple(sequence[i + pad_left + pad_right:right_idx])
         yield (left_side, item, right_side)
 
 

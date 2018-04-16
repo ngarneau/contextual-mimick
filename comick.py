@@ -277,7 +277,6 @@ class ComickDev(Module):
 
     def forward(self, x):
         left_context, word, right_context = x
-
         left_rep, right_rep = self.contexts(left_context, right_context)
         context_rep = self.fc_context(left_rep + right_rep)
         word_hidden_rep = self.fc_word(self.mimick_lstm(word))
