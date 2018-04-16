@@ -16,7 +16,7 @@ def parse_pos_file(filename):
         tags = list()
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
-                token, pos, chunk = line[:-1].split(' ')
+                token, pos, chunk, e = line[:-1].split(' ')
                 sentence.append(token)
                 tags.append(pos)
             else:
@@ -29,19 +29,21 @@ def parse_pos_file(filename):
 
 
 def train(embeddings_path):
-    train_sentences, train_tags = parse_pos_file('./data/pos/train.txt/data')
-    test_sentences, test_tags = parse_pos_file('./data/pos/test.txt/data')
+    train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
+    valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
+    test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
 
-    words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + test_sentences)
-    tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + test_tags)
+    words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
     train_tags = [[tags_to_idx[word] for word in sentence] for sentence in train_tags]
 
+    valid_sentences = [[words_to_idx[word] for word in sentence] for sentence in valid_sentences]
+    valid_tags = [[tags_to_idx[word] for word in sentence] for sentence in valid_tags]
+
     test_sentences = [[words_to_idx[word] for word in sentence] for sentence in test_sentences]
     test_tags = [[tags_to_idx[word] for word in sentence] for sentence in test_tags]
-
-    train_sentences, valid_sentences, train_tags, valid_tags = train_test_split(train_sentences, train_tags)
 
     train_dataset = list(zip(train_sentences, train_tags))
     valid_dataset = list(zip(valid_sentences, valid_tags))
@@ -83,6 +85,7 @@ def train(embeddings_path):
     checkpoint = ModelCheckpoint('./models/pos.torch', save_best_only=True)
     csv_logger = CSVLogger('./train_logs/pos.csv')
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
+    import pdb; pdb.set_trace()
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     print(model.evaluate_generator(test_loader))
 

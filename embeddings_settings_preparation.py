@@ -10,6 +10,8 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from utils import load_embeddings
+from downstream_task.sentiment_classification.train import parse_pickle_file
+from downstream_task.part_of_speech.train import parse_pos_file
 
 
 def parse_conll_file(filename):
@@ -89,7 +91,7 @@ def find_every_words_not_in_embeddings(embedding_path, vocab):
 
 
 def prepare_embeddings(dataset_name, train_tokens, validation_tokens, test_tokens):
-    base_path = dataset_name + '_embeddings_settings'
+    base_path = "data/" + dataset_name + '_embeddings_settings'
     create_necessary_dirs(base_path)
 
     oov_setting2 = filter_validation_and_test_vocab(
@@ -101,14 +103,14 @@ def prepare_embeddings(dataset_name, train_tokens, validation_tokens, test_token
     # GloVe Embeddings processing
     # We need to do this only once
     oov_setting1 = find_every_words_not_in_embeddings(
-        './glove_embeddings/glove.6B.50d.txt',
+        './data/glove_embeddings/glove.6B.50d.txt',
         train_tokens.keys() | validation_tokens.keys() | test_tokens.keys()
     )
     create_oov_file(join(base_path, 'setting1', 'glove', 'oov.txt'), oov_setting1)
     create_oov_file(join(base_path, 'setting2', 'glove', 'oov.txt'), oov_setting1 | oov_setting2)
     glove_dims = [50, 100, 200, 300]
     for dim in glove_dims:
-        original_embedding_path = './glove_embeddings/glove.6B.{}d.txt'.format(dim)
+        original_embedding_path = './data/glove_embeddings/glove.6B.{}d.txt'.format(dim)
         target_original_embedding_path = join(base_path, 'setting1', 'glove', 'train', 'glove.6B.{}d.txt').format(dim)
         target_training_embedding_path = join(base_path, 'setting2', 'glove', 'train', 'glove.6B.{}d.txt').format(dim)
         target_test_embedding_path = join(base_path, 'setting2', 'glove', 'test', 'glove.6B.{}d.txt').format(dim)
@@ -119,7 +121,7 @@ def prepare_embeddings(dataset_name, train_tokens, validation_tokens, test_token
         logging.info("Done")
 
     # Word2Vec embeddings processing
-    original_embedding_path = './word2vec_embeddings/wiki-news-300d-1M-subword.vec'
+    original_embedding_path = './data/word2vec_embeddings/wiki-news-300d-1M-subword.vec'
 
     oov_setting1 = find_every_words_not_in_embeddings(
         original_embedding_path,
@@ -153,13 +155,48 @@ def parse_semeval_files(folder):
     return distinct_tokens
 
 
+def parse_sentiment_analysis_file(filename):
+    distinct_tokens = dict()
+    sentences, _ = parse_pickle_file(filename)
+    for sentence in sentences:
+        for word in sentence:
+            if word not in distinct_tokens:
+                distinct_tokens[word.lower()] = 1
+            else:
+                distinct_tokens[word.lower()] += 1
+    return distinct_tokens
+
+def parse_part_of_speech_file(filename):
+    distinct_tokens = dict()
+    sentences, _ = parse_pos_file(filename)
+    for sentence in sentences:
+        for word in sentence:
+            if word not in distinct_tokens:
+                distinct_tokens[word.lower()] = 1
+            else:
+                distinct_tokens[word.lower()] += 1
+    return distinct_tokens
+
+
+
 if __name__ == '__main__':
     # train_entities, train_tokens = parse_conll_file('./conll/train.txt')
     # validation_entities, validation_tokens = parse_conll_file('./conll/valid.txt')
     # test_entities, test_tokens = parse_conll_file('./conll/test.txt')
     # prepare_embeddings('conll', train_tokens, validation_tokens, test_tokens)
-    train_tokens = parse_semeval_files('./scienceie/scienceie2017_train/train2')
-    validation_tokens = parse_semeval_files('./scienceie/scienceie2017_dev/dev')
-    test_tokens = parse_semeval_files('./scienceie/semeval_articles_test')
-    prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
+
+    # train_tokens = parse_semeval_files('./scienceie/scienceie2017_train/train2')
+    # validation_tokens = parse_semeval_files('./scienceie/scienceie2017_dev/dev')
+    # test_tokens = parse_semeval_files('./scienceie/semeval_articles_test')
+    # prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
+
+    # train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
+    # validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
+    # test_tokens = parse_sentiment_analysis_file('./data/sentiment/test.pickle')
+    # prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
+
+    train_tokens = parse_part_of_speech_file('./data/sentiment/train.pickle')
+    validation_tokens = parse_part_of_speech_file('./data/sentiment/dev.pickle')
+    test_tokens = parse_part_of_speech_file('./data/sentiment/test.pickle')
+    prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
 
