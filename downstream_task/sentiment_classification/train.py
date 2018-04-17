@@ -24,7 +24,7 @@ def parse_pickle_file(filename):
 
 
 
-def train(embeddings):
+def train(embeddings, model_name='vanilla'):
     train_sentences, train_tags = parse_pickle_file('./data/sentiment/train.pickle')
     valid_sentences, valid_tags = parse_pickle_file('./data/sentiment/dev.pickle')
     test_sentences, test_tags = parse_pickle_file('./data/sentiment/test.pickle')
@@ -75,8 +75,8 @@ def train(embeddings):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/ner.torch', save_best_only=True)
-    csv_logger = CSVLogger('./train_logs/ner.csv')
+    checkpoint = ModelCheckpoint('./models/sentiment_{}.torch'.format(model_name), save_best_only=True)
+    csv_logger = CSVLogger('./train_logs/sentiment_{}.csv'.format(model_name))
     loss = CrossEntropyLoss()
     model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])

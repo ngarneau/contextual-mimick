@@ -226,6 +226,7 @@ class ComickDev(Module):
     """
     This is the architecture in development.
     """
+
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -243,7 +244,7 @@ class ComickDev(Module):
 
         self.contexts = MultiLSTM(num_embeddings=len(self.words_vocabulary),
                                   embedding_dim=word_embeddings_dimension,
-                                  hidden_state_dim=word_embeddings_dimension,
+                                  hidden_state_dim=50,
                                   n_lstms=2,
                                   freeze_embeddings=freeze_word_embeddings,
                                   dropout=context_dropout_p)
@@ -252,18 +253,18 @@ class ComickDev(Module):
             self.load_words_embeddings(words_embeddings)
 
         self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
-                                embedding_dim=characters_embedding_dimension,
-                                hidden_state_dim=word_embeddings_dimension)
+                                     embedding_dim=characters_embedding_dimension,
+                                     hidden_state_dim=word_embeddings_dimension)
 
-        self.fc_context = nn.Linear(in_features=2*word_embeddings_dimension,
+        self.fc_context = nn.Linear(in_features=2 * 50,
                                     out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context.weight)
 
-        self.fc_word = nn.Linear(in_features=2*word_embeddings_dimension,
+        self.fc_word = nn.Linear(in_features=2 * word_embeddings_dimension,
                                  out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_word.weight)
 
-        self.fc_output = nn.Linear(in_features=2*word_embeddings_dimension,
+        self.fc_output = nn.Linear(in_features=2 * word_embeddings_dimension,
                                    out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_output.weight)
 
@@ -285,4 +286,47 @@ class ComickDev(Module):
         output = F.tanh(output)
         output = self.fc_output(output)
 
+        return output
+
+
+class Mimick(Module):
+    """
+    This is the Mimick architecture.
+    """
+
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 word_embeddings_dimension=50,
+                 fc_dropout_p=0.5,
+                 ):
+        super().__init__()
+        self.characters_vocabulary = characters_vocabulary
+
+        self.mimick_lstm = MultiLSTM(
+            num_embeddings=len(self.characters_vocabulary),
+            embedding_dim=characters_embedding_dimension,
+            hidden_state_dim=word_embeddings_dimension
+        )
+
+        self.fc_word = nn.Linear(
+            in_features=2 * word_embeddings_dimension,
+            out_features=word_embeddings_dimension
+        )
+        kaiming_uniform(self.fc_word.weight)
+
+        self.fc_output = nn.Linear(
+            in_features=word_embeddings_dimension,
+            out_features=word_embeddings_dimension
+        )
+        kaiming_uniform(self.fc_output.weight)
+
+        self.dropout = nn.Dropout(p=fc_dropout_p)
+
+    def forward(self, x):
+        left_context, word, right_context = x
+        word_hidden_rep = self.fc_word(self.mimick_lstm(word))
+        output = self.dropout(word_hidden_rep)
+        output = F.tanh(output)
+        output = self.fc_output(output)
         return output

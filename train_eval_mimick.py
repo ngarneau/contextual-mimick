@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickUniqueContext, LRComick, ComickDev
+from comick import ComickUniqueContext, LRComick, ComickDev, Mimick
 from utils import load_embeddings, save_embeddings, parse_conll_file, load_vocab, preprocess_token
 from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
 from utils import make_vocab, WordsInContextVectorizer, ngrams
@@ -327,7 +327,7 @@ def main(task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    model_name = 'comick_dev_n{}_k{}_d{}'.format(n, k, d)
+    model_name = 'mimick_dev_n{}_k{}_d{}'.format(n, k, d)
     epochs = 1
     lr = 0.001
     if debug_mode:
@@ -346,15 +346,11 @@ def main(task_config, n=41, k=1, device=0, d=100):
     #     words_embeddings=embeddings,
     #     freeze_word_embeddings=freeze_word_embeddings,
     # )
-    net = ComickDev(
+    net = Mimick(
         characters_vocabulary=char_to_idx,
-        words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
-        words_embeddings=embeddings,
-        context_dropout_p=0.5,
         fc_dropout_p=0.5,
-        freeze_word_embeddings=freeze_word_embeddings
     )
     model = Model(
         model=net,
@@ -418,7 +414,7 @@ if __name__ == '__main__':
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument("n", default=21, nargs='?')
-        parser.add_argument("k", default=2, nargs='?')
+        parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')

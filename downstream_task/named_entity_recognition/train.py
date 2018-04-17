@@ -28,7 +28,7 @@ def parse_conll_file(filename):
     return sentences, targets
 
 
-def train(embeddings):
+def train(embeddings, model_name='vanilla'):
     train_sentences, train_tags = parse_conll_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_conll_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_conll_file('./data/conll/test.txt')
@@ -81,8 +81,8 @@ def train(embeddings):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/ner.torch', save_best_only=True)
-    csv_logger = CSVLogger('./train_logs/ner.csv')
+    checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True)
+    csv_logger = CSVLogger('./train_logs/ner_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     print(model.evaluate_generator(test_loader))
