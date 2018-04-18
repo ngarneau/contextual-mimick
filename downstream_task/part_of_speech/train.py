@@ -82,7 +82,7 @@ def train(embeddings, model_name='vanilla'):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True)
+    checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
     csv_logger = CSVLogger('./train_logs/pos_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])

@@ -97,6 +97,7 @@ class LSTMClassifier(LSTMSequence):
         _, (hidden_states, cell_states) = self.word_lstm(packed_input)
         lstm_out = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
         lstm_out = lstm_out[rev_perm_idx]
+        lstm_out = self.dropout(lstm_out)
         tag_space = self.hidden2tag(lstm_out)
 
         return tag_space

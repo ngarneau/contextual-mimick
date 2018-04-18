@@ -247,11 +247,11 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
             nb_of_pred += 1
 
     logging.info('\nResults on the test:')
-    logging.info('Mean euclidean dist:'.format(np.mean(euclidean_distances)))
-    logging.info('Variance of euclidean dist:'.format(np.std(euclidean_distances)))
-    logging.info('Mean cosine sim:'.format(np.mean(cos_sims)))
-    logging.info('Variance of cosine sim:'.format(np.std(cos_sims)))
-    logging.info('Number of labels evaluated:'.format(nb_of_pred))
+    logging.info('Mean euclidean dist: {}'.format(np.mean(euclidean_distances)))
+    logging.info('Variance of euclidean dist: {}'.format(np.std(euclidean_distances)))
+    logging.info('Mean cosine sim: {}'.format(np.mean(cos_sims)))
+    logging.info('Variance of cosine sim: {}'.format(np.std(cos_sims)))
+    logging.info('Number of labels evaluated: {}'.format(nb_of_pred))
     return mean_pred_embeddings
 
 
@@ -326,7 +326,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 40
+    epochs = 1
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
