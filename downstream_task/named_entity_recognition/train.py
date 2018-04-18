@@ -13,7 +13,7 @@ from utils import load_embeddings
 def parse_conll_file(filename):
     sentences = list()
     targets = list()
-    with open(filename) as fhandler:
+    with open(filename, encoding='utf-8') as fhandler:
         sentence = list()
         tags = list()
         for line in fhandler:
@@ -86,7 +86,7 @@ def train(embeddings, model_name='vanilla'):
     checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/ner_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
-    model.fit_generator(train_loader, valid_loader, epochs=1, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))

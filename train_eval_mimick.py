@@ -326,7 +326,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 1
+    epochs = 40
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name

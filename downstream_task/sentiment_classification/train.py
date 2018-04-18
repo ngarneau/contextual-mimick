@@ -1,3 +1,4 @@
+import logging
 import pickle
 import numpy as np
 from pytoune.framework import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, Model

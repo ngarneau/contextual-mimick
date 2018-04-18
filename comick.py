@@ -244,7 +244,7 @@ class ComickDev(Module):
 
         self.contexts = MultiLSTM(num_embeddings=len(self.words_vocabulary),
                                   embedding_dim=word_embeddings_dimension,
-                                  hidden_state_dim=50,
+                                  hidden_state_dim=word_embeddings_dimension,
                                   n_lstms=2,
                                   freeze_embeddings=freeze_word_embeddings,
                                   dropout=context_dropout_p)

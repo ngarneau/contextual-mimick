@@ -13,7 +13,7 @@ from utils import load_embeddings
 def parse_pos_file(filename):
     sentences = list()
     targets = list()
-    with open(filename) as fhandler:
+    with open(filename, encoding='utf-8') as fhandler:
         sentence = list()
         tags = list()
         for line in fhandler:
