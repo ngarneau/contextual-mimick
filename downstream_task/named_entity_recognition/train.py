@@ -1,3 +1,5 @@
+import logging
+
 from pytoune.framework import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, Model
 from sklearn.model_selection import train_test_split
 from torch.optim import Adam
@@ -84,8 +86,11 @@ def train(embeddings, model_name='vanilla'):
     checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True)
     csv_logger = CSVLogger('./train_logs/ner_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
-    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
-    print(model.evaluate_generator(test_loader))
+    model.fit_generator(train_loader, valid_loader, epochs=1, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+
+    loss, metric = model.evaluate_generator(test_loader)
+    logging.info("Test loss: {}".format(loss))
+    logging.info("Test metric: {}".format(metric))
 
 
 if __name__ == '__main__':

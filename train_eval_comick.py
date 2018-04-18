@@ -36,7 +36,7 @@ def load_data(d, corpus, verbose=True):
     test_sentences = parse_conll_file('./data/conll/test.txt')
 
     if verbose:
-        print('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
+        logging.info('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
 
     return embeddings, (train_sentences, valid_sentences, test_sentences)
 
@@ -96,7 +96,7 @@ def prepare_data(embeddings,
     if data_augmentation:
         augmented_examples = augment_data(examples, embeddings)
         if verbose:
-            print("Number of non-augmented examples:", len(examples))
+            logging.info("Number of non-augmented examples: {}".format(len(examples)))
         examples |= augmented_examples  # Union
     examples = preprocess_examples(examples)
 
@@ -145,38 +145,37 @@ def prepare_data(embeddings,
                                  use_gpu=use_gpu)
 
     if verbose:
-        print('Number of unique examples:', len(examples))
-        print('Number of unique examples wo embeds:',
-              len(examples_without_embeds))
+        logging.info('Number of unique examples: {}'.format(len(examples)))
+        logging.info('Number of unique examples wo embeds:'.format(len(examples_without_embeds)))
 
-        print('\nGlobal statistics:')
+        logging.info('\nGlobal statistics:')
         stats = train_valid_dataset.stats()
         for stats, value in stats.items():
-            print(stats + ': ' + str(value))
+            logging.info(stats + ': ' + str(value))
 
-        print('\nStatistics on the training dataset:')
+        logging.info('\nStatistics on the training dataset:')
         stats = train_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
-            print(stats + ': ' + str(value))
+            logging.info(stats + ': ' + str(value))
 
-        print('\nStatistics on the validation dataset:')
+        logging.info('\nStatistics on the validation dataset:')
         stats = valid_dataset.stats(over_population_threshold)
         for stats, value in stats.items():
-            print(stats + ': ' + str(value))
+            logging.info(stats + ': ' + str(value))
 
-        print('\nStatistics on the test dataset:')
+        logging.info('\nStatistics on the test dataset:')
         stats = test_dataset.stats()
         for stats, value in stats.items():
-            print(stats + ': ' + str(value))
+            logging.info(stats + ': ' + str(value))
 
-        print('\nFor training, loading ' + str(k) + ' examples per label per epoch.')
+        logging.info('\nFor training, loading ' + str(k) + ' examples per label per epoch.')
 
     return train_loader, valid_loader, test_loader
 
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
-    lrscheduler = ReduceLROnPlateau(patience=2)
+    lrscheduler = ReduceLROnPlateau(patience=3)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
 
@@ -247,12 +246,12 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
             cos_sims.append(cos_sim(y_true, y_pred))
             nb_of_pred += 1
 
-    print('\nResults on the test:')
-    print('Mean euclidean dist:', np.mean(euclidean_distances))
-    print('Variance of euclidean dist:', np.std(euclidean_distances))
-    print('Mean cosine sim:', np.mean(cos_sims))
-    print('Variance of cosine sim:', np.std(cos_sims))
-    print('Number of labels evaluated:', nb_of_pred)
+    logging.info('\nResults on the test:')
+    logging.info('Mean euclidean dist:'.format(np.mean(euclidean_distances)))
+    logging.info('Variance of euclidean dist:'.format(np.std(euclidean_distances)))
+    logging.info('Mean cosine sim:'.format(np.mean(cos_sims)))
+    logging.info('Variance of cosine sim:'.format(np.std(cos_sims)))
+    logging.info('Number of labels evaluated:'.format(nb_of_pred))
     return mean_pred_embeddings
 
 
@@ -263,7 +262,7 @@ def get_data_loader(task, debug_mode, embedding_dimension):
         raise NotImplementedError("Task {} as no suitable data loader".format(task))
 
 
-def main(task_config, n=41, k=1, device=0, d=100):
+def main(model_name, task_config, n=41, k=1, device=0, d=100):
     # Control of randomization
     seed = 299792458  # "Seed" of light
     torch.manual_seed(seed)
@@ -327,8 +326,7 @@ def main(task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    model_name = 'comick_dev_n{}_k{}_d{}'.format(n, k, d)
-    epochs = 1
+    epochs = 40
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -336,16 +334,6 @@ def main(task_config, n=41, k=1, device=0, d=100):
         epochs = 3
 
     # Create the model
-    # net = LRComick(
-    #     characters_vocabulary=char_to_idx,
-    #     words_vocabulary=word_to_idx,
-    #     characters_embedding_dimension=20,
-    #     characters_hidden_state_dimension=50,
-    #     word_embeddings_dimension=d,
-    #     words_hidden_state_dimension=50,
-    #     words_embeddings=embeddings,
-    #     freeze_word_embeddings=freeze_word_embeddings,
-    # )
     net = ComickDev(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
@@ -431,9 +419,14 @@ if __name__ == '__main__':
         if d not in [50, 100, 200, 300]:
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
+        logger = logging.getLogger()
         for task_config in get_tasks_configs():
-            main(task_config, n=n, k=k, device=device, d=d)
+            model_name = '{}_{}_n{}_k{}_d{}_{}'.format('comick', task_config['name'], n, k, d, ())
+            handler = logging.FileHandler('{}.log'.format(model_name))
+            logger.addHandler(handler)
+            main(model_name, task_config, n=n, k=k, device=device, d=d)
+            logger.removeHandler(handler)
     except:
-        print('Execution stopped after {:.2f} seconds.'.format(time() - t))
+        logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
-    print('Execution completed in {:.2f} seconds.'.format(time() - t))
+    logging.info('Execution completed in {:.2f} seconds.'.format(time() - t))

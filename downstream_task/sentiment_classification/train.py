@@ -80,7 +80,9 @@ def train(embeddings, model_name='vanilla'):
     loss = CrossEntropyLoss()
     model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
-    print(model.evaluate_generator(test_loader))
+    loss, metric = model.evaluate_generator(test_loader)
+    logging.info("Test loss: {}".format(loss))
+    logging.info("Test metric: {}".format(metric))
 
 
 if __name__ == '__main__':

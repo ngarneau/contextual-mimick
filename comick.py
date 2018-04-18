@@ -256,7 +256,7 @@ class ComickDev(Module):
                                      embedding_dim=characters_embedding_dimension,
                                      hidden_state_dim=word_embeddings_dimension)
 
-        self.fc_context = nn.Linear(in_features=2 * 50,
+        self.fc_context = nn.Linear(in_features=2 * word_embeddings_dimension,
                                     out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context.weight)
 
