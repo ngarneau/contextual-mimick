@@ -273,7 +273,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     debug_mode = False
     verbose = True
     save = True
-    freeze_word_embeddings = False
+    freeze_word_embeddings = True
     over_population_threshold = 80
     data_augmentation = True
     if debug_mode:
@@ -326,7 +326,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 1
+    epochs = 100
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -405,8 +405,8 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=21, nargs='?')
-        parser.add_argument("k", default=2, nargs='?')
+        parser.add_argument("n", default=3, nargs='?')
+        parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')

@@ -326,7 +326,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 40
+    epochs = 100
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -378,11 +378,6 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
 def get_tasks_configs():
     return [
         {
-            'name': 'sent',
-            'dataloader': SentimentDataLoader,
-            'task_script': train_sent
-        },
-        {
             'name': 'ner',
             'dataloader': CoNLLDataLoader,
             'task_script': train_ner
@@ -391,6 +386,11 @@ def get_tasks_configs():
             'name': 'pos',
             'dataloader': CoNLLDataLoader,
             'task_script': train_pos
+        },
+        {
+            'name': 'sent',
+            'dataloader': SentimentDataLoader,
+            'task_script': train_sent
         },
     ]
 

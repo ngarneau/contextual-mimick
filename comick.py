@@ -32,6 +32,7 @@ class MultiLSTM(Module):
                  freeze_embeddings=False,
                  dropout=0):
         super().__init__()
+        self.dropout = nn.Dropout(dropout)
 
         self.embeddings = nn.Embedding(
             num_embeddings=num_embeddings,
@@ -67,6 +68,7 @@ class MultiLSTM(Module):
 
             # Embed
             embeddings = self.embeddings(x[perm_idx])
+            embeddings = self.dropout(embeddings)
 
             # Initialize hidden to zero
             packed_input = pack_padded_sequence(
