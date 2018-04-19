@@ -11,6 +11,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 from utils import load_embeddings
 from downstream_task.sentiment_classification.train import parse_pickle_file
+from downstream_task.newsgroup_classification.train import parse_20newsgroup_file
 from downstream_task.part_of_speech.train import parse_pos_file
 
 
@@ -177,6 +178,17 @@ def parse_part_of_speech_file(filename):
                 distinct_tokens[word.lower()] += 1
     return distinct_tokens
 
+def parse_newsgroup_file(filename):
+    distinct_tokens = dict()
+    sentences, _ = parse_20newsgroup_file(filename)
+    for sentence in sentences:
+        for word in sentence:
+            if word not in distinct_tokens:
+                distinct_tokens[word.lower()] = 1
+            else:
+                distinct_tokens[word.lower()] += 1
+    return distinct_tokens
+
 
 
 if __name__ == '__main__':
@@ -185,10 +197,10 @@ if __name__ == '__main__':
     # test_entities, test_tokens = parse_conll_file('./conll/test.txt')
     # prepare_embeddings('conll', train_tokens, validation_tokens, test_tokens)
 
-    train_tokens = parse_semeval_files('./data/scienceie/scienceie2017_train/train2')
-    validation_tokens = parse_semeval_files('./data/scienceie/scienceie2017_dev/dev')
-    test_tokens = parse_semeval_files('./data/scienceie/semeval_articles_test')
-    prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
+    # train_tokens = parse_semeval_files('./data/scienceie/scienceie2017_train/train2')
+    # validation_tokens = parse_semeval_files('./data/scienceie/scienceie2017_dev/dev')
+    # test_tokens = parse_semeval_files('./data/scienceie/semeval_articles_test')
+    # prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
 
     # train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
     # validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
@@ -199,4 +211,9 @@ if __name__ == '__main__':
     # validation_tokens = parse_part_of_speech_file('./data/conll/valid.txt')
     # test_tokens = parse_part_of_speech_file('./data/conll/test.txt')
     # prepare_embeddings('pos', train_tokens, validation_tokens, test_tokens)
+
+    train_tokens = parse_newsgroup_file('./data/20newsgroup/train.pickle')
+    validation_tokens = parse_newsgroup_file('./data/20newsgroup/dev.pickle')
+    test_tokens = parse_newsgroup_file('./data/20newsgroup/test.pickle')
+    prepare_embeddings('newsgroup', train_tokens, validation_tokens, test_tokens)
 

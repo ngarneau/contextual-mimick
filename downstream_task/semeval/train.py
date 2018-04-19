@@ -1,4 +1,5 @@
 import logging
+import random
 
 from pytoune.framework import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger, Model
 from sklearn.model_selection import train_test_split
@@ -8,6 +9,8 @@ from torch.utils.data import DataLoader
 from downstream_task.models import LSTMTagger
 from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx, f1
 from utils import load_embeddings
+import torch
+import numpy as np
 
 
 def parse_semeval_file(filename):
@@ -94,6 +97,10 @@ def train(embeddings, model_name='vanilla'):
 
 
 if __name__ == '__main__':
+    seed = 299792458  # "Seed" of light
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     logging.getLogger().setLevel(logging.INFO)
     embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
     train(embeddings)

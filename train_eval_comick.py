@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 
-from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
+from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader, NewsGroupDataLoader
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -18,6 +18,7 @@ from downstream_task.named_entity_recognition.train import train as train_ner
 from downstream_task.sentiment_classification.train import train as train_sent
 from downstream_task.chunking.train import train as train_chunk
 from downstream_task.semeval.train import train as train_semeval
+from downstream_task.newsgroup_classification.train import train as train_newsgroup
 
 import numpy as np
 import pickle as pkl
@@ -375,37 +376,60 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     logging.info("Evaluating embeddings...")
     predicted_evaluation_embeddings.update(embeddings)
 
-    logging.info("Using predicted embeddings on {} task...".format(task_config['name']))
-    task = task_config['task_script']
-    task(predicted_evaluation_embeddings, model_name)
+    for task in task_config['tasks']:
+        logging.info("Using predicted embeddings on {} task...".format(task['name']))
+        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name)
 
 
 def get_tasks_configs():
     return [
         {
+            'name': 'newsgroup',
+            'dataloader': NewsGroupDataLoader,
+            'tasks': [
+                {
+                    'name': 'newsgroup',
+                    'script': train_newsgroup
+                },
+            ]
+        },
+        {
+            'name': 'conll',
+            'dataloader': CoNLLDataLoader,
+            'tasks': [
+                {
+                    'name': 'ner',
+                    'script': train_ner
+                },
+                {
+                    'name': 'pos',
+                    'script': train_pos
+                },
+                {
+                    'name': 'chunk',
+                    'script': train_chunk
+                },
+            ]
+        },
+        {
             'name': 'semeval',
             'dataloader': SemEvalDataLoader,
-            'task_script': train_semeval
-        },
-        {
-            'name': 'ner',
-            'dataloader': CoNLLDataLoader,
-            'task_script': train_ner
-        },
-        {
-            'name': 'pos',
-            'dataloader': CoNLLDataLoader,
-            'task_script': train_pos
+            'tasks': [
+                {
+                    'name': 'semeval',
+                    'script': train_semeval
+                }
+            ]
         },
         {
             'name': 'sent',
             'dataloader': SentimentDataLoader,
-            'task_script': train_sent
-        },
-        {
-            'name': 'chunking',
-            'dataloader': CoNLLDataLoader,
-            'task_script': train_chunk
+            'tasks': [
+                {
+                    'name': 'sent',
+                    'script': train_sent
+                },
+            ]
         },
     ]
 
