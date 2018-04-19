@@ -383,16 +383,16 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
 
 def get_tasks_configs():
     return [
-        {
-            'name': 'newsgroup',
-            'dataloader': NewsGroupDataLoader,
-            'tasks': [
-                {
-                    'name': 'newsgroup',
-                    'script': train_newsgroup
-                },
-            ]
-        },
+        # {
+        #     'name': 'newsgroup',
+        #     'dataloader': NewsGroupDataLoader,
+        #     'tasks': [
+        #         {
+        #             'name': 'newsgroup',
+        #             'script': train_newsgroup
+        #         },
+        #     ]
+        # },
         {
             'name': 'conll',
             'dataloader': CoNLLDataLoader,
