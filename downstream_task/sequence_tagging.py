@@ -1,6 +1,6 @@
 import numpy as np
 from pytoune import torch_to_numpy, torch
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, classification_report
 from torch.nn import CrossEntropyLoss
 
 from utils import pad_sequences
@@ -23,7 +23,7 @@ def f1(y_pred_tensor, y_true_tensor):
         if yt != 0:
             predictions.append(np.argmax(yp))
             truths.append(yt)
-    return torch.FloatTensor([f1_score(predictions, truths, average='macro')])
+    return torch.FloatTensor([f1_score(truths, predictions, average='macro')])
 
 
 def acc(y_pred_tensor, y_true_tensor):

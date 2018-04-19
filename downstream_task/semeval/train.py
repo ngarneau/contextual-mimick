@@ -6,11 +6,11 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader
 
 from downstream_task.models import LSTMTagger
-from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx
+from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx, f1
 from utils import load_embeddings
 
 
-def parse_pos_file(filename):
+def parse_semeval_file(filename):
     sentences = list()
     targets = list()
     with open(filename, encoding='utf-8') as fhandler:
@@ -18,9 +18,9 @@ def parse_pos_file(filename):
         tags = list()
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
-                token, pos, chunk, e = line[:-1].split(' ')
+                token, id, start, end, e = line[:-1].split(' ')
                 sentence.append(token.lower())
-                tags.append(pos)
+                tags.append(e)
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
@@ -31,9 +31,9 @@ def parse_pos_file(filename):
 
 
 def train(embeddings, model_name='vanilla'):
-    train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
-    valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
-    test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
+    train_sentences, train_tags = parse_semeval_file('./data/scienceie/train_spacy.txt')
+    valid_sentences, valid_tags = parse_semeval_file('./data/scienceie/valid_spacy.txt')
+    test_sentences, test_tags = parse_semeval_file('./data/scienceie/test_spacy.txt')
 
     words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
@@ -46,6 +46,7 @@ def train(embeddings, model_name='vanilla'):
 
     test_sentences = [[words_to_idx[word] for word in sentence] for sentence in test_sentences]
     test_tags = [[tags_to_idx[word] for word in sentence] for sentence in test_tags]
+
 
     train_dataset = list(zip(train_sentences, train_tags))
     valid_dataset = list(zip(valid_sentences, valid_tags))
@@ -82,10 +83,11 @@ def train(embeddings, model_name='vanilla'):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
-    csv_logger = CSVLogger('./train_logs/pos_{}.csv'.format(model_name))
-    model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
+    checkpoint = ModelCheckpoint('./models/semeval_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    csv_logger = CSVLogger('./train_logs/semeval_{}.csv'.format(model_name))
+    model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))

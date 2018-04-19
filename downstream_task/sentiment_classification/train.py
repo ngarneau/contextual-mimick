@@ -19,7 +19,7 @@ def parse_pickle_file(filename):
     sentences = list()
     labels = list()
     for sentence, label in data:
-        sentences.append(sentence)
+        sentences.append([w.lower() for w in sentence])
         labels.append(int(np.argmax(label)))
     return sentences, labels
 

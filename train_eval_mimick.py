@@ -1,26 +1,27 @@
 import argparse
-import os
 import logging
+import os
 
-from data_loaders import CoNLLDataLoader, SentimentDataLoader
+from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickUniqueContext, LRComick, ComickDev, Mimick
-from utils import load_embeddings, save_embeddings, parse_conll_file, load_vocab, preprocess_token
-from utils import square_distance, euclidean_distance, cosine_sim, cosine_distance
+from comick import Mimick
+from utils import load_embeddings, save_embeddings, parse_conll_file, preprocess_token
+from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer, ngrams
 from utils import collate_fn, collate_x
 from per_class_dataset import *
 from downstream_task.part_of_speech.train import train as train_pos
 from downstream_task.named_entity_recognition.train import train as train_ner
 from downstream_task.sentiment_classification.train import train as train_sent
+from downstream_task.chunking.train import train as train_chunk
+from downstream_task.semeval.train import train as train_semeval
 
 import numpy as np
 import pickle as pkl
 from sklearn.metrics.pairwise import cosine_similarity
-import torch.nn.functional as F
 from pytoune import torch_to_numpy, tensors_to_variables
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
@@ -378,6 +379,11 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
 def get_tasks_configs():
     return [
         {
+            'name': 'semeval',
+            'dataloader': SemEvalDataLoader,
+            'task_script': train_semeval
+        },
+        {
             'name': 'ner',
             'dataloader': CoNLLDataLoader,
             'task_script': train_ner
@@ -391,6 +397,11 @@ def get_tasks_configs():
             'name': 'sent',
             'dataloader': SentimentDataLoader,
             'task_script': train_sent
+        },
+        {
+            'name': 'chunking',
+            'dataloader': CoNLLDataLoader,
+            'task_script': train_chunk
         },
     ]
 

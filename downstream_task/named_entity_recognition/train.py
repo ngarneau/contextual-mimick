@@ -19,7 +19,7 @@ def parse_conll_file(filename):
         for line in fhandler:
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
                 token, pos, chunk, e = line[:-1].split(' ')
-                sentence.append(token)
+                sentence.append(token.lower())
                 tags.append(e)
             else:
                 if len(sentence) > 0:

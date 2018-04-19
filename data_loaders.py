@@ -1,5 +1,6 @@
 import logging
 
+from downstream_task.semeval.train import parse_semeval_file
 from downstream_task.sentiment_classification.train import parse_pickle_file
 from utils import load_embeddings, parse_conll_file, load_vocab
 
@@ -71,4 +72,18 @@ class SentimentDataLoader(DataLoader):
         self.train_sentences, _ = parse_pickle_file('./data/sentiment/train.pickle')
         self.valid_sentences, _ = parse_pickle_file('./data/sentiment/dev.pickle')
         self.test_sentences, _ = parse_pickle_file('./data/sentiment/test.pickle')
+        logging.debug('Loading {}d embeddings from : {}'.format(embedding_dimension, path_embeddings))
+
+
+class SemEvalDataLoader(DataLoader):
+    def __init__(self, debug_mode, embedding_dimension):
+        super().__init__(debug_mode)
+        path_embeddings = './data/semeval_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
+            embedding_dimension)
+        self.embeddings = load_embeddings(path_embeddings)
+        self.test_vocabs = load_vocab('./data/semeval_embeddings_settings/setting2/glove/oov.txt')
+        self.test_embeddings = {word: self.embeddings[word] for word in self.test_vocabs if word in self.embeddings}
+        self.train_sentences, _ = parse_semeval_file('./data/scienceie/train_spacy.txt')
+        self.valid_sentences, _ = parse_semeval_file('./data/scienceie/valid_spacy.txt')
+        self.test_sentences, _ = parse_semeval_file('./data/scienceie/test_spacy.txt')
         logging.debug('Loading {}d embeddings from : {}'.format(embedding_dimension, path_embeddings))

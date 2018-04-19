@@ -10,7 +10,7 @@ from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collat
 from utils import load_embeddings
 
 
-def parse_pos_file(filename):
+def parse_chunk_file(filename):
     sentences = list()
     targets = list()
     with open(filename, encoding='utf-8') as fhandler:
@@ -20,7 +20,7 @@ def parse_pos_file(filename):
             if not (line.startswith('-DOCSTART-') or line.startswith('\n')):
                 token, pos, chunk, e = line[:-1].split(' ')
                 sentence.append(token.lower())
-                tags.append(pos)
+                tags.append(chunk)
             else:
                 if len(sentence) > 0:
                     sentences.append(sentence)
@@ -31,9 +31,9 @@ def parse_pos_file(filename):
 
 
 def train(embeddings, model_name='vanilla'):
-    train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
-    valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
-    test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
+    train_sentences, train_tags = parse_chunk_file('./data/conll/train.txt')
+    valid_sentences, valid_tags = parse_chunk_file('./data/conll/valid.txt')
+    test_sentences, test_tags = parse_chunk_file('./data/conll/test.txt')
 
     words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
@@ -82,8 +82,8 @@ def train(embeddings, model_name='vanilla'):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
-    csv_logger = CSVLogger('./train_logs/pos_{}.csv'.format(model_name))
+    checkpoint = ModelCheckpoint('./models/chunk_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    csv_logger = CSVLogger('./train_logs/chunk{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     loss, metric = model.evaluate_generator(test_loader)

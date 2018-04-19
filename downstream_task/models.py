@@ -55,7 +55,7 @@ class LSTMTagger(LSTMSequence):
 
     def forward(self, sentence):
         # Sort sentences in decreasing order
-        lengths = sentence.data.ne(0).sum(dim=1).long()
+        lengths = sentence.data.ne(0).long().sum(dim=1)
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
         _, rev_perm_idx = perm_idx.sort(0)
         sentence = sentence[perm_idx]
