@@ -92,5 +92,6 @@ def train(embeddings, model_name='vanilla'):
 
 
 if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
     embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
     train(embeddings)
