@@ -33,7 +33,7 @@ def parse_pos_file(filename):
     return sentences, targets
 
 
-def train(embeddings, model_name='vanilla'):
+def train(embeddings, model_name='vanilla', device=0):
     train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
@@ -54,25 +54,40 @@ def train(embeddings, model_name='vanilla'):
     valid_dataset = list(zip(valid_sentences, valid_tags))
     test_dataset = list(zip(test_sentences, test_tags))
 
+    def cuda_collate(samples):
+        words_tensor, labels_tensor = collate_examples(samples)
+        return words_tensor.cuda(), labels_tensor.cuda()
+
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        cuda_device = device
+        torch.cuda.set_device(cuda_device)
+        logging.info('Using GPU')
+
+    if use_gpu:
+        collate_fn = cuda_collate
+    else:
+        collate_fn = collate_examples
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=collate_examples
+        collate_fn=collate_fn
     )
 
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=collate_examples
+        collate_fn=collate_fn
     )
 
     test_loader = DataLoader(
         test_dataset,
         batch_size=32,
         shuffle=True,
-        collate_fn=collate_examples
+        collate_fn=collate_fn
     )
 
     net = LSTMTagger(
@@ -82,6 +97,8 @@ def train(embeddings, model_name='vanilla'):
         len(tags_to_idx)
     )
     net.load_words_embeddings(embeddings)
+    if use_gpu:
+        net.cuda()
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)

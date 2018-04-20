@@ -35,11 +35,6 @@ def parse_conll_file(filename):
 
 def train(embeddings, model_name='vanilla', device=0):
 
-    use_gpu = torch.cuda.is_available()
-    if use_gpu:
-        cuda_device = device
-        torch.cuda.set_device(cuda_device)
-        logging.info('Using GPU')
 
     train_sentences, train_tags = parse_conll_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_conll_file('./data/conll/valid.txt')
@@ -65,6 +60,12 @@ def train(embeddings, model_name='vanilla', device=0):
     def cuda_collate(samples):
         words_tensor, labels_tensor = collate_examples(samples)
         return words_tensor.cuda(), labels_tensor.cuda()
+
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        cuda_device = device
+        torch.cuda.set_device(cuda_device)
+        logging.info('Using GPU')
 
     if use_gpu:
         collate_fn = cuda_collate

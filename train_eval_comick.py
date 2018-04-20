@@ -378,7 +378,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
 
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name)
+        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device)
 
 
 def get_tasks_configs():
