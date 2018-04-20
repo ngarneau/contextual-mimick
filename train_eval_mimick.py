@@ -265,12 +265,6 @@ def get_data_loader(task, debug_mode, embedding_dimension):
 
 
 def main(model_name, task_config, n=41, k=1, device=0, d=100):
-    # Control of randomization
-    seed = 299792458  # "Seed" of light
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-
     # Global parameters
     debug_mode = False
     verbose = True
@@ -450,6 +444,11 @@ if __name__ == '__main__':
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
         for i in range(5):
+            # Control of randomization
+            seed = 42 + i  # "Seed" of light
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
             for task_config in get_tasks_configs():
                 model_name = '{}_{}_n{}_k{}_d{}_i{}'.format('mimick', task_config['name'], n, k, d, i)
                 handler = logging.FileHandler('{}.log'.format(model_name))
