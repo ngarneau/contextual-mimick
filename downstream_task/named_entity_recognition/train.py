@@ -62,23 +62,22 @@ def train(embeddings, model_name='vanilla', device=0):
     valid_dataset = list(zip(valid_sentences, valid_tags))
     test_dataset = list(zip(test_sentences, test_tags))
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=32,
-        shuffle=True,
-        collate_fn=collate_examples
-    )
-
     def cuda_collate(samples):
         words_tensor, labels_tensor = collate_examples(samples)
-        words_tensor.cuda()
-        labels_tensor.cuda()
-        return words_tensor, labels_tensor
+        return words_tensor.cuda(), labels_tensor.cuda()
 
     if use_gpu:
         collate_fn = cuda_collate
     else:
         collate_fn = collate_examples
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=32,
+        shuffle=True,
+        collate_fn=collate_fn
+    )
+
 
     valid_loader = DataLoader(
         valid_dataset,

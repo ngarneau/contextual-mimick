@@ -34,7 +34,7 @@ class LSTMSequence(nn.Module):
     def set_item_embedding(self, idx, embedding):
         t = torch.FloatTensor(embedding)
         if self.use_cuda:
-            t.cuda()
+            t = t.cuda()
         self.word_embeddings.weight.data[idx] = t
 
     def load_words_embeddings(self, words_embeddings):
