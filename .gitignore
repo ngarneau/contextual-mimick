@@ -111,6 +111,7 @@ train_logs/
 data/conll/
 data/conll_embeddings_settings/
 data/glove_embeddings/
+data/
 
 temp.py
 test.py
