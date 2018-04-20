@@ -455,12 +455,13 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for task_config in get_tasks_configs():
-            model_name = '{}_{}_n{}_k{}_d{}_{}'.format('comick', task_config['name'], n, k, d, time())
-            handler = logging.FileHandler('{}.log'.format(model_name))
-            logger.addHandler(handler)
-            main(model_name, task_config, n=n, k=k, device=device, d=d)
-            logger.removeHandler(handler)
+        for i in range(5):
+            for task_config in get_tasks_configs():
+                model_name = '{}_{}_n{}_k{}_d{}_i{}'.format('comick', task_config['name'], n, k, d, i)
+                handler = logging.FileHandler('{}.log'.format(model_name))
+                logger.addHandler(handler)
+                main(model_name, task_config, n=n, k=k, device=device, d=d)
+                logger.removeHandler(handler)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
