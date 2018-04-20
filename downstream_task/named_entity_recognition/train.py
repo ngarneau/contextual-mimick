@@ -98,7 +98,8 @@ def train(embeddings, model_name='vanilla', device=0):
         100,
         50,
         words_to_idx,
-        len(tags_to_idx)
+        len(tags_to_idx),
+        use_gpu
     )
     net.load_words_embeddings(embeddings)
     if use_gpu:

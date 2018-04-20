@@ -10,9 +10,11 @@ class LSTMSequence(nn.Module):
             words_embedding_dimension,
             words_hidden_dimension,
             words_vocabulary,
-            tagset_size
+            tagset_size,
+            use_cuda=False
     ):
         super(LSTMSequence, self).__init__()
+        self.use_cuda = use_cuda
         self.words_embedding_dimension = words_embedding_dimension
         self.words_hidden_dimension = words_hidden_dimension
         self.words_vocabulary_size = len(words_vocabulary)
@@ -30,7 +32,10 @@ class LSTMSequence(nn.Module):
         self.hidden2tag = nn.Linear(words_hidden_dimension*2, tagset_size)
 
     def set_item_embedding(self, idx, embedding):
-        self.word_embeddings.weight.data[idx] = torch.FloatTensor(embedding)
+        t = torch.FloatTensor(embedding)
+        if self.use_cuda:
+            t.cuda()
+        self.word_embeddings.weight.data[idx] = t
 
     def load_words_embeddings(self, words_embeddings):
         for word, embedding in words_embeddings.items():
@@ -49,9 +54,10 @@ class LSTMTagger(LSTMSequence):
             words_embedding_dimension,
             words_hidden_dimension,
             words_vocabulary,
-            tagset_size
+            tagset_size,
+            use_cuda=False
     ):
-        super(LSTMTagger, self).__init__(words_embedding_dimension, words_hidden_dimension, words_vocabulary, tagset_size)
+        super(LSTMTagger, self).__init__(words_embedding_dimension, words_hidden_dimension, words_vocabulary, tagset_size, use_cuda)
 
     def forward(self, sentence):
         # Sort sentences in decreasing order
@@ -78,9 +84,10 @@ class LSTMClassifier(LSTMSequence):
             words_embedding_dimension,
             words_hidden_dimension,
             words_vocabulary,
-            tagset_size
+            tagset_size,
+            use_cuda=False
     ):
-        super(LSTMClassifier, self).__init__(words_embedding_dimension, words_hidden_dimension, words_vocabulary, tagset_size)
+        super(LSTMClassifier, self).__init__(words_embedding_dimension, words_hidden_dimension, words_vocabulary, tagset_size, use_cuda)
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, sentence):
@@ -100,4 +107,38 @@ class LSTMClassifier(LSTMSequence):
         lstm_out = self.dropout(lstm_out)
         tag_space = self.hidden2tag(lstm_out)
 
+        return tag_space
+
+
+class BOWClassifier(nn.Module):
+
+    def __init__(
+            self,
+            words_embedding_dimension,
+            words_vocabulary,
+            tagset_size
+    ):
+        super(BOWClassifier, self).__init__()
+        self.words_embedding_dimension = words_embedding_dimension
+        self.words_vocabulary_size = len(words_vocabulary)
+        self.words_vocabulary = words_vocabulary
+        self.word_embeddings = nn.Embedding(self.words_vocabulary_size, words_embedding_dimension)
+        self.dropout = nn.Dropout(0.5)
+        self.hidden2tag = nn.Linear(words_embedding_dimension, tagset_size)
+
+    def set_item_embedding(self, idx, embedding):
+        self.word_embeddings.weight.data[idx] = torch.FloatTensor(embedding)
+
+    def load_words_embeddings(self, words_embeddings):
+        for word, embedding in words_embeddings.items():
+            if word in self.words_vocabulary:
+                idx = self.words_vocabulary[word]
+                self.set_item_embedding(idx, embedding)
+
+    def forward(self, sentence):
+        embeds = self.word_embeddings(sentence)
+        embeds = self.dropout(embeds)
+        bow = embeds.sum(dim=1)
+        bow = F.sigmoid(bow)
+        tag_space = self.hidden2tag(bow)
         return tag_space
