@@ -44,20 +44,18 @@ def load_data(d, corpus, verbose=True):
 
 
 def augment_data(examples, embeddings):
-    labels = set(label for x, label in examples)
+    labels = sorted(set(label for x, label in examples))
     similar_words = pkl.load(open('./data/similar_words.p', 'rb'))
 
-    new_examples = set()
+    new_examples = dict()
     for (left_context, word, right_context), label in examples:
         if label in similar_words:
             sim_words = similar_words[label]
             for sim_word, cos_sim in sim_words:
                 # Add new labels, not new examples to already existing labels.
                 if sim_word not in labels and cos_sim >= 0.6:
-                    new_example = (
-                        (left_context, sim_word, right_context), sim_word)
-                    new_examples.add(new_example)
-
+                    new_example = ((left_context, sim_word, right_context), sim_word)
+                    new_examples[new_example] = 1
     return new_examples
 
 
@@ -85,23 +83,23 @@ def prepare_data(embeddings,
                  verbose=True,
                  data_augmentation=False):
     # Train-validation part
-    examples = set()
-    examples_without_embeds = set()
+    examples = dict()
+    examples_without_embeds = dict()
     for sentence in train_sentences:
         for ngram in ngrams(sentence, n):
+            key = (ngram, ngram[1])
             if ngram[1] in embeddings:
                 # Keeps only different ngrams which have a training embeddings
-                examples.add((ngram, ngram[1]))
+                examples[key] = 1
             else:
-                examples_without_embeds.add((ngram, ngram[1]))
+                examples_without_embeds[key] = 1
 
     if data_augmentation:
         augmented_examples = augment_data(examples, embeddings)
         if verbose:
             logging.info("Number of non-augmented examples: {}".format(len(examples)))
-        examples |= augmented_examples  # Union
+        examples.update(augmented_examples)  # Union
     examples = preprocess_examples(examples)
-
 
     transform = vectorizer.vectorize_unknown_example
 
