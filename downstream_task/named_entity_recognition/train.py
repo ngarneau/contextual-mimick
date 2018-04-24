@@ -107,7 +107,11 @@ def train(embeddings, model_name='vanilla', device=0):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    model_path = './models/'
+    checkpoint = ModelCheckpoint(model_path+'ner_'+model_name+'.torch',
+                                 save_best_only=True,
+                                 restore_best=True,
+                                 temporary_filename=model_path+'tmp_ner_'+model_name+'.torch')
     csv_logger = CSVLogger('./train_logs/ner_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
