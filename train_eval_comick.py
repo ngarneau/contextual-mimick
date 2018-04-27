@@ -262,7 +262,7 @@ def get_data_loader(task, debug_mode, embedding_dimension):
         raise NotImplementedError("Task {} as no suitable data loader".format(task))
 
 
-def main(model_name, task_config, n=41, k=1, device=0, d=100):
+def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     # Global parameters
     debug_mode = False
     verbose = True
@@ -320,7 +320,6 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 100
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -436,12 +435,14 @@ if __name__ == '__main__':
         parser.add_argument("k", default=1, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
+        parser.add_argument("e", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
         n = int(args.n)
         k = int(args.k)
         device = int(args.device)
         d = int(args.d)
+        epochs = int(args.e)
         task = args.t
         if d not in [50, 100, 200, 300]:
             raise ValueError(
@@ -454,10 +455,10 @@ if __name__ == '__main__':
             np.random.seed(seed)
             random.seed(seed)
             for task_config in get_tasks_configs():
-                model_name = '{}_{}_n{}_k{}_d{}_i{}'.format('comick', task_config['name'], n, k, d, i)
+                model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('comick', task_config['name'], n, k, d, i, epochs)
                 handler = logging.FileHandler('{}.log'.format(model_name))
                 logger.addHandler(handler)
-                main(model_name, task_config, n=n, k=k, device=device, d=d)
+                main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=epochs)
                 logger.removeHandler(handler)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
