@@ -153,7 +153,7 @@ class MirrorLSTM(Module):
             if side == 'left':
                 # Concatenate [forward, backward]
                 output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
-            else
+            else:
             # Concatenate [backward, forward]
                 output = torch.cat([hidden_states[1], hidden_states[0]], dim=1)
             output = output[rev_perm_idx]
@@ -328,7 +328,6 @@ class ComickDev(Module):
         self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
                                    embedding_dim=word_embeddings_dimension,
                                    hidden_state_dim=word_embeddings_dimension,
-                                   n_lstms=2,
                                    freeze_embeddings=freeze_word_embeddings,
                                    dropout=context_dropout_p)
 
