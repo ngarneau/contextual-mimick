@@ -58,7 +58,7 @@ class MultiLSTM(Module):
 
     def forward(self, *xs):
         """
-        xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one stream
+        xs is a tuple of sequences of items. Must be the same length as 'n_lstms'. Returns a list of outputs if there is more than one sequence.
         """
         outputs = []
         for x, lstm in zip(xs, self.lstms):
@@ -79,6 +79,87 @@ class MultiLSTM(Module):
             outputs.append(output)
 
         return outputs if len(outputs) > 1 else outputs[0]
+
+    def set_item_embedding(self, idx, embedding):
+        self.embeddings.weight.data[idx] = torch.FloatTensor(embedding)
+
+
+class MirrorLSTM(Module):
+    """
+    Module that converts two sequences of items into their common embeddings, then applies a bidirectional LSTM on each sequence. The outputs are the concatenations of the two final hidden states.
+    """
+
+    def __init__(self,
+                 num_embeddings,
+                 embedding_dim,
+                 hidden_state_dim,
+                 padding_idx=0,
+                 freeze_embeddings=True,
+                 dropout=0):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+
+        self.embeddings = nn.Embedding(
+            num_embeddings=num_embeddings,
+            embedding_dim=embedding_dim,
+            padding_idx=0)
+        kaiming_uniform(self.embeddings.weight)
+        if freeze_embeddings:
+            for param in self.embeddings.parameters():
+                print('Freezing embeddings')
+                param.requires_grad = False
+
+        self.lstm_left = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_state_dim,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout,
+        )
+
+        self.lstm_right = nn.LSTM(
+            input_size=embedding_dim,
+            hidden_size=hidden_state_dim,
+            num_layers=1,
+            batch_first=True,
+            bidirectional=True,
+            dropout=dropout,
+        )
+        self.lstms = {'left': self.lstm_left,
+                      'right': self.lstm_right}
+
+    def forward(self, x_left, x_right):
+
+        x = {'left': x_left,
+             'right': x_right}
+
+        outputs = []
+        for side in ['left', 'right']:
+            lengths = x[side].data.ne(0).sum(dim=1).long()
+            seq_lengths, perm_idx = lengths.sort(0, descending=True)
+            _, rev_perm_idx = perm_idx.sort(0)
+
+            # Embed
+            embeddings = self.embeddings(x[side][perm_idx])
+            embeddings = self.dropout(embeddings)
+
+            # Initialize hidden to zero
+            packed_input = pack_padded_sequence(
+                embeddings, list(seq_lengths), batch_first=True)
+            packed_output, (hidden_states, cell_states) = self.lstms[side](
+                packed_input)
+
+            if side == 'left':
+                # Concatenate [forward, backward]
+                output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
+            else
+            # Concatenate [backward, forward]
+                output = torch.cat([hidden_states[1], hidden_states[0]], dim=1)
+            output = output[rev_perm_idx]
+            outputs.append(output)
+
+        return outputs
 
     def set_item_embedding(self, idx, embedding):
         self.embeddings.weight.data[idx] = torch.FloatTensor(embedding)
@@ -244,12 +325,12 @@ class ComickDev(Module):
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
-        self.contexts = MultiLSTM(num_embeddings=len(self.words_vocabulary),
-                                  embedding_dim=word_embeddings_dimension,
-                                  hidden_state_dim=word_embeddings_dimension,
-                                  n_lstms=2,
-                                  freeze_embeddings=freeze_word_embeddings,
-                                  dropout=context_dropout_p)
+        self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
+                                   embedding_dim=word_embeddings_dimension,
+                                   hidden_state_dim=word_embeddings_dimension,
+                                   n_lstms=2,
+                                   freeze_embeddings=freeze_word_embeddings,
+                                   dropout=context_dropout_p)
 
         if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
