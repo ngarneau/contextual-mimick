@@ -2,6 +2,7 @@ import os
 import logging
 
 from gensim.models import KeyedVectors
+from tqdm import tqdm
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -37,7 +38,7 @@ def augment_data(examples, embeddings_path):
 
     logging.info("Getting new examples for {} labels...".format(len(labels)))
     new_examples = dict()
-    for (left_context, word, right_context), label in examples:
+    for (left_context, word, right_context), label in tqdm(examples):
         sim_words = word2vec_model.most_similar(label, topn=5)
         for sim_word, cos_sim in sim_words:
             # Add new labels, not new examples to already existing labels.
