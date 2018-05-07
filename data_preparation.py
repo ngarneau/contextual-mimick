@@ -51,9 +51,9 @@ def augment_data(examples, embeddings_path):
 def preprocess_examples(examples):
     preprocessed_examples = list()
     for (left_context, word, right_context), label in examples:
-        preprocessed_word = preprocess_token(word)
+        # preprocessed_word = preprocess_token(word)
         preprocessed_examples.append((
-            (left_context, preprocessed_word, right_context),
+            (left_context, word, right_context),
             label
         ))
     return preprocessed_examples
@@ -85,7 +85,7 @@ def prepare_data(embeddings,
                 examples_without_embeds[key] = 1
 
     if data_augmentation:
-        augmented_examples = augment_data(examples, embeddings)
+        augmented_examples = augment_data(examples, './data/glove_embeddings/glove.6B.100d.txt')
         if verbose:
             logging.info(
                 "Number of non-augmented examples: {}".format(len(examples)))
