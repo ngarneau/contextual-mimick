@@ -8,10 +8,11 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from comick import ComickDev
-from utils import load_embeddings, save_embeddings, parse_conll_file, preprocess_token
+from utils import save_embeddings
 from utils import square_distance, cosine_sim
-from utils import make_vocab, WordsInContextVectorizer, ngrams
+from utils import make_vocab, WordsInContextVectorizer
 from utils import collate_fn, collate_x
+from data_preparation import *
 from per_class_dataset import *
 from downstream_task.part_of_speech.train import train as train_pos
 from downstream_task.named_entity_recognition.train import train as train_ner
@@ -31,6 +32,7 @@ from torch.optim import Adam
 from gensim.models import KeyedVectors
 
 
+<<<<<<< HEAD
 def load_data(d, corpus, verbose=True):
     path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(d)
     embeddings = load_embeddings(path_embeddings)
@@ -180,6 +182,8 @@ def prepare_data(embeddings,
     return train_loader, valid_loader, test_loader
 
 
+=======
+>>>>>>> b718048a19c7def15c726f25ba2965a8bb0cc904
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=3)
@@ -275,7 +279,8 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     verbose = True
     save = True
     freeze_word_embeddings = True
-    over_population_threshold = 80
+    over_population_threshold = 100
+    relative_over_population = True
     data_augmentation = True
     if debug_mode:
         data_augmentation = False
@@ -286,10 +291,11 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     logging.info("Verbose: {}".format(verbose))
     logging.info("Freeze word embeddings: {}".format(freeze_word_embeddings))
     logging.info("Over population threshold: {}".format(over_population_threshold))
+    logging.info("Relative over population: {}".format(relative_over_population))
     logging.info("Data augmentation: {}".format(data_augmentation))
 
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -311,7 +317,6 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     vectorizer = vectorizer
 
     # Prepare examples
-
     train_loader, valid_loader, test_loader = prepare_data(
         embeddings=embeddings,
         test_vocabs=test_vocabs,
@@ -322,6 +327,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         use_gpu=use_gpu,
         k=k,
         over_population_threshold=over_population_threshold,
+        relative_over_population=relative_over_population,
         data_augmentation=data_augmentation,
         verbose=verbose,
     )
