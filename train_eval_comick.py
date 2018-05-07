@@ -28,6 +28,8 @@ from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
 
+from gensim.models import KeyedVectors
+
 
 def load_data(d, corpus, verbose=True):
     path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(d)
@@ -43,19 +45,24 @@ def load_data(d, corpus, verbose=True):
     return embeddings, (train_sentences, valid_sentences, test_sentences)
 
 
-def augment_data(examples, embeddings):
-    labels = sorted(set(label for x, label in examples))
-    similar_words = pkl.load(open('./data/similar_words.p', 'rb'))
+def augment_data(examples, embeddings_path):
 
+    logging.info("Loading embedding model...")
+    word2vec_model = KeyedVectors.load_word2vec_format(embeddings_path)
+    logging.info("Done.")
+
+    labels = sorted(set(label for x, label in examples))
+
+    logging.info("Getting new examples for {} labels...".format(len(labels)))
     new_examples = dict()
     for (left_context, word, right_context), label in examples:
-        if label in similar_words:
-            sim_words = similar_words[label]
-            for sim_word, cos_sim in sim_words:
-                # Add new labels, not new examples to already existing labels.
-                if sim_word not in labels and cos_sim >= 0.6:
-                    new_example = ((left_context, sim_word, right_context), sim_word)
-                    new_examples[new_example] = 1
+        sim_words = word2vec_model.most_similar(label, topn=5)
+        for sim_word, cos_sim in sim_words:
+            # Add new labels, not new examples to already existing labels.
+            if sim_word not in labels and cos_sim >= 0.6:
+                new_example = ((left_context, sim_word, right_context), sim_word)
+                new_examples[new_example] = 1
+    logging.info("Done.")
     return new_examples
 
 
@@ -95,7 +102,7 @@ def prepare_data(embeddings,
                 examples_without_embeds[key] = 1
 
     if data_augmentation:
-        augmented_examples = augment_data(examples, embeddings)
+        augmented_examples = augment_data(examples, './data/glove_embeddings/glove.6B.{}d.txt'.format(d))
         if verbose:
             logging.info("Number of non-augmented examples: {}".format(len(examples)))
         examples.update(augmented_examples)  # Union
