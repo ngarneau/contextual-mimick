@@ -140,7 +140,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     logging.info("Data augmentation: {}".format(data_augmentation))
 
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
