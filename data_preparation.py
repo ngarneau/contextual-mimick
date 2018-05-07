@@ -35,12 +35,16 @@ def augment_data(examples, embeddings_path):
     logging.info("Done.")
 
     labels = sorted(set(label for x, label in examples))
+    logging.info("Computing similar words for {} labels...".format(len(labels)))
+    sim_words = dict()
+    for label in tqdm(labels):
+        sim_words[label] = word2vec_model.most_similar(label, topn=5)
+    logging.info("Done.")
 
-    logging.info("Getting new examples for {} labels...".format(len(labels)))
     new_examples = dict()
     for (left_context, word, right_context), label in tqdm(examples):
-        sim_words = word2vec_model.most_similar(label, topn=5)
-        for sim_word, cos_sim in sim_words:
+        sim_words_for_label = sim_words[word]
+        for sim_word, cos_sim in sim_words_for_label:
             # Add new labels, not new examples to already existing labels.
             if sim_word not in labels and cos_sim >= 0.6:
                 new_example = ((left_context, sim_word, right_context), sim_word)
