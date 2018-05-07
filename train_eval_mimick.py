@@ -262,7 +262,7 @@ def get_data_loader(task, debug_mode, embedding_dimension):
         raise NotImplementedError("Task {} as no suitable data loader".format(task))
 
 
-def main(model_name, task_config, n=41, k=1, device=0, d=100):
+def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     # Global parameters
     debug_mode = False
     verbose = True
@@ -320,7 +320,6 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100):
     )
 
     # Initialize training parameters
-    epochs = 100
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -381,24 +380,24 @@ def get_tasks_configs():
         #         },
         #     ]
         # },
-        {
-            'name': 'conll',
-            'dataloader': CoNLLDataLoader,
-            'tasks': [
-                {
-                    'name': 'ner',
-                    'script': train_ner
-                },
-                {
-                    'name': 'pos',
-                    'script': train_pos
-                },
-                {
-                    'name': 'chunk',
-                    'script': train_chunk
-                },
-            ]
-        },
+        #{
+        #    'name': 'conll',
+        #    'dataloader': CoNLLDataLoader,
+        #    'tasks': [
+        #        {
+        #            'name': 'ner',
+        #            'script': train_ner
+        #        },
+        #        {
+        #            'name': 'pos',
+        #            'script': train_pos
+        #        },
+        #        {
+        #            'name': 'chunk',
+        #            'script': train_chunk
+        #        },
+        #    ]
+        #},
         {
             'name': 'semeval',
             'dataloader': SemEvalDataLoader,
@@ -441,18 +440,19 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for i in range(5):
-            # Control of randomization
-            seed = 42 + i  # "Seed" of light
-            torch.manual_seed(seed)
-            np.random.seed(seed)
-            random.seed(seed)
-            for task_config in get_tasks_configs():
-                model_name = '{}_{}_n{}_k{}_d{}_i{}'.format('mimick', task_config['name'], n, k, d, i)
-                handler = logging.FileHandler('{}.log'.format(model_name))
-                logger.addHandler(handler)
-                main(model_name, task_config, n=n, k=k, device=device, d=d)
-                logger.removeHandler(handler)
+        for e in [3]:
+            for i in range(5):
+                # Control of randomization
+                seed = 42 + i  # "Seed" of light
+                torch.manual_seed(seed)
+                np.random.seed(seed)
+                random.seed(seed)
+                for task_config in get_tasks_configs():
+                    model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('mimick', task_config['name'], n, k, d, i, e)
+                    handler = logging.FileHandler('{}.log'.format(model_name))
+                    logger.addHandler(handler)
+                    main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=e)
+                    logger.removeHandler(handler)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
