@@ -12,6 +12,7 @@ from utils import collate_fn, collate_x
 from per_class_dataset import *
 import pickle as pkl
 
+
 def load_data(d, corpus, verbose=True):
     path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
         d)
@@ -29,7 +30,6 @@ def load_data(d, corpus, verbose=True):
 
 
 def augment_data(examples, embeddings_path):
-
     logging.info("Loading embedding model...")
     word2vec_model = KeyedVectors.load_word2vec_format(embeddings_path)
     logging.info("Done.")
@@ -99,7 +99,8 @@ def prepare_data(embeddings,
 
     transform = vectorizer.vectorize_unknown_example
 
-    def target_transform(y): return embeddings[y]
+    def target_transform(y):
+        return embeddings[y]
 
     train_valid_dataset = PerClassDataset(
         examples,
@@ -113,8 +114,11 @@ def prepare_data(embeddings,
     filter_labels_cond = None
     if over_population_threshold != None:
         if relative_over_population:
-            over_population_threshold = int(train_valid_dataset.stats()['most common labels number of examples']/over_population_threshold)
-        def filter_labels_cond(label, N): return N <= over_population_threshold
+            over_population_threshold = int(
+                train_valid_dataset.stats()['most common labels number of examples'] / over_population_threshold)
+
+        def filter_labels_cond(label, N):
+            return N <= over_population_threshold
 
     train_loader = PerClassLoader(dataset=train_dataset,
                                   collate_fn=collate_fn,

@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import torch
 from pytoune import torch_to_numpy
 from sklearn.metrics.pairwise import cosine_similarity
@@ -16,7 +16,7 @@ def load_embeddings(path):
             if len(line) > 50:
                 fields = line.strip().split(' ')
                 word = fields[0]
-                vector = numpy.asarray(fields[1:], dtype='float32')
+                vector = np.asarray(fields[1:], dtype='float32')
                 embeddings[word] = vector
     return embeddings
 
@@ -144,7 +144,7 @@ def preprocess_token(token):
 
 def collate_fn(batch):
     x, y = collate_x(batch)
-    return (x, torch.FloatTensor(numpy.array(y)))
+    return (x, torch.FloatTensor(np.array(y)))
 
 
 def collate_x(batch):
@@ -186,7 +186,7 @@ def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_
 def euclidean_distance(y_pred_tensor, y_true_tensor):
     y_pred = torch_to_numpy(y_pred_tensor)
     y_true = torch_to_numpy(y_true_tensor)
-    dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
+    dist = np.linalg.norm((y_true - y_pred), axis=1).mean()
     return torch.FloatTensor([dist.tolist()])
 
 
