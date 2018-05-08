@@ -116,10 +116,11 @@ def train(embeddings, model_name='vanilla', device=0):
 
 
 if __name__ == '__main__':
-    seed = 299792458  # "Seed" of light
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    logging.getLogger().setLevel(logging.INFO)
-    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-    train(embeddings)
+    for i in range(5):
+        seed = 42 + i  # "Seed" of light
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
+        logging.getLogger().setLevel(logging.INFO)
+        embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+        train(embeddings, "vanilla_i{}".format(i))

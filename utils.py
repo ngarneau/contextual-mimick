@@ -13,10 +13,11 @@ def load_embeddings(path):
     i = 0
     with open(path, 'r', encoding='utf8') as embeddings_file:
         for line in embeddings_file:
-            fields = line.strip().split(' ')
-            word = fields[0]
-            vector = numpy.asarray(fields[1:], dtype='float32')
-            embeddings[word] = vector
+            if len(line) > 50:
+                fields = line.strip().split(' ')
+                word = fields[0]
+                vector = numpy.asarray(fields[1:], dtype='float32')
+                embeddings[word] = vector
     return embeddings
 
 
