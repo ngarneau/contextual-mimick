@@ -255,7 +255,6 @@ class ComickUniqueContext(Module):
     """
     This is the architecture with only one context.
     """
-
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -294,14 +293,12 @@ class ComickUniqueContext(Module):
                 self.context.set_item_embedding(idx, embedding)
 
     def forward(self, x):
-        context, word = x
-
+        left_context, word, right_context = x
+        context = torch.cat([left_context, right_context], dim=1)
         context_rep = self.context(context)
         word_hidden_rep = self.mimick(word)
-        hidden_rep = context_rep + hidden_word_rep
-
+        hidden_rep = context_rep + word_hidden_rep
         output = self.fc(F.tanh(hidden_rep))
-
         return output
 
 
