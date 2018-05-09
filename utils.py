@@ -83,24 +83,24 @@ class WordsInContextVectorizer:
         self.words_to_idx = words_to_idx
         self.chars_to_idx = chars_to_idx
 
-    def vectorize_sequence(self, word, to_idx):
+    def vectorize_sequence(self, sequence, to_idx):
         if 'UNK' in to_idx:
             unknown_index = to_idx['UNK']
             v = list()
-            for char in word:
-                if char in to_idx:
-                    v.append(to_idx[char])
-                elif char.capitalize() in to_idx:
-                    v.append(to_idx[char.capitalize()])
-                elif char.upper() in to_idx:
-                    v.append(to_idx[char.upper()])
-                elif char.lower() in to_idx:
-                    v.append(to_idx[char.lower()])
+            for item in sequence:
+                if item in to_idx:
+                    v.append(to_idx[item])
+                elif item.capitalize() in to_idx:
+                    v.append(to_idx[item.capitalize()])
+                elif item.upper() in to_idx:
+                    v.append(to_idx[item.upper()])
+                elif item.lower() in to_idx:
+                    v.append(to_idx[item.lower()])
                 else:
                     v.append(to_idx['UNK'])
             return v
         else:
-            return [to_idx[char] for char in word]
+            return [to_idx[item] for item in sequence]
 
     def vectorize_example(self, example):
         x, y = example
@@ -143,6 +143,7 @@ def preprocess_token(token):
 
 
 def collate_fn(batch):
+    print(batch)
     x, y = collate_x(batch)
     return (x, torch.FloatTensor(np.array(y)))
 

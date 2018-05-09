@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickDev
+from comick import Comick
 from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
@@ -185,7 +185,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = Comick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,

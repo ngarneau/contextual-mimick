@@ -2,24 +2,16 @@ import argparse
 import logging
 import os
 
-from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader, NewsGroupDataLoader
-
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from comick import Mimick
-from utils import save_embeddings
+from utils import save_embeddings, load_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
-from utils import collate_fn, collate_x
+from utils import pad_sequences
 from data_preparation import *
 from per_class_dataset import *
-from downstream_task.part_of_speech.train import train as train_pos
-from downstream_task.named_entity_recognition.train import train as train_ner
-from downstream_task.sentiment_classification.train import train as train_sent
-from downstream_task.chunking.train import train as train_chunk
-from downstream_task.semeval.train import train as train_semeval
-from downstream_task.newsgroup_classification.train import train as train_newsgroup
 
 import numpy as np
 import pickle as pkl
@@ -28,6 +20,99 @@ from pytoune import torch_to_numpy, tensors_to_variables
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
+from random import shuffle
+
+def make_char_to_idx(words):
+    alphabet = set()
+    for word in words:
+        for char in word:
+            alphabet.add(char)
+    
+    char_to_idx = {'PAD':0}
+    for char in sorted(alphabet):
+        char_to_idx[char] = len(char_to_idx)
+    
+    return char_to_idx
+
+
+class Vectorizer:
+    def __init__(self, index, unknown_idx='UNK'):
+        self.index = index
+        self.unk = unknown_idx
+        if self.unk not in self.index:
+            self.index[self.unk] = len(self.index)
+    
+    def vectorize_sequence(self, sequence):
+        vectorized_sequence = []
+        for item in sequence:
+            if item in self.index:
+                vectorized_sequence.append(self.index[item])
+            else:
+                vectorized_sequence.append(self.index[self.unk])
+
+        return vectorized_sequence
+    
+    def vectorize_example(self, example):
+        x, y = example
+        return self.vectorize_sequence(x), y
+
+
+def collate_fn(batch):
+    x, y = zip(*batch)
+
+    x_lengths = torch.LongTensor([len(item) for item in x])
+    padded_x = pad_sequences(x, x_lengths)
+
+    return (padded_x, torch.FloatTensor(np.array(y)))
+
+
+def prepare_data(d,
+                 split_ratios=[.8,.1,.1],
+                 use_gpu=False,
+                 batch_size=64,
+                 verbose=True,
+                 debug_mode=False):
+    path_embeddings = './data/glove_embeddings/glove.6B.{}d.txt'.format(d)
+    if verbose:
+        logging.info('Loading ' + str(d) + 'd embeddings from: "' + path_embeddings + '"')
+
+    embeddings = load_embeddings(path_embeddings)
+    words = [word for word in embeddings]
+    char_to_idx = make_char_to_idx(words)
+
+    vectorizer = Vectorizer(char_to_idx)
+    examples = [(vectorizer.vectorize_sequence(word), embed) for word, embed in embeddings.items()]
+    if debug_mode:
+        examples = examples[:850]
+
+    # shuffle(examples)
+    m_train = int(len(examples)*split_ratios[0])
+    m_valid = int(len(examples)*split_ratios[1])
+    # m_test = len(embeddings)*split_ratios[2]
+
+    train_ex = examples[:m_train]
+    valid_ex = examples[m_train:m_train+m_valid]
+    test_ex = examples[m_train+m_valid:]
+    if verbose:
+        logging.info('Training size: ' + str(m_train))
+        logging.info('Validation size: ' + str(m_valid))
+        logging.info('Test size: ' + str(len(test_ex)))
+    train_loader = DataLoader(
+        train_ex,
+        collate_fn=collate_fn,
+        use_gpu=use_gpu,
+        batch_size=batch_size)
+    valid_loader = DataLoader(valid_ex,
+        collate_fn=collate_fn,
+        use_gpu=use_gpu,
+        batch_size=batch_size)
+    test_loader = DataLoader(test_ex,
+        collate_fn=collate_fn,
+        use_gpu=use_gpu,
+        batch_size=batch_size)
+
+    return train_loader, valid_loader, test_loader, char_to_idx
+
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
@@ -111,72 +196,31 @@ def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
     return mean_pred_embeddings
 
 
-def get_data_loader(task, debug_mode, embedding_dimension):
-    if task == 'ner':
-        return CoNLLDataLoader(debug_mode, embedding_dimension)
-    else:
-        raise NotImplementedError("Task {} as no suitable data loader".format(task))
-
-
-def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
+def main(model_name, device=0, d=100, epochs=100):
     # Global parameters
     debug_mode = False
     verbose = True
     save = True
-    freeze_word_embeddings = False
-    over_population_threshold = 100
-    relative_over_population = True
-    data_augmentation = True
-    if debug_mode:
-        data_augmentation = False
-        over_population_threshold = None
-
-    logging.info("Task name: {}".format(task_config['name']))
+    
     logging.info("Debug mode: {}".format(debug_mode))
     logging.info("Verbose: {}".format(verbose))
-    logging.info("Freeze word embeddings: {}".format(freeze_word_embeddings))
-    logging.info("Over population threshold: {}".format(over_population_threshold))
-    logging.info("Relative over population: {}".format(relative_over_population))
-    logging.info("Data augmentation: {}".format(data_augmentation))
 
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
         logging.info('Using GPU')
 
-    # Load data
-    dataloader = task_config['dataloader'](debug_mode, d)
-    train_sentences = dataloader.get_train_sentences
-    valid_sentences = dataloader.get_valid_sentences
-    test_sentences = dataloader.get_test_sentences
-    embeddings = dataloader.get_embeddings
-    test_embeddings = dataloader.get_test_embeddings
-    test_vocabs = dataloader.get_test_vocab
-    all_sentences = train_sentences + valid_sentences + test_sentences
-
-    # Prepare vectorizer
-    word_to_idx, char_to_idx = make_vocab(all_sentences)
-    vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
-    vectorizer = vectorizer
-
     # Prepare examples
-
-    train_loader, valid_loader, test_loader = prepare_data(
-        embeddings=embeddings,
-        test_vocabs=test_vocabs,
-        train_sentences=train_sentences,
-        test_sentences=all_sentences,
-        vectorizer=vectorizer,
-        n=n,
+    train_loader, valid_loader, test_loader, char_to_idx = prepare_data(
+        d=d,
         use_gpu=use_gpu,
-        k=k,
-        over_population_threshold=over_population_threshold,
-        relative_over_population=relative_over_population,
-        data_augmentation=data_augmentation,
+        batch_size=64,
+        debug_mode=debug_mode,
         verbose=verbose,
     )
+    logging.info('Size of alphabet: ' + str(len(char_to_idx)))
 
     # Initialize training parameters
     lr = 0.001
@@ -191,6 +235,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         fc_dropout_p=0.5,
+        comick_compatibility=False
     )
     model = Model(
         model=net,
@@ -209,76 +254,18 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         epochs=epochs,
     )
 
-    predicted_evaluation_embeddings = evaluate(
-        model,
-        test_loader=test_loader,
-        test_embeddings=test_embeddings,
-        save=save,
-        model_name=model_name + '.txt'
-    )
+    # predicted_evaluation_embeddings = evaluate(
+    #     model,
+    #     test_loader=test_loader,
+    #     test_embeddings=test_embeddings,
+    #     save=save,
+    #     model_name=model_name + '.txt'
+    # )
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
-    logging.info("Evaluating embeddings...")
-    predicted_evaluation_embeddings.update(embeddings)
-
-    for task in task_config['tasks']:
-        logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device)
-
-
-def get_tasks_configs():
-    return [
-        # {
-        #     'name': 'newsgroup',
-        #     'dataloader': NewsGroupDataLoader,
-        #     'tasks': [
-        #         {
-        #             'name': 'newsgroup',
-        #             'script': train_newsgroup
-        #         },
-        #     ]
-        # },
-        {
-           'name': 'conll',
-           'dataloader': CoNLLDataLoader,
-           'tasks': [
-               {
-                   'name': 'ner',
-                   'script': train_ner
-               },
-               {
-                   'name': 'pos',
-                   'script': train_pos
-               },
-               {
-                   'name': 'chunk',
-                   'script': train_chunk
-               },
-           ]
-        },
-        {
-            'name': 'semeval',
-            'dataloader': SemEvalDataLoader,
-            'tasks': [
-                {
-                    'name': 'semeval',
-                    'script': train_semeval
-                }
-            ]
-        },
-        {
-            'name': 'sent',
-            'dataloader': SentimentDataLoader,
-            'tasks': [
-                {
-                    'name': 'sent',
-                    'script': train_sent
-                },
-            ]
-        },
-    ]
-
+    # logging.info("Evaluating embeddings...")
+    # predicted_evaluation_embeddings.update(embeddings)
 
 if __name__ == '__main__':
     from time import time
@@ -286,13 +273,9 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=21, nargs='?')
-        parser.add_argument("k", default=1, nargs='?')
+        parser.add_argument("d", default=50, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
-        parser.add_argument("d", default=100, nargs='?')
         args = parser.parse_args()
-        n = int(args.n)
-        k = int(args.k)
         device = int(args.device)
         d = int(args.d)
         if d not in [50, 100, 200, 300]:
@@ -300,18 +283,18 @@ if __name__ == '__main__':
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
         for e in [100]:
-            for i in range(5):
+            for i in range(1):
                 # Control of randomization
-                seed = 42 + i  # "Seed" of light
+                seed = 42 + i
                 torch.manual_seed(seed)
                 np.random.seed(seed)
                 random.seed(seed)
-                for task_config in get_tasks_configs():
-                    model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('mimick', task_config['name'], n, k, d, i, e)
-                    handler = logging.FileHandler('{}.log'.format(model_name))
-                    logger.addHandler(handler)
-                    main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=e)
-                    logger.removeHandler(handler)
+
+                model_name = 'mimick_glove_d{}'.format(d)
+                handler = logging.FileHandler('{}.log'.format(model_name))
+                logger.addHandler(handler)
+                main(model_name, device=device, d=d)
+                logger.removeHandler(handler)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
