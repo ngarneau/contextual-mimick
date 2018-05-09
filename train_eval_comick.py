@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickDev
+from comick import ComickDev, ComickUniqueContext, LRComick
 from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
@@ -185,14 +185,12 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = LRComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
-        context_dropout_p=0.5,
-        fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
     model = Model(
@@ -289,8 +287,8 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=3, nargs='?')
-        parser.add_argument("k", default=1, nargs='?')
+        parser.add_argument("n", default=21, nargs='?')
+        parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("e", default=100, nargs='?')

@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickDev
+from comick import ComickDev, Mimick
 from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
@@ -299,7 +299,7 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for e in [3]:
+        for e in [100]:
             for i in range(5):
                 # Control of randomization
                 seed = 42 + i  # "Seed" of light
