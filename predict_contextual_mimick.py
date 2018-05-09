@@ -1,34 +1,42 @@
 import logging
 import math
 import argparse
+import os
 
-from train_contextual_mimick import my_ngrams
+from utils import ngrams
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import numpy
 import torch
-from nltk.util import ngrams
+from utils import ngrams
 from pytoune.framework import torch_to_numpy
 
 from evaluation import evaluate_embeddings
 from contextual_mimick import ContextualMimick, get_contextual_mimick
+from comick import ComickDev
 from utils import load_embeddings, pad_sequences, parse_conll_file, make_vocab, WordsInContextVectorizer, load_vocab
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("n")
-    parser.add_argument("model_path")
-    parser.add_argument("path_words_to_predict")
+    parser.add_argument("n", default=41, nargs='?')
+    parser.add_argument("k", default=2, nargs='?')
+    parser.add_argument("d", default=100, nargs='?')
+    parser.add_argument("model_path", default='models/best_comick_dev_n41_k2_d100.torch', nargs='?')
+    parser.add_argument("path_words_to_predict", default='./embeddings_settings/setting2/all_oov_setting2.txt', nargs='?')
     args = parser.parse_args()
     n = int(args.n)
+    k = int(args.k)
+    d = int(args.d)
     model_path = args.model_path
     path_words_to_predict = args.path_words_to_predict
 
     # Prepare our examples
     sentences = parse_conll_file('./conll/train.txt')
+    sentences += parse_conll_file('./conll/valid.txt')
+    sentences += parse_conll_file('./conll/test.txt')
 
     word_to_idx, char_to_idx = make_vocab(sentences)
 
@@ -41,7 +49,12 @@ def main():
     else:
         map_location = lambda storage, loc: storage
 
-    net = get_contextual_mimick(char_to_idx, word_to_idx)
+    net = ComickDev(
+        characters_vocabulary=char_to_idx,
+        words_vocabulary=word_to_idx,
+        characters_embedding_dimension=20,
+        word_embeddings_dimension=d,
+    )
 
     net.eval()
     net.load_state_dict(torch.load(model_path, map_location))
@@ -51,7 +64,7 @@ def main():
     test_sentences += parse_conll_file('./conll/test.txt')
     test_vocab = load_vocab(path_words_to_predict)
 
-    examples = [ngram for sentence in test_sentences for ngram in my_ngrams(sentence, n)]
+    examples = [ngram for sentence in test_sentences for ngram in ngrams(sentence, n)]
     filtered_examples = [e for e in examples if e[1].lower() in test_vocab]  # Target word is in test vocab
 
     examples_by_target_word = dict()
@@ -79,17 +92,24 @@ def main():
             torch.autograd.Variable(r)
         ))
         if word in my_embeddings:  # Compute the average
-            my_embeddings[word] = (my_embeddings[word] + torch_to_numpy(prediction[0])) / 2
+            my_embeddings[word].append(torch_to_numpy(prediction[0]))
         else:
-            my_embeddings[word] = torch_to_numpy(prediction[0])
+            my_embeddings[word] = [torch_to_numpy(prediction[0])]
 
-    with open('./predicted_embeddings/contextual_mimick_validation_embeddings.txt', 'w') as fhandle:
-        for word, embedding in my_embeddings.items():
+    averaged_embeddings = dict()
+    for word, embeddings in my_embeddings.items():
+        averaged_embeddings[word] = numpy.mean(embeddings, axis=0)
+
+    filepath = './predicted_embeddings/'
+    os.makedirs(filepath, exist_ok=True)
+    filename = 'comick_dev_pred_n{}_k{}_d{}_dropout.txt'.format(n, k, d)
+    with open(filepath + filename, 'w') as fhandle:
+        for word, embedding in averaged_embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
             fhandle.write(s)
 
-    evaluate_embeddings(my_embeddings)
+    evaluate_embeddings(averaged_embeddings, d)
 
 if __name__ == '__main__':
     main()
