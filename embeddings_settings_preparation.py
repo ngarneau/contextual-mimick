@@ -49,7 +49,7 @@ def create_necessary_dirs(base_path):
 
 def create_embedding_file(original_embedding_path, target_embedding_path, tokens):
     embeddings = load_embeddings(original_embedding_path)
-    with open(target_embedding_path, 'w') as fh:
+    with open(target_embedding_path, 'w', encoding='utf-8') as fh:
         for token in tokens:
             if token in embeddings:
                 vec = ' '.join([str(i) for i in embeddings[token]])
@@ -66,7 +66,7 @@ def create_embedding_file(original_embedding_path, target_embedding_path, tokens
 
 
 def create_oov_file(target_vocab_path, tokens):
-    with open(target_vocab_path, 'w') as fh:
+    with open(target_vocab_path, 'w', encoding='utf-8') as fh:
         for token in tokens:
             fh.write("{}\n".format(token))
 
@@ -122,30 +122,30 @@ def prepare_embeddings(dataset_name, train_tokens, validation_tokens, test_token
         logging.info("Done")
 
     # Word2Vec embeddings processing
-    original_embedding_path = './data/word2vec_embeddings/wiki-news-300d-1M-subword.vec'
+    # original_embedding_path = './data/word2vec_embeddings/wiki-news-300d-1M-subword.vec'
 
-    oov_setting1 = find_every_words_not_in_embeddings(
-        original_embedding_path,
-        train_tokens.keys() | validation_tokens.keys() | test_tokens.keys()
-    )
-    create_oov_file(join(base_path, 'setting1', 'w2v', 'oov.txt'), oov_setting1)
-    create_oov_file(join(base_path, 'setting2', 'w2v', 'oov.txt'), oov_setting1 | oov_setting2)
+    # oov_setting1 = find_every_words_not_in_embeddings(
+    #     original_embedding_path,
+    #     train_tokens.keys() | validation_tokens.keys() | test_tokens.keys()
+    # )
+    # create_oov_file(join(base_path, 'setting1', 'w2v', 'oov.txt'), oov_setting1)
+    # create_oov_file(join(base_path, 'setting2', 'w2v', 'oov.txt'), oov_setting1 | oov_setting2)
 
-    target_original_embedding_path = join(base_path, 'setting1', 'w2v', 'train', 'wiki-news-300d-1M-subword.vec')
-    target_training_embedding_path = join(base_path, 'setting2', 'w2v', 'train', 'wiki-news-300d-1M-subword.vec')
-    target_test_embedding_path = join(base_path, 'setting2', 'w2v', 'test', 'wiki-news-300d-1M-subword.vec')
-    shutil.copy(original_embedding_path, target_original_embedding_path)
-    logging.info("Creating train embeddings from {}".format(original_embedding_path))
-    create_embedding_file(original_embedding_path, target_training_embedding_path, train_tokens.keys())
-    create_embedding_file(original_embedding_path, target_test_embedding_path, oov_setting2)
-    logging.info("Done")
+    # target_original_embedding_path = join(base_path, 'setting1', 'w2v', 'train', 'wiki-news-300d-1M-subword.vec')
+    # target_training_embedding_path = join(base_path, 'setting2', 'w2v', 'train', 'wiki-news-300d-1M-subword.vec')
+    # target_test_embedding_path = join(base_path, 'setting2', 'w2v', 'test', 'wiki-news-300d-1M-subword.vec')
+    # shutil.copy(original_embedding_path, target_original_embedding_path)
+    # logging.info("Creating train embeddings from {}".format(original_embedding_path))
+    # create_embedding_file(original_embedding_path, target_training_embedding_path, train_tokens.keys())
+    # create_embedding_file(original_embedding_path, target_test_embedding_path, oov_setting2)
+    # logging.info("Done")
 
 
 def parse_semeval_files(folder):
     distinct_tokens = dict()
     onlyfiles = [f for f in listdir(folder) if isfile(join(folder, f)) and '.txt' in f]
     for f in onlyfiles:
-        with open(join(folder, f)) as fh:
+        with open(join(folder, f), encoding='utf-8') as fh:
             for line in fh:
                 tokens = word_tokenize(line)
                 for token in tokens:
@@ -202,18 +202,18 @@ if __name__ == '__main__':
     # test_tokens = parse_semeval_files('./data/scienceie/semeval_articles_test')
     # prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
 
-    # train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
-    # validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
-    # test_tokens = parse_sentiment_analysis_file('./data/sentiment/test.pickle')
-    # prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
+    train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
+    validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
+    test_tokens = parse_sentiment_analysis_file('./data/sentiment/test.pickle')
+    prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
 
     # train_tokens = parse_part_of_speech_file('./data/conll/train.txt')
     # validation_tokens = parse_part_of_speech_file('./data/conll/valid.txt')
     # test_tokens = parse_part_of_speech_file('./data/conll/test.txt')
     # prepare_embeddings('pos', train_tokens, validation_tokens, test_tokens)
 
-    train_tokens = parse_newsgroup_file('./data/20newsgroup/train.pickle')
-    validation_tokens = parse_newsgroup_file('./data/20newsgroup/dev.pickle')
-    test_tokens = parse_newsgroup_file('./data/20newsgroup/test.pickle')
-    prepare_embeddings('newsgroup', train_tokens, validation_tokens, test_tokens)
+    # train_tokens = parse_newsgroup_file('./data/20newsgroup/train.pickle')
+    # validation_tokens = parse_newsgroup_file('./data/20newsgroup/dev.pickle')
+    # test_tokens = parse_newsgroup_file('./data/20newsgroup/test.pickle')
+    # prepare_embeddings('newsgroup', train_tokens, validation_tokens, test_tokens)
 
