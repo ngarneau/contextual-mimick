@@ -255,7 +255,6 @@ class ComickUniqueContext(Module):
     """
     This is the architecture with only one context.
     """
-
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -295,7 +294,6 @@ class ComickUniqueContext(Module):
 
     def forward(self, x):
         context, word = x
-
         context_rep = self.context(context)
         word_hidden_rep = self.mimick(word)
         hidden_rep = context_rep + hidden_word_rep
@@ -309,7 +307,6 @@ class ComickDev(Module):
     """
     This is the architecture in development.
     """
-
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],

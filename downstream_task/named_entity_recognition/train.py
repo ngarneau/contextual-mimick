@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
+from comick import ComickDev
 from downstream_task.models import LSTMTagger
 from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx, f1
 from utils import load_embeddings
@@ -34,14 +35,20 @@ def parse_conll_file(filename):
 
 
 def train(embeddings, model_name='vanilla', device=0):
-
-
     train_sentences, train_tags = parse_conll_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_conll_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_conll_file('./data/conll/test.txt')
 
     words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
+    words_without_embeddings = words_vocab - embeddings.keys()
+
+    chars_vocab = {c for w in words_vocab for c in w if w not in ['PAD', '<BOS>', '<EOS>']}
+    chars_to_idx = {
+        'PAD': 0
+    }
+    for c in sorted(chars_vocab):
+        chars_to_idx[c] = len(chars_to_idx)
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
     train_tags = [[tags_to_idx[word] for word in sentence] for sentence in train_tags]
@@ -51,7 +58,6 @@ def train(embeddings, model_name='vanilla', device=0):
 
     test_sentences = [[words_to_idx[word] for word in sentence] for sentence in test_sentences]
     test_tags = [[tags_to_idx[word] for word in sentence] for sentence in test_tags]
-
 
     train_dataset = list(zip(train_sentences, train_tags))
     valid_dataset = list(zip(valid_sentences, valid_tags))
@@ -79,7 +85,6 @@ def train(embeddings, model_name='vanilla', device=0):
         collate_fn=collate_fn
     )
 
-
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=32,
@@ -94,24 +99,33 @@ def train(embeddings, model_name='vanilla', device=0):
         collate_fn=collate_fn
     )
 
+    comick = ComickDev(
+        chars_to_idx,
+        words_to_idx,
+        freeze_word_embeddings=False,
+        word_embeddings_dimension=100
+    )
+    comick.load_words_embeddings(embeddings)
+
     net = LSTMTagger(
         100,
         50,
         words_to_idx,
+        words_without_embeddings,
         len(tags_to_idx),
+        comick,
         use_gpu
     )
     net.load_words_embeddings(embeddings)
     if use_gpu:
         net.cuda()
 
-    lrscheduler = ReduceLROnPlateau(patience=5)
+    lrscheduler = ReduceLROnPlateau(patience=3)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    checkpoint = ModelCheckpoint('./models/ner_{}.torch'.format(model_name), save_best_only=True, restore_best=True, monitor='val_f1', mode='max')
     csv_logger = CSVLogger('./train_logs/ner_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[f1])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
-
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))

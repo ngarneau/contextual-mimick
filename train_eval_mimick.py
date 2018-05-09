@@ -126,7 +126,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     freeze_word_embeddings = False
     over_population_threshold = 100
     relative_over_population = True
-    data_augmentation = True
+    data_augmentation = False
     if debug_mode:
         data_augmentation = False
         over_population_threshold = None

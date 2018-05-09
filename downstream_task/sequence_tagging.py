@@ -43,6 +43,8 @@ def acc(y_pred_tensor, y_true_tensor):
 def make_idx(vocab: set):
     idx = dict()
     idx['PAD'] = 0
+    idx['<BOS>'] = 1
+    idx['<EOS>'] = 2
     for v in sorted(vocab):
         idx[v] = len(idx)
     return idx
