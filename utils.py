@@ -23,7 +23,7 @@ def load_embeddings(path):
 
 def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
     os.makedirs(path, exist_ok=True)
-    with open(path + filename, 'w') as fhandle:
+    with open(path + filename, 'w', encoding='utf-8') as fhandle:
         for word, embedding in embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
