@@ -115,7 +115,7 @@ def prepare_data(d,
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=3)
-    early_stopping = EarlyStopping(patience=10)
+    early_stopping = EarlyStopping(patience=10, min_delta=1e-4)
     model_path = './models/'
 
     os.makedirs(model_path, exist_ok=True)
@@ -138,7 +138,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def evaluate(model, test_loader, save=True, model_name=None):
+def evaluate(model, test_loader):
     eucl_dist, [cos_sim] = model.evaluate_generator(test_loader)
     # if save:
     #     if model_name == None:
@@ -174,12 +174,12 @@ def predict_OOV(model, char_to_idx, OOV_path, filename):
     save_embeddings({w:e for w,e in zip(OOVs, OOV_embeddings)}, filename)
 
 
-def main(model_name, device=0, d=100, epochs=100):
+def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
     # Global parameters
-    debug_mode = True
+    debug_mode = debug_mode
     verbose = True
     save = True
-    
+
     logging.info("Debug mode: {}".format(debug_mode))
     logging.info("Verbose: {}".format(verbose))
 
@@ -210,7 +210,7 @@ def main(model_name, device=0, d=100, epochs=100):
     # Create the model
     net = Mimick(
         characters_vocabulary=char_to_idx,
-        characters_embedding_dimension=16,
+        characters_embedding_dimension=char_embedding_dimension,
         word_embeddings_dimension=d,
         fc_dropout_p=0.5,
         comick_compatibility=False
@@ -232,7 +232,7 @@ def main(model_name, device=0, d=100, epochs=100):
         epochs=epochs,
     )
 
-    evaluate(model, test_loader, save, model_name)
+    evaluate(model, test_loader)
 
     save_char_embeddings(model, char_to_idx, 'char_'+model_name)
 
