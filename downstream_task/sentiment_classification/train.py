@@ -94,8 +94,8 @@ def train(embeddings, model_name='vanilla', device=0):
     if use_gpu:
         net.cuda()
 
-    lrscheduler = ReduceLROnPlateau(patience=5)
-    early_stopping = EarlyStopping(patience=10)
+    lrscheduler = ReduceLROnPlateau(patience=2)
+    early_stopping = EarlyStopping(patience=5)
     checkpoint = ModelCheckpoint('./models/sentiment_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
     csv_logger = CSVLogger('./train_logs/sentiment_{}.csv'.format(model_name))
     loss = CrossEntropyLoss()
@@ -114,4 +114,7 @@ if __name__ == '__main__':
         random.seed(seed)
         logging.getLogger().setLevel(logging.INFO)
         embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+        oov_embeddings = load_embeddings(
+            './mimick_oov_predicted_embeddings/sentiment_OOV_embeddings_mimick_glove_d100_c20.txt')
+        embeddings.update(oov_embeddings)
         train(embeddings, "vanilla_i{}".format(i))
