@@ -6,11 +6,9 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 from comick import Mimick
-from utils import save_embeddings, load_embeddings
+from utils import save_embeddings, load_embeddings, load_vocab
 from utils import square_distance, cosine_sim
-from utils import make_vocab, WordsInContextVectorizer
 from utils import pad_sequences
-from data_preparation import *
 from per_class_dataset import *
 
 import numpy as np
@@ -85,7 +83,7 @@ def prepare_data(d,
     if debug_mode:
         examples = examples[:850]
 
-    # shuffle(examples)
+    shuffle(examples)
     m_train = int(len(examples)*split_ratios[0])
     m_valid = int(len(examples)*split_ratios[1])
     # m_test = len(embeddings)*split_ratios[2]
@@ -140,65 +138,45 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def predict_mean_embeddings(model, loader):
-    model.model.eval()
-    predicted_embeddings = {}
-    for x, y in loader:
-        x = tensors_to_variables(x)
-        embeddings = torch_to_numpy(model.model(x))
-        for label, embedding in zip(y, embeddings):
-            if label in predicted_embeddings:
-                predicted_embeddings[label].append(embedding)
-            else:
-                predicted_embeddings[label] = [embedding]
+def evaluate(model, test_loader, save=True, model_name=None):
+    eucl_dist, [cos_sim] = model.evaluate_generator(test_loader)
+    # if save:
+    #     if model_name == None:
+    #         raise ValueError('A filename should be provided.')
+    #     save_embeddings(mean_pred_embeddings, model_name)
 
-    mean_pred_embeddings = {}
-    for label in predicted_embeddings:
-        mean_pred_embeddings[label] = np.mean(
-            np.array(predicted_embeddings[label]), axis=0)
-    return mean_pred_embeddings
-
-
-def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
-    mean_pred_embeddings = predict_mean_embeddings(model, test_loader)
-
-    if save:
-        if model_name == None:
-            raise ValueError('A filename should be provided.')
-        save_embeddings(mean_pred_embeddings, model_name)
-
-    predicted_results = {}
-
-    def norm(y_true, y_pred):
-        return np.linalg.norm(y_pred - y_true)
-
-    euclidean_distances = []
-
-    def cos_sim(y_true, y_pred):
-        return float(cosine_similarity(y_pred, y_true))
-
-    cos_sims = []
-    nb_of_pred = 0
-    for label in mean_pred_embeddings:
-        if label in test_embeddings:
-            y_pred = mean_pred_embeddings[label].reshape(1, -1)
-            y_true = test_embeddings[label].reshape(1, -1)
-            euclidean_distances.append(norm(y_true, y_pred))
-            cos_sims.append(cos_sim(y_true, y_pred))
-            nb_of_pred += 1
-
+    # print(eucl_dist, cos_sim)
     logging.info('\nResults on the test:')
-    logging.info('Mean euclidean dist: {}'.format(np.mean(euclidean_distances)))
-    logging.info('Variance of euclidean dist: {}'.format(np.std(euclidean_distances)))
-    logging.info('Mean cosine sim: {}'.format(np.mean(cos_sims)))
-    logging.info('Variance of cosine sim: {}'.format(np.std(cos_sims)))
-    logging.info('Number of labels evaluated: {}'.format(nb_of_pred))
-    return mean_pred_embeddings
+    logging.info('Mean euclidean dist: {}'.format(eucl_dist))
+    # logging.info('Variance of euclidean dist: {}'.format(np.std(euclidean_distances)))
+    logging.info('Mean cosine sim: {}'.format(cos_sim))
+    # logging.info('Variance of cosine sim: {}'.format(np.std(cos_sims)))
+    # logging.info('Number of labels evaluated: {}'.format(nb_of_pred))
+    # return mean_pred_embeddings
+
+
+def save_char_embeddings(model, char_to_idx, filename='mimick_char_embeddings'):
+    char_embeddings = {}
+    for char, idx in char_to_idx.items():
+        char_embeddings[char] = torch_to_numpy(model.model.mimick_lstm.embeddings.weight.data[idx])
+    save_embeddings(char_embeddings, filename)
+
+
+def predict_OOV(model, char_to_idx, OOV_path, filename):
+    OOVs = load_vocab(OOV_path)
+    max_length = max([len(w) for w in OOVs])
+    OOVs_to_idx = np.zeros((len(OOVs), max_length), dtype=int)
+    for i, w in enumerate(OOVs):
+        for j, c in enumerate(w):
+            OOVs_to_idx[i,j] = char_to_idx[c]
+
+    OOV_embeddings = model.predict(OOVs_to_idx, batch_size=1)
+    save_embeddings({w:e for w,e in zip(OOVs, OOV_embeddings)}, filename)
 
 
 def main(model_name, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     
@@ -232,7 +210,7 @@ def main(model_name, device=0, d=100, epochs=100):
     # Create the model
     net = Mimick(
         characters_vocabulary=char_to_idx,
-        characters_embedding_dimension=20,
+        characters_embedding_dimension=16,
         word_embeddings_dimension=d,
         fc_dropout_p=0.5,
         comick_compatibility=False
@@ -253,6 +231,13 @@ def main(model_name, device=0, d=100, epochs=100):
         valid_loader=valid_loader,
         epochs=epochs,
     )
+
+    evaluate(model, test_loader, save, model_name)
+
+    save_char_embeddings(model, char_to_idx, 'char_'+model_name)
+
+    # for dataset, OOV_path in [('conll', './data/conll/all_oov.txt')]:
+    #     predict_OOV(model, char_to_idx, OOV_path, dataset+'_OOV_embeddings_'+model_name)
 
     # predicted_evaluation_embeddings = evaluate(
     #     model,
