@@ -7,18 +7,50 @@ logging.getLogger().setLevel(logging.INFO)
 
 import torch
 from comick import Mimick
-from mimick_GloVe import prepare_data, evaluate, save_char_embeddings
-# from utils import save_embeddings, load_embeddings, load_vocab
+from mimick_GloVe import prepare_data, evaluate, save_char_embeddings, Vectorizer
+from utils import save_embeddings, load_embeddings, load_vocab
 from utils import square_distance, cosine_sim
+from utils import pad_sequences
+from per_class_dataset import DataLoader
 
 import numpy as np
 import random
 # import pickle as pkl
 
 # from sklearn.metrics.pairwise import cosine_similarity
-# from pytoune import torch_to_numpy, tensors_to_variables
+from pytoune import tensors_to_variables, torch_to_numpy
 from pytoune.framework import Model
 from torch.optim import Adam
+
+
+def collate_x(batch):
+    x, y = zip(*batch)
+
+    x_lengths = torch.LongTensor([len(item) for item in x])
+    padded_x = pad_sequences(x, x_lengths)
+
+    return padded_x, y
+
+
+def predict_OOV(model, char_to_idx, OOV_path, filename):
+    OOVs = load_vocab(OOV_path)
+
+    vectorizer = Vectorizer(char_to_idx)
+    examples = [(vectorizer.vectorize_sequence(word), word) for word in OOVs]
+    loader = DataLoader(examples,
+                        collate_fn=collate_x,
+                        use_gpu=False,
+                        batch_size=1)
+
+    model.model.eval()
+    predicted_embeddings = {}
+    for x, y in loader:
+        x = tensors_to_variables(x)
+        embeddings = torch_to_numpy(model.model(x))
+        for label, embedding in zip(y, embeddings):
+            predicted_embeddings[label] = embedding
+            
+    save_embeddings(predicted_embeddings, filename)
 
 
 if __name__ == '__main__':
@@ -70,6 +102,11 @@ if __name__ == '__main__':
     print('Done.')
 
     # Evaluation
-    evaluate(model, test_loader)
+    # evaluate(model, test_loader)
 
-    save_char_embeddings(model, char_to_idx, 'char_'+model_name)
+    # save_char_embeddings(model, char_to_idx, 'char_'+model_name)
+
+    for dataset in ['conll', 'semeval', 'sentiment']:
+        path = './data/'+dataset+'_embeddings_settings/setting1/glove/oov.txt'
+        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name)
+

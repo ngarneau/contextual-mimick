@@ -162,18 +162,6 @@ def save_char_embeddings(model, char_to_idx, filename='mimick_char_embeddings'):
     save_embeddings(char_embeddings, filename)
 
 
-def predict_OOV(model, char_to_idx, OOV_path, filename):
-    OOVs = load_vocab(OOV_path)
-    max_length = max([len(w) for w in OOVs])
-    OOVs_to_idx = np.zeros((len(OOVs), max_length), dtype=int)
-    for i, w in enumerate(OOVs):
-        for j, c in enumerate(w):
-            OOVs_to_idx[i,j] = char_to_idx[c]
-
-    OOV_embeddings = model.predict(OOVs_to_idx, batch_size=1)
-    save_embeddings({w:e for w,e in zip(OOVs, OOV_embeddings)}, filename)
-
-
 def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
     # Global parameters
     debug_mode = debug_mode
