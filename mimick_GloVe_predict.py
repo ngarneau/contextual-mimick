@@ -108,5 +108,5 @@ if __name__ == '__main__':
 
     for dataset in ['conll', 'semeval', 'sentiment']:
         path = './data/'+dataset+'_embeddings_settings/setting1/glove/oov.txt'
-        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name)
+        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt')
 
