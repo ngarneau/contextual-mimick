@@ -62,6 +62,7 @@ def train(embeddings, model_name='vanilla', device=0):
         return words_tensor.cuda(), labels_tensor.cuda()
 
     use_gpu = torch.cuda.is_available()
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -125,7 +126,7 @@ if __name__ == '__main__':
         random.seed(seed)
         logging.getLogger().setLevel(logging.INFO)
         embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-                oov_embeddings = load_embeddings(
-                    './mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
+        oov_embeddings = load_embeddings(
+            './mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
         embeddings.update(oov_embeddings)
-        train(embeddings, "vanilla_{}".format(i), 0)
+        train(embeddings, "mimick_{}".format(i), 0)

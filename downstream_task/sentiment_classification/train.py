@@ -53,6 +53,7 @@ def train(embeddings, model_name='vanilla', device=0):
         return words_tensor.cuda(), labels_tensor.cuda()
 
     use_gpu = torch.cuda.is_available()
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -117,4 +118,4 @@ if __name__ == '__main__':
         oov_embeddings = load_embeddings(
             './mimick_oov_predicted_embeddings/sentiment_OOV_embeddings_mimick_glove_d100_c20.txt')
         embeddings.update(oov_embeddings)
-        train(embeddings, "vanilla_i{}".format(i))
+        train(embeddings, "mimick_glove_i{}".format(i))

@@ -1,0 +1,2 @@
+Mimick GloVe NER
+0.80989306
