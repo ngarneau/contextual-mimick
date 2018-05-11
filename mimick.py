@@ -23,8 +23,7 @@ class Mimick(nn.Module):
         self.characters_embeddings = nn.Embedding(
             num_embeddings=len(self.characters_vocabulary),
             embedding_dim=self.characters_embedding_dimension,
-            padding_idx=0,
-            max_norm=5
+            padding_idx=0
         )
         kaiming_uniform(self.characters_embeddings.weight)
 
@@ -54,27 +53,19 @@ class Mimick(nn.Module):
         )
         kaiming_uniform(self.output.weight)
 
-    def init_hidden(self, batch):
-        if self.bidirectional:
-            first_dim = 2 * self.num_layers
-        else:
-            first_dim = self.num_layers
-        return (autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)),
-                autograd.Variable(torch.zeros(first_dim, batch, self.characters_hidden_state_dimension)))
-
     def forward(self, x):
         # Pre processing
         lengths = x.data.ne(0).sum(dim=1).long()
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
         _, rev_perm_idx = perm_idx.sort(0)
+        x = x[perm_idx]
 
         # Embed
         embeds = self.characters_embeddings(x)
 
         # LSTM thing
-        self.hidden = self.init_hidden(len(x))
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (ht, ct) = self.lstm(packed_input, self.hidden)
+        packed_output, (ht, ct) = self.lstm(packed_input)
         output = torch.cat([ht[0], ht[1]], dim=1)
         output = output[rev_perm_idx]
 
