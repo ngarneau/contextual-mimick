@@ -100,8 +100,8 @@ def train(embeddings, model_name='vanilla', device=0):
     if use_gpu:
         net.cuda()
 
-    lrscheduler = ReduceLROnPlateau(patience=5)
-    early_stopping = EarlyStopping(patience=10)
+    lrscheduler = ReduceLROnPlateau(patience=2)
+    early_stopping = EarlyStopping(patience=5)
     checkpoint = ModelCheckpoint('./models/chunk_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
     csv_logger = CSVLogger('./train_logs/chunk{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])

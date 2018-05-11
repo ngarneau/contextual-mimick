@@ -193,6 +193,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         words_embeddings=embeddings,
         freeze_word_embeddings=freeze_word_embeddings
     )
+    model_name = "{}_{}".format(model_name, net.version)
     model = Model(
         model=net,
         optimizer=Adam(net.parameters(), lr=lr),

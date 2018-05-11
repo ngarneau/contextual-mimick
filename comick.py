@@ -165,13 +165,13 @@ class MirrorLSTM(Module):
         self.embeddings.weight.data[idx] = torch.FloatTensor(embedding)
 
 
-class Context(MultiLSTM):
+class Context(MirrorLSTM):
     """
     This Context module adds dropout and a fully connected layer to a MultiLSTM class.
     """
 
     def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
-        super().__init__(*args, hidden_state_dim=hidden_state_dim, n_lstms=n_contexts, **kwargs)
+        super().__init__(*args, hidden_state_dim=hidden_state_dim, **kwargs)
 
         self.fcs = []
         for i in range(n_contexts):
@@ -207,7 +207,7 @@ class LRComick(Module):
                  freeze_word_embeddings=False,
                  ):
         super().__init__()
-
+        self.version = 1.1
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
@@ -318,7 +318,7 @@ class ComickDev(Module):
                  fc_dropout_p=0.5,
                  ):
         super().__init__()
-
+        self.version = 2.3
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
@@ -343,9 +343,11 @@ class ComickDev(Module):
                                  out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_word.weight)
 
-        self.fc_output = nn.Linear(in_features=2 * word_embeddings_dimension,
-                                   out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc_output.weight)
+        self.fc1 = nn.Linear(in_features=2 * word_embeddings_dimension, out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc1.weight)
+
+        self.fc2 = nn.Linear(in_features=word_embeddings_dimension, out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc2.weight)
 
         self.dropout = nn.Dropout(p=fc_dropout_p)
 
@@ -363,8 +365,10 @@ class ComickDev(Module):
         output = torch.cat((context_rep, word_hidden_rep), dim=1)
         output = self.dropout(output)
         output = F.tanh(output)
-        output = self.fc_output(output)
-
+        output = self.fc1(output)
+        output = self.dropout(output)
+        output = F.tanh(output)
+        output = self.fc2(output)
         return output
 
 
