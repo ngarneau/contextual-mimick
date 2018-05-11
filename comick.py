@@ -165,9 +165,146 @@ class MirrorLSTM(Module):
         self.embeddings.weight.data[idx] = torch.FloatTensor(embedding)
 
 
-class Comick(Module):
+class Context(MirrorLSTM):
     """
-    This is the current architecture.
+    This Context module adds dropout and a fully connected layer to a MultiLSTM class.
+    """
+
+    def __init__(self, *args, hidden_state_dim, output_dim, n_contexts=1, dropout_p=0.5, **kwargs):
+        super().__init__(*args, hidden_state_dim=hidden_state_dim, **kwargs)
+
+        self.fcs = []
+        for i in range(n_contexts):
+            fc = nn.Linear(in_features=2 * hidden_state_dim,
+                           out_features=output_dim)
+            setattr(self, 'fc' + str(i), fc)
+            self.fcs.append(fc)
+
+        self.dropout = nn.Dropout(p=dropout_p)
+
+    def forward(self, *xs):
+        xs = super().forward(*xs)
+        outputs = []
+        for x, fc in zip(xs, self.fcs):
+            outputs.append(fc(self.dropout(x)))
+        return outputs if len(outputs) > 1 else outputs[0]
+
+
+class LRComick(Module):
+    """
+    This is a re-implementation of our original Comick with right and left context.
+    """
+
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 words_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 characters_hidden_state_dimension=50,
+                 word_embeddings_dimension=50,
+                 words_hidden_state_dimension=50,
+                 words_embeddings=None,
+                 fully_connected_layer_hidden_dimension=50,
+                 freeze_word_embeddings=False,
+                 ):
+        super().__init__()
+        self.version = 1.1
+        self.words_vocabulary = words_vocabulary
+        self.characters_vocabulary = characters_vocabulary
+
+        self.contexts = Context(hidden_state_dim=words_hidden_state_dimension,
+                                output_dim=2 * characters_hidden_state_dimension,
+                                num_embeddings=len(self.words_vocabulary),
+                                embedding_dim=word_embeddings_dimension,
+                                n_contexts=2,
+                                freeze_embeddings=freeze_word_embeddings)
+        if words_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
+
+        self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
+                                embedding_dim=characters_embedding_dimension,
+                                hidden_state_dim=characters_hidden_state_dimension)
+
+        self.fc1 = nn.Linear(in_features=2 * characters_hidden_state_dimension,
+                             out_features=fully_connected_layer_hidden_dimension)
+        kaiming_uniform(self.fc1.weight)
+
+        self.fc2 = nn.Linear(in_features=fully_connected_layer_hidden_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc2.weight)
+
+    def load_words_embeddings(self, words_embeddings):
+        for word, embedding in words_embeddings.items():
+            if word in self.words_vocabulary:
+                idx = self.words_vocabulary[word]
+                self.contexts.set_item_embedding(idx, embedding)
+
+    def forward(self, x):
+        left_context, word, right_context = x
+
+        left_rep, right_rep = self.contexts(left_context, right_context)
+        word_hidden_rep = self.mimick(word)
+        hidden_rep = left_rep + word_hidden_rep + right_rep
+
+        output = self.fc1(F.tanh(hidden_rep))
+        output = self.fc2(F.tanh(output))
+
+        return output
+
+
+class ComickUniqueContext(Module):
+    """
+    This is the architecture with only one context.
+    """
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 words_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 characters_hidden_state_dimension=50,
+                 word_embeddings_dimension=50,
+                 words_hidden_state_dimension=50,
+                 words_embeddings=None,
+                 freeze_word_embeddings=False,
+                 ):
+        super().__init__()
+
+        self.words_vocabulary = words_vocabulary
+        self.characters_vocabulary = characters_vocabulary
+
+        self.context = Context(hidden_state_dim=words_hidden_state_dimension,
+                               output_dim=2 * characters_hidden_state_dimension,
+                               num_embeddings=len(self.words_vocabulary),
+                               embedding_dim=word_embeddings_dimension,
+                               freeze_embeddings=freeze_word_embeddings)
+        if words_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
+
+        self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
+                                embedding_dim=characters_embedding_dimension,
+                                hidden_state_dim=characters_hidden_state_dimension)
+
+        self.fc = nn.Linear(in_features=2 * characters_hidden_state_dimension,
+                            out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc.weight)
+
+    def load_words_embeddings(self, words_embeddings):
+        for word, embedding in words_embeddings.items():
+            if word in self.words_vocabulary:
+                idx = self.words_vocabulary[word]
+                self.context.set_item_embedding(idx, embedding)
+
+    def forward(self, x):
+        left_context, word, right_context = x
+        context = torch.cat([left_context, right_context], dim=1)
+        context_rep = self.context(context)
+        word_hidden_rep = self.mimick(word)
+        hidden_rep = context_rep + word_hidden_rep
+        output = self.fc(F.tanh(hidden_rep))
+        return output
+
+
+class ComickDev(Module):
+    """
+    This is the architecture in development.
     """
 
     def __init__(self,
@@ -181,7 +318,7 @@ class Comick(Module):
                  fc_dropout_p=0.5,
                  ):
         super().__init__()
-
+        self.version = 2.3
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
@@ -206,9 +343,11 @@ class Comick(Module):
                                  out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_word.weight)
 
-        self.fc_output = nn.Linear(in_features=2 * word_embeddings_dimension,
-                                   out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc_output.weight)
+        self.fc1 = nn.Linear(in_features=2 * word_embeddings_dimension, out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc1.weight)
+
+        self.fc2 = nn.Linear(in_features=word_embeddings_dimension, out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc2.weight)
 
         self.dropout = nn.Dropout(p=fc_dropout_p)
 
@@ -226,8 +365,10 @@ class Comick(Module):
         output = torch.cat((context_rep, word_hidden_rep), dim=1)
         output = self.dropout(output)
         output = F.tanh(output)
-        output = self.fc_output(output)
-
+        output = self.fc1(output)
+        output = self.dropout(output)
+        output = F.tanh(output)
+        output = self.fc2(output)
         return output
 
 
