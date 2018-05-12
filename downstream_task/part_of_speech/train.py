@@ -59,6 +59,7 @@ def train(embeddings, model_name='vanilla', device=0):
         return words_tensor.cuda(), labels_tensor.cuda()
 
     use_gpu = torch.cuda.is_available()
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -100,8 +101,8 @@ def train(embeddings, model_name='vanilla', device=0):
     if use_gpu:
         net.cuda()
 
-    lrscheduler = ReduceLROnPlateau(patience=5)
-    early_stopping = EarlyStopping(patience=10)
+    lrscheduler = ReduceLROnPlateau(patience=2)
+    early_stopping = EarlyStopping(patience=5)
     checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
     csv_logger = CSVLogger('./train_logs/pos_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
@@ -119,4 +120,7 @@ if __name__ == '__main__':
         random.seed(seed)
         logging.getLogger().setLevel(logging.INFO)
         embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-        train(embeddings, "vanilla_i{}".format(i))
+        oov_embeddings = load_embeddings(
+                    './mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
+        embeddings.update(oov_embeddings)
+        train(embeddings, "mimick_glove_i{}".format(i))

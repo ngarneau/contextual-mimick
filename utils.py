@@ -2,6 +2,10 @@ import numpy as np
 import torch
 from pytoune import torch_to_numpy
 from sklearn.metrics.pairwise import cosine_similarity
+<<<<<<< HEAD
+from torch._utils import _accumulate
+=======
+>>>>>>> 1d699252aaea444ee74d0afc75dec56f53efab6c
 from torch.nn import functional as F
 import re
 import os
@@ -21,6 +25,53 @@ def load_embeddings(path):
     return embeddings
 
 
+<<<<<<< HEAD
+def pad_sequences(vectorized_seqs, seq_lengths):
+    """
+    Pads vectorized ngrams so that they occupy the same space in a LongTensor.
+    """
+    seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
+    for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
+        seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
+    return seq_tensor
+
+
+class Subset(Dataset):
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]
+
+    def __len__(self):
+        return len(self.indices)
+
+
+def random_split(dataset, lengths):
+    if sum(lengths) != len(dataset):
+        raise ValueError("Sum of input lengths does not equal the length of the input dataset!")
+    indices = torch.randperm(sum(lengths))
+    return [Subset(dataset, indices[offset - length:offset]) for offset, length in zip(_accumulate(lengths), lengths)]
+
+
+def euclidean_distance(y_pred_tensor, y_true_tensor):
+    y_pred = torch_to_numpy(y_pred_tensor)
+    y_true = torch_to_numpy(y_true_tensor)
+    dist = numpy.linalg.norm((y_true - y_pred), axis=1).mean()
+    return torch.FloatTensor([dist.tolist()])
+
+
+def cosine_sim(y_pred_tensor, y_true_tensor):
+    y_pred = torch_to_numpy(y_pred_tensor)
+    y_true = torch_to_numpy(y_true_tensor)
+    dist = cosine_similarity(y_true, y_pred).mean()
+    return torch.FloatTensor([dist.tolist()])
+
+
+def square_distance(input, target):
+    return F.pairwise_distance(input, target).mean()
+=======
 def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
     os.makedirs(path, exist_ok=True)
     with open(path + filename, 'w', encoding='utf-8') as fhandle:
@@ -28,6 +79,7 @@ def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
             fhandle.write(s)
+>>>>>>> 1d699252aaea444ee74d0afc75dec56f53efab6c
 
 
 def parse_conll_file(filename):
@@ -72,7 +124,7 @@ def make_vocab(sentences):
 
 def load_vocab(path):
     vocab = set()
-    with open(path) as fhandle:
+    with open(path, encoding='utf-8') as fhandle:
         for line in fhandle:
             vocab.add(line[:-1])
     return vocab

@@ -115,7 +115,7 @@ def prepare_data(d,
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=3, verbose=True)
-    early_stopping = EarlyStopping(patience=10)
+    early_stopping = EarlyStopping(patience=10, min_delta=1e-4, verbose=True)
     model_path = './models/'
 
     os.makedirs(model_path, exist_ok=True)
@@ -139,7 +139,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def evaluate(model, test_loader, save=True, model_name=None):
+def evaluate(model, test_loader):
     eucl_dist, [cos_sim] = model.evaluate_generator(test_loader)
     # if save:
     #     if model_name == None:
@@ -161,18 +161,6 @@ def save_char_embeddings(model, char_to_idx, filename='mimick_char_embeddings'):
     for char, idx in char_to_idx.items():
         char_embeddings[char] = torch_to_numpy(model.model.mimick_lstm.embeddings.weight.data[idx])
     save_embeddings(char_embeddings, filename)
-
-
-def predict_OOV(model, char_to_idx, OOV_path, filename):
-    OOVs = load_vocab(OOV_path)
-    max_length = max([len(w) for w in OOVs])
-    OOVs_to_idx = np.zeros((len(OOVs), max_length), dtype=int)
-    for i, w in enumerate(OOVs):
-        for j, c in enumerate(w):
-            OOVs_to_idx[i,j] = char_to_idx[c]
-
-    OOV_embeddings = model.predict(OOVs_to_idx, batch_size=1)
-    save_embeddings({w:e for w,e in zip(OOVs, OOV_embeddings)}, filename)
 
 
 def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
@@ -237,7 +225,7 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
         epochs=epochs,
     )
 
-    evaluate(model, test_loader, save, model_name)
+    evaluate(model, test_loader)
 
     save_char_embeddings(model, char_to_idx, 'char_'+model_name)
 
