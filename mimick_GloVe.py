@@ -114,7 +114,7 @@ def prepare_data(d,
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
-    lrscheduler = ReduceLROnPlateau(patience=3)
+    lrscheduler = ReduceLROnPlateau(patience=3, verbose=True)
     early_stopping = EarlyStopping(patience=10)
     model_path = './models/'
 
@@ -122,7 +122,8 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
     ckpt_best = ModelCheckpoint(model_path + 'best_' + model_name + '.torch',
                                 save_best_only=True,
                                 restore_best=True,
-                                temporary_filename=model_path + 'temp_best_' + model_name + '.torch')
+                                temporary_filename=model_path + 'temp_best_' + model_name + '.torch',
+                                verbose=True)
 
     ckpt_last = ModelCheckpoint(model_path + 'last_' + model_name + '.torch',
                                 temporary_filename=model_path + 'temp_last_' + model_name + '.torch')
@@ -174,11 +175,15 @@ def predict_OOV(model, char_to_idx, OOV_path, filename):
     save_embeddings({w:e for w,e in zip(OOVs, OOV_embeddings)}, filename)
 
 
-def main(model_name, device=0, d=100, epochs=100):
+def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
     # Global parameters
-    debug_mode = True
+    debug_mode = debug_mode
     verbose = True
     save = True
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     
     logging.info("Debug mode: {}".format(debug_mode))
     logging.info("Verbose: {}".format(verbose))
@@ -210,7 +215,7 @@ def main(model_name, device=0, d=100, epochs=100):
     # Create the model
     net = Mimick(
         characters_vocabulary=char_to_idx,
-        characters_embedding_dimension=16,
+        characters_embedding_dimension=char_embedding_dimension,
         word_embeddings_dimension=d,
         fc_dropout_p=0.5,
         comick_compatibility=False
