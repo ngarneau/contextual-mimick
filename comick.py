@@ -205,18 +205,18 @@ class LRComick(Module):
                  words_embeddings=None,
                  fully_connected_layer_hidden_dimension=50,
                  freeze_word_embeddings=False,
+                 context_dropout_p=0,
                  ):
         super().__init__()
         self.version = 1.1
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
-        self.contexts = Context(hidden_state_dim=words_hidden_state_dimension,
-                                output_dim=2 * characters_hidden_state_dimension,
-                                num_embeddings=len(self.words_vocabulary),
-                                embedding_dim=word_embeddings_dimension,
-                                n_contexts=2,
-                                freeze_embeddings=freeze_word_embeddings)
+        self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
+                                   embedding_dim=word_embeddings_dimension,
+                                   hidden_state_dim=words_hidden_state_dimension,
+                                   freeze_embeddings=freeze_word_embeddings,
+                                   dropout=context_dropout_p)
 
         if words_embeddings is not None:
             self.load_words_embeddings(words_embeddings)
@@ -228,13 +228,17 @@ class LRComick(Module):
         if characters_embeddings is not None:
             self.load_chars_embeddings(characters_embeddings)
 
-        self.fc1 = nn.Linear(in_features=2 * characters_hidden_state_dimension,
-                             out_features=fully_connected_layer_hidden_dimension)
+        self.fc1 = nn.Linear(in_features=2 * words_hidden_state_dimension,
+                             out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc1.weight)
 
-        self.fc2 = nn.Linear(in_features=fully_connected_layer_hidden_dimension,
+        self.fc2 = nn.Linear(in_features=2 * characters_hidden_state_dimension,
                              out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc2.weight)
+
+        self.fc3 = nn.Linear(in_features=word_embeddings_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc3.weight)
 
     def load_words_embeddings(self, words_embeddings):
         for word, embedding in words_embeddings.items():
@@ -252,45 +256,28 @@ class LRComick(Module):
         left_context, word, right_context = x
 
         left_rep, right_rep = self.contexts(left_context, right_context)
-        word_hidden_rep = self.mimick(word)
-        hidden_rep = left_rep + word_hidden_rep + right_rep
+        context_rep = left_rep + right_rep
+        context_rep = self.fc1(F.tanh(context_rep))
 
-        output = self.fc1(F.tanh(hidden_rep))
-        output = self.fc2(F.tanh(output))
+        word_hidden_rep = self.mimick(word)
+        word_rep = self.fc2(F.tanh(word_hidden_rep))
+
+        hidden_rep = context_rep + word_rep
+        output = self.fc3(F.tanh(hidden_rep))
 
         return output
 
 
 class LRComickContextOnly(LRComick):
-    def __init__(self,
-                 characters_vocabulary: Dict[str, int],
-                 words_vocabulary: Dict[str, int],
-                 characters_embedding_dimension=20,
-                 characters_hidden_state_dimension=50,
-                 word_embeddings_dimension=50,
-                 words_hidden_state_dimension=50,
-                 words_embeddings=None,
-                 fully_connected_layer_hidden_dimension=50,
-                 freeze_word_embeddings=False,
-                 ):
-        super().__init__(
-            characters_vocabulary,
-            words_vocabulary,
-            characters_embedding_dimension,
-            characters_hidden_state_dimension,
-            word_embeddings_dimension,
-            words_hidden_state_dimension,
-            words_embeddings,
-            fully_connected_layer_hidden_dimension,
-            freeze_word_embeddings
-        )
-
     def forward(self, x):
         left_context, word, right_context = x
         left_rep, right_rep = self.contexts(left_context, right_context)
-        hidden_rep = left_rep + right_rep
-        output = self.fc1(F.tanh(hidden_rep))
-        output = self.fc2(F.tanh(output))
+        context_rep = left_rep + right_rep
+        context_rep = self.fc1(F.tanh(context_rep))
+        # word_hidden_rep = self.mimick(word)
+        # word_rep = self.fc2(F.tanh(word_hidden_rep))
+        # hidden_rep = context_rep + word_rep
+        output = self.fc3(F.tanh(context_rep))
         return output
 
 
