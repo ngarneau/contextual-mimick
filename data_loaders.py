@@ -7,7 +7,7 @@ from utils import load_embeddings, parse_conll_file, load_vocab
 
 
 class DataLoader:
-    def __init__(self, debug_mode):
+    def __init__(self, debug_mode=False):
         self.test_vocabs = set()
         self.test_embeddings = dict()
         self.embeddings = dict()
@@ -49,7 +49,7 @@ class DataLoader:
 
 
 class CoNLLDataLoader(DataLoader):
-    def __init__(self, debug_mode, embedding_dimension):
+    def __init__(self, debug_mode=False, embedding_dimension):
         super().__init__(debug_mode)
         path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
@@ -63,7 +63,7 @@ class CoNLLDataLoader(DataLoader):
 
 
 class SentimentDataLoader(DataLoader):
-    def __init__(self, debug_mode, embedding_dimension):
+    def __init__(self, debug_mode=False, embedding_dimension):
         super().__init__(debug_mode)
         path_embeddings = './data/sentiment_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
@@ -77,7 +77,7 @@ class SentimentDataLoader(DataLoader):
 
 
 class SemEvalDataLoader(DataLoader):
-    def __init__(self, debug_mode, embedding_dimension):
+    def __init__(self, debug_mode=False, embedding_dimension):
         super().__init__(debug_mode)
         path_embeddings = './data/semeval_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
@@ -91,7 +91,7 @@ class SemEvalDataLoader(DataLoader):
 
 
 class NewsGroupDataLoader(DataLoader):
-    def __init__(self, debug_mode, embedding_dimension):
+    def __init__(self, debug_mode=False, embedding_dimension):
         super().__init__(debug_mode)
         path_embeddings = './data/newsgroup_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
