@@ -155,6 +155,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     test_embeddings = dataloader.get_test_embeddings
     test_vocabs = dataloader.get_test_vocab
     all_sentences = train_sentences + valid_sentences + test_sentences
+    chars_embeddings = load_embeddings('./predicted_char_embeddings/char_mimick_glove_d100_c20')
 
     # Prepare vectorizer
     word_to_idx, char_to_idx = make_vocab(all_sentences)
@@ -189,6 +190,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
+        characters_embeddings=chars_embeddings,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
         freeze_word_embeddings=freeze_word_embeddings

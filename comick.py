@@ -165,7 +165,7 @@ class MirrorLSTM(Module):
         self.embeddings.weight.data[idx] = torch.FloatTensor(embedding)
 
 
-class Context(MirrorLSTM):
+class Context(MultiLSTM):
     """
     This Context module adds dropout and a fully connected layer to a MultiLSTM class.
     """
@@ -200,6 +200,7 @@ class LRComick(Module):
                  words_vocabulary: Dict[str, int],
                  characters_embedding_dimension=20,
                  characters_hidden_state_dimension=50,
+                 characters_embeddings=None,
                  word_embeddings_dimension=50,
                  words_hidden_state_dimension=50,
                  words_embeddings=None,
@@ -217,12 +218,16 @@ class LRComick(Module):
                                 embedding_dim=word_embeddings_dimension,
                                 n_contexts=2,
                                 freeze_embeddings=freeze_word_embeddings)
-        if words_embeddings != None:
+
+        if words_embeddings is not None:
             self.load_words_embeddings(words_embeddings)
 
         self.mimick = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
                                 embedding_dim=characters_embedding_dimension,
                                 hidden_state_dim=characters_hidden_state_dimension)
+
+        if characters_embeddings is not None:
+            self.load_chars_embeddings(characters_embeddings)
 
         self.fc1 = nn.Linear(in_features=2 * characters_hidden_state_dimension,
                              out_features=fully_connected_layer_hidden_dimension)
@@ -237,6 +242,12 @@ class LRComick(Module):
             if word in self.words_vocabulary:
                 idx = self.words_vocabulary[word]
                 self.contexts.set_item_embedding(idx, embedding)
+
+    def load_chars_embeddings(self, chars_embeddings):
+        for word, embedding in chars_embeddings.items():
+            if word in self.characters_vocabulary:
+                idx = self.characters_vocabulary[word]
+                self.mimick.set_item_embedding(idx, embedding)
 
     def forward(self, x):
         left_context, word, right_context = x
