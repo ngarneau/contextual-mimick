@@ -91,7 +91,7 @@ class SemEvalDataLoader(DataLoader):
 
 
 class NewsGroupDataLoader(DataLoader):
-    def __init__(self, debug_mode=False, embedding_dimension):
+    def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
         path_embeddings = './data/newsgroup_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
