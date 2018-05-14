@@ -7,64 +7,14 @@ from tqdm import tqdm
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from utils import load_embeddings, parse_conll_file, preprocess_token, ngrams
+from utils import load_embeddings, load_examples
 from utils import collate_fn, collate_x
 from per_class_dataset import *
 import pickle as pkl
 
 
-def load_data(d, corpus, verbose=True):
-    path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
-        d)
-    embeddings = load_embeddings(path_embeddings)
-
-    train_sentences = parse_conll_file('./data/conll/train.txt')
-    valid_sentences = parse_conll_file('./data/conll/valid.txt')
-    test_sentences = parse_conll_file('./data/conll/test.txt')
-
-    if verbose:
-        logging.info('Loading ' + str(d) +
-                     'd embeddings from: "' + path_embeddings + '"')
-
-    return embeddings, (train_sentences, valid_sentences, test_sentences)
-
-
-def augment_data(examples, embeddings_path):
-    logging.info("Loading embedding model...")
-    word2vec_model = KeyedVectors.load_word2vec_format(embeddings_path)
-    logging.info("Done.")
-
-    labels = sorted(set(label for x, label in examples))
-    logging.info("Computing similar words for {} labels...".format(len(labels)))
-    sim_words = dict()
-    for label in tqdm(labels):
-        sim_words[label] = word2vec_model.most_similar(label, topn=5)
-    logging.info("Done.")
-
-    new_examples = dict()
-    for (left_context, word, right_context), label in tqdm(examples):
-        sim_words_for_label = sim_words[word]
-        for sim_word, cos_sim in sim_words_for_label:
-            # Add new labels, not new examples to already existing labels.
-            if sim_word not in labels and cos_sim >= 0.6:
-                new_example = ((left_context, sim_word, right_context), sim_word)
-                new_examples[new_example] = 1
-    logging.info("Done.")
-    return new_examples
-
-
-def preprocess_examples(examples):
-    preprocessed_examples = list()
-    for (left_context, word, right_context), label in examples:
-        # preprocessed_word = preprocess_token(word)
-        preprocessed_examples.append((
-            (left_context, word, right_context),
-            label
-        ))
-    return preprocessed_examples
-
-
-def prepare_data(embeddings,
+def prepare_data(dataset,
+                 embeddings,
                  test_vocabs,
                  train_sentences,
                  test_sentences,
@@ -78,24 +28,11 @@ def prepare_data(embeddings,
                  verbose=True,
                  data_augmentation=False):
     # Train-validation part
-    examples = dict()
-    examples_without_embeds = dict()
-    for sentence in train_sentences:
-        for ngram in ngrams(sentence, n):
-            key = (ngram, ngram[1])
-            if ngram[1] in embeddings:
-                # Keeps only different ngrams which have a training embeddings
-                examples[key] = 1
-            else:
-                examples_without_embeds[key] = 1
-
+    path = './data/' + dataset.dataset_name + '/examples/'
     if data_augmentation:
-        augmented_examples = augment_data(examples, './data/glove_embeddings/glove.6B.100d.txt')
-        if verbose:
-            logging.info(
-                "Number of non-augmented examples: {}".format(len(examples)))
-        examples.update(augmented_examples)  # Union
-    examples = preprocess_examples(examples)
+        examples = load_examples(path + 'augmented_examples_topn5_cos_sim0.6.pkl')
+    else:
+        examples = load_examples(path + 'examples')
 
     transform = vectorizer.vectorize_unknown_example
 
@@ -134,8 +71,7 @@ def prepare_data(embeddings,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if
-                        ngram[1] in test_vocabs)
+    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] in test_vocabs)
     test_examples = preprocess_examples(test_examples)
 
     test_dataset = PerClassDataset(dataset=test_examples,

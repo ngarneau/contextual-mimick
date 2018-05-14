@@ -152,14 +152,14 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         torch.cuda.set_device(cuda_device)
         logging.info('Using GPU')
 
-    # Load data
-    dataloader = task_config['dataloader'](debug_mode, d)
-    train_sentences = dataloader.get_train_sentences
-    valid_sentences = dataloader.get_valid_sentences
-    test_sentences = dataloader.get_test_sentences
-    embeddings = dataloader.get_embeddings
-    test_embeddings = dataloader.get_test_embeddings
-    test_vocabs = dataloader.get_test_vocab
+    # Load dataset
+    dataset = task_config['dataset'](debug_mode, d)
+    train_sentences = dataset.get_train_sentences
+    valid_sentences = dataset.get_valid_sentences
+    test_sentences = dataset.get_test_sentences
+    embeddings = dataset.get_embeddings
+    test_embeddings = dataset.get_test_embeddings
+    test_vocabs = dataset.get_test_vocab
     all_sentences = train_sentences + valid_sentences + test_sentences
     chars_embeddings = load_embeddings('./predicted_char_embeddings/char_mimick_glove_d100_c20')
 
@@ -170,6 +170,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
 
     # Prepare examples
     train_loader, valid_loader, test_loader = prepare_data(
+        dataset=dataset,
         embeddings=embeddings,
         test_vocabs=test_vocabs,
         train_sentences=train_sentences,
@@ -241,7 +242,7 @@ def get_tasks_configs():
     return [
         # {
         #     'name': 'newsgroup',
-        #     'dataloader': NewsGroupDataLoader,
+        #     'dataset': NewsGroupDataLoader,
         #     'tasks': [
         #         {
         #             'name': 'newsgroup',
@@ -251,7 +252,7 @@ def get_tasks_configs():
         # },
         {
             'name': 'conll',
-            'dataloader': CoNLLDataLoader,
+            'dataset': CoNLLDataLoader,
             'tasks': [
                 {
                     'name': 'ner',
@@ -269,7 +270,7 @@ def get_tasks_configs():
         },
         {
             'name': 'semeval',
-            'dataloader': SemEvalDataLoader,
+            'dataset': SemEvalDataLoader,
             'tasks': [
                 {
                     'name': 'semeval',
@@ -279,7 +280,7 @@ def get_tasks_configs():
         },
         {
             'name': 'sent',
-            'dataloader': SentimentDataLoader,
+            'dataset': SentimentDataLoader,
             'tasks': [
                 {
                     'name': 'sent',
