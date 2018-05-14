@@ -15,6 +15,7 @@ class DataLoader:
         self.valid_sentences = []
         self.train_sentences = []
         self.debug_mode = debug_mode
+        self.dataset_name = ''
         logging.info("Loading data in debug mode: {}".format(debug_mode))
 
     def __filter_sentences(self, attr, num):
@@ -51,6 +52,7 @@ class DataLoader:
 class CoNLLDataLoader(DataLoader):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
+        self.dataset_name = 'CoNLL'
         path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
@@ -65,6 +67,7 @@ class CoNLLDataLoader(DataLoader):
 class SentimentDataLoader(DataLoader):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
+        self.dataset_name = 'Sentiment'
         path_embeddings = './data/sentiment_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
@@ -79,6 +82,7 @@ class SentimentDataLoader(DataLoader):
 class SemEvalDataLoader(DataLoader):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
+        self.dataset_name = 'SemEval'
         path_embeddings = './data/semeval_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
@@ -93,6 +97,7 @@ class SemEvalDataLoader(DataLoader):
 class NewsGroupDataLoader(DataLoader):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
+        self.dataset_name = 'NewsGroup'
         path_embeddings = './data/newsgroup_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
