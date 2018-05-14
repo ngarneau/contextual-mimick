@@ -30,6 +30,18 @@ def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
             fhandle.write(s)
 
 
+def load_examples(pathfile):
+    with open(pathfile, 'rb') as file:
+        examples = pkl.load(file)
+    return examples
+
+
+def save_examples(examples, path, filename):
+    os.makedirs(path, exist_ok=True)
+    with open(path + filename + '.pkl', 'wb') as file:
+        pkl.dump(examples, file)
+        
+
 def parse_conll_file(filename):
     sentences = list()
     with open(filename) as fhandler:
