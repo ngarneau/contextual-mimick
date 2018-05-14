@@ -194,7 +194,6 @@ class LRComick(Module):
     """
     This is a re-implementation of our original Comick with right and left context.
     """
-
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -260,6 +259,40 @@ class LRComick(Module):
         output = self.fc2(F.tanh(output))
 
         return output
+
+
+class LRComickContextOnly(LRComick):
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 words_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 characters_hidden_state_dimension=50,
+                 word_embeddings_dimension=50,
+                 words_hidden_state_dimension=50,
+                 words_embeddings=None,
+                 fully_connected_layer_hidden_dimension=50,
+                 freeze_word_embeddings=False,
+                 ):
+        super().__init__(
+            characters_vocabulary,
+            words_vocabulary,
+            characters_embedding_dimension,
+            characters_hidden_state_dimension,
+            word_embeddings_dimension,
+            words_hidden_state_dimension,
+            words_embeddings,
+            fully_connected_layer_hidden_dimension,
+            freeze_word_embeddings
+        )
+
+    def forward(self, x):
+        left_context, word, right_context = x
+        left_rep, right_rep = self.contexts(left_context, right_context)
+        hidden_rep = left_rep + right_rep
+        output = self.fc1(F.tanh(hidden_rep))
+        output = self.fc2(F.tanh(output))
+        return output
+
 
 
 class ComickUniqueContext(Module):
