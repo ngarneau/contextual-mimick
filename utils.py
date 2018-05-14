@@ -30,6 +30,18 @@ def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
             fhandle.write(s)
 
 
+def load_examples(pathfile):
+    with open(pathfile, 'rb') as file:
+        examples = pkl.load(file)
+    return examples
+
+
+def save_examples(examples, path, filename):
+    os.makedirs(path, exist_ok=True)
+    with open(path + filename + '.pkl', 'wb') as file:
+        pkl.dump(examples, file)
+        
+
 def parse_conll_file(filename):
     sentences = list()
     with open(filename) as fhandler:
@@ -171,16 +183,18 @@ def pad_sequences(vectorized_seqs, seq_lengths):
     return seq_tensor
 
 
-def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
+def ngrams(sequence, n=-1, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
     sequence = [left_pad_symbol] * pad_left + sequence + [right_pad_symbol] * pad_right
 
     L = len(sequence)
     m = n // 2
+    if n == -1:
+        m = L
     for i, item in enumerate(sequence[pad_left:-pad_right]):
         left_idx = max(0, i - m + pad_left)
         left_side = tuple(sequence[left_idx:i + pad_left])
-        right_idx = min(L, i + m + pad_left + pad_right)
-        right_side = tuple(sequence[i + pad_left + pad_right:right_idx])
+        right_idx = min(L, i + m + pad_left + 1)
+        right_side = tuple(sequence[i + pad_left + 1:right_idx])
         yield (left_side, item, right_side)
 
 
@@ -204,4 +218,8 @@ def cosine_distance(input, target):
 
 
 if __name__ == '__main__':
-    test_preprocessing()
+    # test_preprocessing()
+    ex = 'My name is JS'.split(' ')
+    a = [ngram for ngram in ngrams(ex, -1, pad_left=2, pad_right=4)]
+    for b in a:
+        print(b)
