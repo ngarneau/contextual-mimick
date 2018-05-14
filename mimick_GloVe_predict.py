@@ -102,11 +102,11 @@ if __name__ == '__main__':
     print('Done.')
 
     # Evaluation
-    # evaluate(model, test_loader)
+    evaluate(model, test_loader)
 
     # save_char_embeddings(model, char_to_idx, 'char_'+model_name)
 
-    for dataset in ['conll', 'semeval', 'sentiment']:
-        path = './data/'+dataset+'_embeddings_settings/setting1/glove/oov.txt'
-        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt')
+    # for dataset in ['conll', 'semeval', 'sentiment']:
+    #     path = './data/'+dataset+'_embeddings_settings/setting1/glove/oov.txt'
+    #     predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt')
 
