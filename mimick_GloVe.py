@@ -114,15 +114,16 @@ def prepare_data(d,
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
-    lrscheduler = ReduceLROnPlateau(patience=3)
-    early_stopping = EarlyStopping(patience=10, min_delta=1e-4)
+    lrscheduler = ReduceLROnPlateau(patience=3, verbose=True)
+    early_stopping = EarlyStopping(patience=10, min_delta=1e-4, verbose=True)
     model_path = './models/'
 
     os.makedirs(model_path, exist_ok=True)
     ckpt_best = ModelCheckpoint(model_path + 'best_' + model_name + '.torch',
                                 save_best_only=True,
                                 restore_best=True,
-                                temporary_filename=model_path + 'temp_best_' + model_name + '.torch')
+                                temporary_filename=model_path + 'temp_best_' + model_name + '.torch',
+                                verbose=True)
 
     ckpt_last = ModelCheckpoint(model_path + 'last_' + model_name + '.torch',
                                 temporary_filename=model_path + 'temp_last_' + model_name + '.torch')
@@ -167,7 +168,11 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
     debug_mode = debug_mode
     verbose = True
     save = True
-
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    
     logging.info("Debug mode: {}".format(debug_mode))
     logging.info("Verbose: {}".format(verbose))
 
