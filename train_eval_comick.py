@@ -48,7 +48,13 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
     os.makedirs(logger_path, exist_ok=True)
     csv_logger = CSVLogger(logger_path + model_name + '.csv')
 
-    callbacks = [lrscheduler, ckpt_best, ckpt_last, early_stopping, csv_logger]
+    callbacks = [
+        lrscheduler,
+        ckpt_best,
+        ckpt_last,
+        # early_stopping,
+        csv_logger
+    ]
 
     # Fit the model
     model.fit_generator(train_loader, valid_loader,
