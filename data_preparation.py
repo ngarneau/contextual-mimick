@@ -76,12 +76,22 @@ def prepare_data(dataset,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = load_examples(path + 'valid_examples.pkl') + load_examples(path + 'test_examples.pkl')
+    test_examples = load_examples(path + 'valid_test_examples.pkl')
     test_examples = truncate_examples(test_examples)
-
     test_dataset = PerClassDataset(dataset=test_examples,
-                                   transform=transform)
+                                   transform=transform,
+                                   target_transform=target_transform)
     test_loader = PerClassLoader(dataset=test_dataset,
+                                 collate_fn=collate_fn,
+                                 k=-1,
+                                 batch_size=64,
+                                 use_gpu=use_gpu)
+
+    oov_examples = load_examples(path + 'oov_examples.pkl')
+    oov_examples = truncate_examples(oov_examples)
+    oov_dataset = PerClassDataset(dataset=oov_examples,
+                                   transform=transform)
+    oov_loader = PerClassLoader(dataset=oov_dataset,
                                  collate_fn=collate_x,
                                  k=-1,
                                  batch_size=64,
@@ -115,4 +125,4 @@ def prepare_data(dataset,
         logging.info('\nFor training, loading ' + str(k) +
                      ' examples per label per epoch.')
 
-    return train_loader, valid_loader, test_loader
+    return train_loader, valid_loader, test_loader, oov_loader

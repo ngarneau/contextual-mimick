@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 
-from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader, NewsGroupDataLoader
+from data.dataset_manager import CoNLL, Sentiment, SemEval
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -12,14 +12,13 @@ from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
 from utils import collate_fn, collate_x
-from data_preparation import *
+from data_preparation import prepare_data
 from per_class_dataset import *
 from downstream_task.part_of_speech.train import train as train_pos
 from downstream_task.named_entity_recognition.train import train as train_ner
 from downstream_task.sentiment_classification.train import train as train_sent
 from downstream_task.chunking.train import train as train_chunk
 from downstream_task.semeval.train import train as train_semeval
-from downstream_task.newsgroup_classification.train import train as train_newsgroup
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -153,14 +152,13 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         logging.info('Using GPU')
 
     # Load dataset
-    dataset = task_config['dataset'](debug_mode, d)
-    train_sentences = dataset.get_train_sentences
-    valid_sentences = dataset.get_valid_sentences
-    test_sentences = dataset.get_test_sentences
-    embeddings = dataset.get_embeddings
-    test_embeddings = dataset.get_test_embeddings
-    test_vocabs = dataset.get_test_vocab
-    all_sentences = train_sentences + valid_sentences + test_sentences
+    dataset = task_config['dataset'](debug_mode)
+    
+    all_sentences = dataset.get_train_sentences
+                    + dataset.get_valid_sentences
+                    + dataset.get_test_sentences
+
+    word_embeddings = load_embeddings('./data/glove_embeddings/glove.6B.{}d.txt'.format(d))
     chars_embeddings = load_embeddings('./predicted_char_embeddings/char_mimick_glove_d100_c20')
 
     # Prepare vectorizer
@@ -169,12 +167,9 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     vectorizer = vectorizer
 
     # Prepare examples
-    train_loader, valid_loader, test_loader = prepare_data(
+    train_loader, valid_loader, test_loader, oov_loader = prepare_data(
         dataset=dataset,
-        embeddings=embeddings,
-        test_vocabs=test_vocabs,
-        train_sentences=train_sentences,
-        test_sentences=all_sentences,
+        embeddings=word_embeddings,
         vectorizer=vectorizer,
         n=n,
         use_gpu=use_gpu,
@@ -199,12 +194,12 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         characters_embedding_dimension=20,
         characters_embeddings=chars_embeddings,
         word_embeddings_dimension=d,
-        words_embeddings=embeddings,
+        words_embeddings=word_embeddings,
         context_dropout_p=0.5,
         fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
-    model_name = "{}_{}".format(model_name, net.version)
+    model_name = "{}_v{}".format(model_name, net.version)
     model = Model(
         model=net,
         optimizer=Adam(net.parameters(), lr=lr),
@@ -242,19 +237,9 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
 
 def get_tasks_configs():
     return [
-        # {
-        #     'name': 'newsgroup',
-        #     'dataset': NewsGroupDataLoader,
-        #     'tasks': [
-        #         {
-        #             'name': 'newsgroup',
-        #             'script': train_newsgroup
-        #         },
-        #     ]
-        # },
         {
             'name': 'conll',
-            'dataset': CoNLLDataLoader,
+            'dataset': CoNLL,
             'tasks': [
                 {
                     'name': 'ner',
@@ -272,7 +257,7 @@ def get_tasks_configs():
         },
         {
             'name': 'semeval',
-            'dataset': SemEvalDataLoader,
+            'dataset': SemEval,
             'tasks': [
                 {
                     'name': 'semeval',
@@ -282,7 +267,7 @@ def get_tasks_configs():
         },
         {
             'name': 'sent',
-            'dataset': SentimentDataLoader,
+            'dataset': Sentiment,
             'tasks': [
                 {
                     'name': 'sent',
