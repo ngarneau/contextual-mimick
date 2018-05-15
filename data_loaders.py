@@ -6,7 +6,7 @@ from downstream_task.newsgroup_classification.train import parse_20newsgroup_fil
 from utils import load_embeddings, parse_conll_file, load_vocab
 
 
-class DataLoader:
+class DatasetManager:
     def __init__(self, debug_mode=False):
         self.test_vocabs = set()
         self.oov = set()
@@ -54,67 +54,68 @@ class DataLoader:
         return self.oov
 
 
-class CoNLLDataLoader(DataLoader):
+class CoNLL(DatasetManager):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
         self.dataset_name = 'conll'
         path_embeddings = './data/glove_embeddings/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
-        self.test_vocabs = load_vocab('./data/conll_embeddings_settings/setting2/glove/oov.txt')
-        self.oov = load_vocab('./data/conll/oov.txt')
-        self.test_embeddings = {word: self.embeddings[word] for word in self.test_vocabs if word in self.embeddings}
+        try:
+            self.oov = load_vocab('./data/conll/oov.txt')
+        except FileNotFoundError:
+            pass
         self.train_sentences = parse_conll_file('./data/conll/train.txt')
         self.valid_sentences = parse_conll_file('./data/conll/valid.txt')
         self.test_sentences = parse_conll_file('./data/conll/test.txt')
         logging.debug('Loading {}d embeddings from : {}'.format(embedding_dimension, path_embeddings))
 
 
-class SentimentDataLoader(DataLoader):
+class Sentiment(DatasetManager):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
         self.dataset_name = 'sentiment'
         path_embeddings = './data/glove_embeddings/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
-        self.test_vocabs = load_vocab(
-            './data/sentiment_embeddings_settings/setting2/glove/oov.txt')
-        self.oov = load_vocab('./data/sentiment/oov.txt')
-        self.test_embeddings = {word: self.embeddings[word] for word in self.test_vocabs if word in self.embeddings}
+        try:
+            self.oov = load_vocab('./data/sentiment/oov.txt')
+        except FileNotFoundError:
+            pass
         self.train_sentences, _ = parse_pickle_file('./data/sentiment/train.pickle')
         self.valid_sentences, _ = parse_pickle_file('./data/sentiment/dev.pickle')
         self.test_sentences, _ = parse_pickle_file('./data/sentiment/test.pickle')
         logging.debug('Loading {}d embeddings from : {}'.format(embedding_dimension, path_embeddings))
 
 
-class SemEvalDataLoader(DataLoader):
+class SemEval(DatasetManager):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
         self.dataset_name = 'scienceie'
         path_embeddings = './data/glove_embeddings/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
-        self.test_vocabs = load_vocab(
-            './data/semeval_embeddings_settings/setting2/glove/oov.txt')
-        self.oov = load_vocab('./data/scienceie/oov.txt')
-        self.test_embeddings = {word: self.embeddings[word] for word in self.test_vocabs if word in self.embeddings}
+        try:
+            self.oov = load_vocab('./data/scienceie/oov.txt')
+        except FileNotFoundError:
+            pass
         self.train_sentences, _ = parse_semeval_file('./data/scienceie/train_spacy.txt')
         self.valid_sentences, _ = parse_semeval_file('./data/scienceie/valid_spacy.txt')
         self.test_sentences, _ = parse_semeval_file('./data/scienceie/test_spacy.txt')
         logging.debug('Loading {}d embeddings from : {}'.format(embedding_dimension, path_embeddings))
 
 
-class NewsGroupDataLoader(DataLoader):
+class NewsGroup(DatasetManager):
     def __init__(self, embedding_dimension, debug_mode=False):
         super().__init__(debug_mode)
         self.dataset_name = '20newsgroup'
         path_embeddings = './data/glove_embeddings/glove.6B.{}d.txt'.format(
             embedding_dimension)
         self.embeddings = load_embeddings(path_embeddings)
-        self.test_vocabs = load_vocab(
-            './data/newsgroup_embeddings_settings/setting2/glove/oov.txt')
-        self.oov = load_vocab('./data/20newsgroup/oov.txt')
-        self.test_embeddings = {word: self.embeddings[word] for word in self.test_vocabs if word in self.embeddings}
+        try:
+            self.oov = load_vocab('./data/20newsgroup/oov.txt')
+        except FileNotFoundError:
+            pass
         self.train_sentences, _ = parse_20newsgroup_file('./data/20newsgroup/train.pickle')
         self.valid_sentences, _ = parse_20newsgroup_file('./data/20newsgroup/dev.pickle')
         self.test_sentences, _ = parse_20newsgroup_file('./data/20newsgroup/test.pickle')

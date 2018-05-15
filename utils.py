@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch.nn import functional as F
 import re
 import os
+import pickle as pkl
 
 
 def load_embeddings(path):
@@ -84,7 +85,7 @@ def make_vocab(sentences):
 
 def load_vocab(path):
     vocab = set()
-    with open(path, encoding='utf-8') as fhandle:
+    with open(path, 'rb') as fhandle:
         for line in fhandle:
             vocab.add(line[:-1])
     return vocab

@@ -1,38 +1,44 @@
 import os
 import logging
 
-from gensim.models import KeyedVectors
-from tqdm import tqdm
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
 from utils import load_embeddings, load_examples
 from utils import collate_fn, collate_x
 from per_class_dataset import *
 import pickle as pkl
 
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
+
+
+def truncate_examples(examples, n):
+    m = n // 2
+    truncated_examples = []
+    for (CL, word, CR), label in examples:
+        truncated_examples.append( ((CL[-m:], word, CR[:m]), word) )
+    
+    return truncated_examples
+
 
 def prepare_data(dataset,
                  embeddings,
-                 test_vocabs,
-                 train_sentences,
-                 test_sentences,
                  vectorizer,
                  n=15,
                  ratio=.8,
                  use_gpu=False,
                  k=1,
+                 data_augmentation=False,
                  over_population_threshold=100,
                  relative_over_population=True,
                  verbose=True,
-                 data_augmentation=False):
+                 ):
     # Train-validation part
     path = './data/' + dataset.dataset_name + '/examples/'
     if data_augmentation:
-        examples = load_examples(path + 'augmented_examples_topn5_cos_sim0.6.pkl')
+        examples = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
     else:
-        examples = load_examples(path + 'examples')
+        examples = load_examples(path + 'examples.pkl')
+
+    examples = truncate_examples(examples)
 
     transform = vectorizer.vectorize_unknown_example
 
@@ -53,7 +59,6 @@ def prepare_data(dataset,
         if relative_over_population:
             over_population_threshold = int(
                 train_valid_dataset.stats()['most common labels number of examples'] / over_population_threshold)
-
         def filter_labels_cond(label, N):
             return N <= over_population_threshold
 
@@ -71,8 +76,8 @@ def prepare_data(dataset,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if ngram[1] in test_vocabs)
-    test_examples = preprocess_examples(test_examples)
+    test_examples = load_examples(path + 'valid_examples.pkl') + load_examples(path + 'test_examples.pkl')
+    test_examples = truncate_examples(test_examples)
 
     test_dataset = PerClassDataset(dataset=test_examples,
                                    transform=transform)
