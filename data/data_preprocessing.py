@@ -32,16 +32,18 @@ def augment_data(examples, embeddings_path, filter_cond=None, topn=5, min_cos_si
         sim_words[label] = word2vec_model.most_similar(label, topn=topn)
     logging.info("Done.")
 
+    counter = 0
     new_examples = set()
     for (left_context, word, right_context), label in tqdm(examples):
-        sim_words_for_label = sim_words[word]
-        for sim_word, cos_sim in sim_words_for_label:
+        for sim_word, cos_sim in sim_words[word]:
             # Add new labels, not new examples to already existing labels.
             if filter_cond(sim_word) and cos_sim >= min_cos_sim:
-                new_example = (
-                    (left_context, sim_word, right_context), sim_word)
+                new_example = ((left_context, sim_word, right_context), sim_word)
                 new_examples.add(new_example)
+            else:
+                counter += 1
     logging.info("Done.")
+    print('number of refused examples:', counter)
     return new_examples
 
 
@@ -50,7 +52,7 @@ def preprocess_data(dataset,
                     topn,
                     min_cos_sim):
     path =  './' + dataset.dataset_name + '/examples/'
-    embeddings = load_embeddings(embeddings_path)
+    # embeddings = load_embeddings(embeddings_path)
 
     # Training part
     examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings)
@@ -70,6 +72,10 @@ def preprocess_data(dataset,
         sentence) if ngram[1] not in tr_val_dataset and ngram[1] in embeddings)
     save_examples(test_examples, path, 'test_examples')
     test_dataset = PerClassDataset(test_examples)
+
+    # valid_examples = load_examples(path+'valid_examples.pkl')
+    # test_examples = load_examples(path+'test_examples.pkl')
+    save_examples(test_examples | valid_examples, path, 'valid_test_examples')
 
     # OOV part
     all_sentences = dataset.get_train_sentences + dataset.get_valid_sentences + dataset.get_test_sentences
@@ -97,7 +103,7 @@ def create_oov(dataset, embeddings_path):
         file.write('\n'.join(oov)+'\n')
 
 
-def compute_statistics(dataset):
+def compute_statistics(dataset, relative_threshold):
     path = './' + dataset.dataset_name + '/examples/'
     
     na_ex = load_examples(path+'examples.pkl')
@@ -105,6 +111,7 @@ def compute_statistics(dataset):
 
     a_ex = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
     a_train = PerClassDataset(a_ex)
+    threshold = int(a_train.stats()['most common labels number of examples'] / relative_threshold)
 
     valid_ex = load_examples(path+'valid_examples.pkl')
     valid = PerClassDataset(valid_ex)
@@ -112,13 +119,17 @@ def compute_statistics(dataset):
     test_ex = load_examples(path+'test_examples.pkl')
     test = PerClassDataset(test_ex)
 
+    val_test_ex = load_examples(path+'valid_test_examples.pkl')
+    val_test = PerClassDataset(val_test_ex)
+
     oov_ex = load_examples(path+'oov_examples.pkl')
     oov = PerClassDataset(oov_ex)
 
     stats = {'non-augmented':na_train.stats(),
-             'augmented':a_train.stats(),
+             'augmented':a_train.stats(threshold),
              'valid':valid.stats(),
              'test':test.stats(),
+             'valid_test':val_test.stats(),
              'oov':oov.stats(),
              'sentences':{'train':len(dataset.get_train_sentences),
                           'valid':len(dataset.get_valid_sentences),
@@ -136,11 +147,20 @@ if __name__ == '__main__':
     d = 50
     topn = 5
     min_cos_sim = .6
+    relative_threshold = 100
     embeddings_path = './glove_embeddings/glove.6B.50d.txt'
+
+    # Create a list of OOV first
     for dataset in [CoNLL(),
                     Sentiment(),
                     SemEval(),
                     ]:
-        # create_oov(dataset, embeddings_path)
+        create_oov(dataset, embeddings_path)
+    
+    # Create the examples
+    for dataset in [CoNLL(),
+                    Sentiment(),
+                    SemEval(),
+                    ]:
         preprocess_data(dataset, embeddings_path, topn, min_cos_sim)
-        # compute_statistics(dataset)
+        compute_statistics(dataset, relative_threshold)
