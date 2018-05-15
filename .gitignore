@@ -112,7 +112,7 @@ data/conll/
 data/conll_embeddings_settings/
 data/glove_embeddings/
 data/scienceie/
-data/scienceie/scienceie_embeddings_settings/
+data/semeval_embeddings_settings/
 data/sentiment/
 data/sentiment_embeddings_settings/
 

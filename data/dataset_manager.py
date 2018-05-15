@@ -67,7 +67,7 @@ class CoNLL(DatasetManager):
                          debug_mode=debug_mode)
         self.dataset_name = 'conll'
         try:
-            self.oov = load_vocab('./data/conll/oov.txt')
+            self.oov = load_vocab('./conll/oov.txt')
         except FileNotFoundError:
             pass
     
@@ -96,7 +96,7 @@ class Sentiment(DatasetManager):
                          debug_mode=debug_mode)
         self.dataset_name = 'sentiment'
         try:
-            self.oov = load_vocab('./data/sentiment/oov.txt')
+            self.oov = load_vocab('./sentiment/oov.txt')
         except FileNotFoundError:
             pass
 
@@ -116,7 +116,7 @@ class SemEval(DatasetManager):
         self.dataset_name = 'scienceie'
 
         try:
-            self.oov = load_vocab('./data/scienceie/oov.txt')
+            self.oov = load_vocab('./scienceie/oov.txt')
         except FileNotFoundError:
             pass
 
