@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickDev, ComickUniqueContext, LRComick
+from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly
 from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
@@ -48,7 +48,13 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
     os.makedirs(logger_path, exist_ok=True)
     csv_logger = CSVLogger(logger_path + model_name + '.csv')
 
-    callbacks = [lrscheduler, ckpt_best, ckpt_last, early_stopping, csv_logger]
+    callbacks = [
+        lrscheduler,
+        ckpt_best,
+        ckpt_last,
+        early_stopping,
+        csv_logger
+    ]
 
     # Fit the model
     model.fit_generator(train_loader, valid_loader,
@@ -155,6 +161,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     test_embeddings = dataloader.get_test_embeddings
     test_vocabs = dataloader.get_test_vocab
     all_sentences = train_sentences + valid_sentences + test_sentences
+    chars_embeddings = load_embeddings('./predicted_char_embeddings/char_mimick_glove_d100_c20')
 
     # Prepare vectorizer
     word_to_idx, char_to_idx = make_vocab(all_sentences)
@@ -185,14 +192,17 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = LRComick(
+    net = LRComickContextOnly(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=embeddings,
+        # context_dropout_p=0.5,
+        # fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
+    model_name = "{}_{}".format(model_name, net.__class__.__name__.lower())
     model = Model(
         model=net,
         optimizer=Adam(net.parameters(), lr=lr),
@@ -287,14 +297,12 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("n", default=21, nargs='?')
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("e", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
-        n = int(args.n)
         k = int(args.k)
         device = int(args.device)
         d = int(args.d)
@@ -304,18 +312,19 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for i in range(5):
-            # Control of randomization
-            seed = 42 + i  # "Seed" of light
-            torch.manual_seed(seed)
-            np.random.seed(seed)
-            random.seed(seed)
-            for task_config in get_tasks_configs():
-                model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('comick', task_config['name'], n, k, d, i, epochs)
-                handler = logging.FileHandler('{}.log'.format(model_name))
-                logger.addHandler(handler)
-                main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=epochs)
-                logger.removeHandler(handler)
+        for n in [9, 15, 21, 41]:
+            for i in range(5):
+                # Control of randomization
+                seed = 42 + i  # "Seed" of light
+                torch.manual_seed(seed)
+                np.random.seed(seed)
+                random.seed(seed)
+                for task_config in get_tasks_configs():
+                    model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('comick', task_config['name'], n, k, d, i, epochs)
+                    handler = logging.FileHandler('{}.log'.format(model_name))
+                    logger.addHandler(handler)
+                    main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=epochs)
+                    logger.removeHandler(handler)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
