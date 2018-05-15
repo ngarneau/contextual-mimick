@@ -37,7 +37,7 @@ def augment_data(examples, embeddings_path, filter_cond=None, topn=5, min_cos_si
         sim_words_for_label = sim_words[word]
         for sim_word, cos_sim in sim_words_for_label:
             # Add new labels, not new examples to already existing labels.
-            if filter_cond(label) and cos_sim >= min_cos_sim:
+            if filter_cond(sim_word) and cos_sim >= min_cos_sim:
                 new_example = (
                     (left_context, sim_word, right_context), sim_word)
                 new_examples.add(new_example)
@@ -53,9 +53,9 @@ def preprocess_data(dataset,
     embeddings = load_embeddings(embeddings_path)
 
     # Training part
-    # examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings)
-    # save_examples(examples, path, 'examples')
-    examples = load_examples(path+'examples.pkl')
+    examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings)
+    save_examples(examples, path, 'examples')
+    # examples = load_examples(path+'examples.pkl')
     na_dataset = PerClassDataset(examples)
 
     # Validation part
@@ -137,10 +137,10 @@ if __name__ == '__main__':
     topn = 5
     min_cos_sim = .6
     embeddings_path = './glove_embeddings/glove.6B.50d.txt'
-    for dataset in [CoNLL(debug_mode=True),
-                    # Sentiment(),
-                    # SemEval(),
+    for dataset in [CoNLL(),
+                    Sentiment(),
+                    SemEval(),
                     ]:
         # create_oov(dataset, embeddings_path)
         preprocess_data(dataset, embeddings_path, topn, min_cos_sim)
-        compute_statistics(dataset)
+        # compute_statistics(dataset)
