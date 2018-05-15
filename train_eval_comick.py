@@ -52,7 +52,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
         lrscheduler,
         ckpt_best,
         ckpt_last,
-        # early_stopping,
+        early_stopping,
         csv_logger
     ]
 
@@ -312,7 +312,7 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for n in [5, 9, 15, 21, 41]:
+        for n in [9, 15, 21, 41]:
             for i in range(5):
                 # Control of randomization
                 seed = 42 + i  # "Seed" of light
