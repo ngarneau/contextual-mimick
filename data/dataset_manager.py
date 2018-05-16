@@ -59,11 +59,11 @@ class DatasetManager:
 
 
 class CoNLL(DatasetManager):
-    def __init__(self, debug_mode=False):
+    def __init__(self, debug_mode=False, relative_path='./'):
         super().__init__(cls=type(self),
-                         train_path='./conll/train.txt',
-                         valid_path='./conll/valid.txt',
-                         test_path='./conll/test.txt',
+                         train_path=relative_path+'./conll/train.txt',
+                         valid_path=relative_path+'./conll/valid.txt',
+                         test_path=relative_path+'./conll/test.txt',
                          debug_mode=debug_mode)
         self.dataset_name = 'conll'
         try:
@@ -88,11 +88,11 @@ class CoNLL(DatasetManager):
 
 
 class Sentiment(DatasetManager):
-    def __init__(self, debug_mode=False):
+    def __init__(self, debug_mode=False, relative_path='./'):
         super().__init__(cls=type(self),
-                         train_path='./sentiment/train.pickle',
-                         valid_path='./sentiment/dev.pickle',
-                         test_path='./sentiment/test.pickle',
+                         train_path=relative_path+'./sentiment/train.pickle',
+                         valid_path=relative_path+'./sentiment/dev.pickle',
+                         test_path=relative_path+'./sentiment/test.pickle',
                          debug_mode=debug_mode)
         self.dataset_name = 'sentiment'
         try:
@@ -107,11 +107,11 @@ class Sentiment(DatasetManager):
 
 
 class SemEval(DatasetManager):
-    def __init__(self, debug_mode=False):
+    def __init__(self, debug_mode=False, relative_path='./'):
         super().__init__(cls=type(self),
-                         train_path='./scienceie/train_spacy.txt',
-                         valid_path='./scienceie/valid_spacy.txt',
-                         test_path='./scienceie/test_spacy.txt',
+                         train_path=relative_path+'./scienceie/train_spacy.txt',
+                         valid_path=relative_path+'./scienceie/valid_spacy.txt',
+                         test_path=relative_path+'./scienceie/test_spacy.txt',
                          debug_mode=debug_mode)
         self.dataset_name = 'scienceie'
 

@@ -214,10 +214,6 @@ def square_distance(input, target):
     return F.pairwise_distance(input, target).mean()
 
 
-def cosine_distance(input, target):
-    return F.cosine_similarity(input, target).mean()
-
-
 if __name__ == '__main__':
     # test_preprocessing()
     ex = 'My name is JS'.split(' ')
