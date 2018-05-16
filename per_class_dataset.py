@@ -316,6 +316,7 @@ class DataLoader(DataLoader):
         for x, y in super().__iter__():
             yield self._to_gpu(x), self._to_gpu(y)
 
+
 class PerClassLoader():
     """
     This class implements a dataloader that returns exactly k examples per class per epoch. This is simply a pipeline of PerClassSampler -> BatchSampler -> DataLoader.
@@ -327,9 +328,16 @@ class PerClassLoader():
         batch_size (Integer, optional, default=1): Number of examples returned per batch.
         use_gpu (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
         """
-    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
+    def __init__(self,
+                 dataset,
+                 collate_fn=None,
+                 k=1,
+                 batch_size=1,
+                 use_gpu=False,
+                 shuffle=True,
+                 filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k=k, filter_labels_cond=filter_labels_cond)
+        self.sampler = PerClassSampler(dataset, k=k, shuffle=shuffle, filter_labels_cond=filter_labels_cond)
         self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
