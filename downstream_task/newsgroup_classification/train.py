@@ -80,8 +80,12 @@ def train(embeddings, model_name='vanilla'):
 
     lrscheduler = ReduceLROnPlateau(patience=5)
     early_stopping = EarlyStopping(patience=10)
-    checkpoint = ModelCheckpoint('./models/sentiment_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
-    csv_logger = CSVLogger('./train_logs/sentiment_{}.csv'.format(model_name))
+    model_path = './models/'
+    checkpoint = ModelCheckpoint(model_path+'newsclassif_'+model_name+'.torch',
+                                 save_best_only=True,
+                                 restore_best=True,
+                                 temporary_filename=model_path+'tmp_newsclassif_'+model_name+'.torch')
+    csv_logger = CSVLogger('./train_logs/newsclassif_{}.csv'.format(model_name))
     loss = CrossEntropyLoss()
     model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])

@@ -33,7 +33,11 @@ def parse_pos_file(filename):
     return sentences, targets
 
 
-def train(embeddings, model_name='vanilla', device=0):
+def launch_train(embeddings, model_name, device, debug):
+    if debug:
+        epochs = 1
+    else:
+        epochs = 40
     train_sentences, train_tags = parse_pos_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_pos_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_pos_file('./data/conll/test.txt')
@@ -59,7 +63,6 @@ def train(embeddings, model_name='vanilla', device=0):
         return words_tensor.cuda(), labels_tensor.cuda()
 
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -103,24 +106,43 @@ def train(embeddings, model_name='vanilla', device=0):
 
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=5)
-    checkpoint = ModelCheckpoint('./models/pos_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    model_path = './models/'
+    checkpoint = ModelCheckpoint(model_path+'pos_'+model_name+'.torch',
+                                 save_best_only=True,
+                                 restore_best=True,
+                                 temporary_filename=model_path+'tmp_pos_'+model_name+'.torch',
+                                 verbose=True)
     csv_logger = CSVLogger('./train_logs/pos_{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
-    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=epochs, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))
 
 
-if __name__ == '__main__':
-    for i in range(5):
-        seed = 42 + i  # "Seed" of light
+def train(embeddings, model_name='vanilla', device=0, debug=False):
+    for i in range(10):
+        # Control of randomization
+        model_name = '{}_i{}'.format(model_name, i)
+        seed = 42 + i
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        logging.getLogger().setLevel(logging.INFO)
-        embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-        oov_embeddings = load_embeddings(
-                    './mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
-        embeddings.update(oov_embeddings)
-        train(embeddings, "mimick_glove_i{}".format(i))
+        launch_train(embeddings, model_name, device, debug)
+
+def train_previous_mimick(embeddings, device=0, debug=False):
+    previous_mimick_embeddings = load_embeddings('./data/previous_mimick/conll_model_output')
+    embeddings.update(previous_mimick_embeddings)
+    model_name = 'previous_mimick'
+    train(embeddings, model_name, device, debug)
+
+
+def train_baseline(embeddings, device=0, debug=False):
+    model_name = 'baseline'
+    train(embeddings, model_name, device, debug)
+
+if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+    train_previous_mimick(embeddings)
+

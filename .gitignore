@@ -111,7 +111,10 @@ train_logs/
 data/conll/
 data/conll_embeddings_settings/
 data/glove_embeddings/
-data/
+data/scienceie/
+data/semeval_embeddings_settings/
+data/sentiment/
+data/sentiment_embeddings_settings/
 
 temp.py
 test.py

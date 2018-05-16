@@ -6,11 +6,12 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
 import random
+from copy import deepcopy
 import numpy as np
 
 __author__ = "Jean-Samuel Leboeuf"
-__date__ = "2018-04-04"
-__version__ = "0.2.3"
+__date__ = "2018-05-15"
+__version__ = "0.2.4"
 
 class PerClassDataset(Dataset):
     """
@@ -97,7 +98,37 @@ class PerClassDataset(Dataset):
         return (self.transform(x), self.target_transform(label))
     
     def __contains__(self, label):
-        return label in self.dataset
+        return label in self.labels_mapping
+    
+    def update(self, other_pcd, keep_duplicate=True):
+        """
+        Updates the current instance with the examples of an other PerClassDataset instance. If 'keep_duplicate' is False, only one copy of all identical examples between the two datasets is kept. Examples must support comparisons.
+        """
+        for label, N in other_pcd:
+            self._len += N
+            other_idx = other_pcd.labels_mapping[label]
+            if label in self:
+                idx = self.labels_mapping[label]
+                if not keep_duplicate:
+                    for example in other_pcd.dataset[other_idx]:
+                        if example not in self.dataset[idx]:
+                            self.dataset[idx].append(example)
+                        else:
+                            self._len -= 1
+                else:
+                    self.dataset[idx] += other_pcd.dataset[other_idx]
+            else:
+                idx = self.labels_mapping[label] = len(self.labels_mapping)
+                self.dataset[idx] = other_pcd.dataset[other_idx]
+    
+    def __ior__(self, other_pcd):
+        self.update(other_pcd)
+        return self
+    
+    def __or__(self, other_pcd):
+        copied_pcd = deepcopy(self)
+        copied_pcd.update(other_pcd)
+        return copied_pcd
 
     def split(self, ratio=.8, shuffle=True, reuse_label_mappings=False):
         """
@@ -285,6 +316,7 @@ class DataLoader(DataLoader):
         for x, y in super().__iter__():
             yield self._to_gpu(x), self._to_gpu(y)
 
+
 class PerClassLoader():
     """
     This class implements a dataloader that returns exactly k examples per class per epoch. This is simply a pipeline of PerClassSampler -> BatchSampler -> DataLoader.
@@ -296,9 +328,16 @@ class PerClassLoader():
         batch_size (Integer, optional, default=1): Number of examples returned per batch.
         use_gpu (Boolean, optional, default=False): Specify if the loader puts the data to GPU or not.
         """
-    def __init__(self, dataset, collate_fn=None, k=1, batch_size=1, use_gpu=False, filter_labels_cond=None):
+    def __init__(self,
+                 dataset,
+                 collate_fn=None,
+                 k=1,
+                 batch_size=1,
+                 use_gpu=False,
+                 shuffle=True,
+                 filter_labels_cond=None):
         self.dataset = dataset
-        self.sampler = PerClassSampler(dataset, k=k, filter_labels_cond=filter_labels_cond)
+        self.sampler = PerClassSampler(dataset, k=k, shuffle=shuffle, filter_labels_cond=filter_labels_cond)
         self.batch_sampler = BatchSampler(self.sampler, batch_size=batch_size)
         if collate_fn == None:
             collate_fn = lambda batch: [*zip(*batch)]
@@ -322,6 +361,13 @@ if __name__ == '__main__':
         print(stats+': '+str(value))
     print('total number of examples:', len(dataset))
     print('number of classes:', len(dataset.dataset))
+    print('1' in dataset)
+
+    data2 = [(i, a) for i in range(20) for a in 'abcdefghijklmnop']
+    dataset2 = PerClassDataset(data2)
+    print(dataset2.labels_mapping)
+    # dataset.update(dataset2)
+    dataset |= dataset2
     
     
     print('\n\nTesting with PerClassLoader')
