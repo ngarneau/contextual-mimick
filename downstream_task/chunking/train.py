@@ -33,7 +33,11 @@ def parse_chunk_file(filename):
     return sentences, targets
 
 
-def train(embeddings, model_name='vanilla', device=0):
+def launch_train(embeddings, model_name, device, debug):
+    if debug:
+        epochs = 1
+    else:
+        epochs = 40
     train_sentences, train_tags = parse_chunk_file('./data/conll/train.txt')
     valid_sentences, valid_tags = parse_chunk_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_chunk_file('./data/conll/test.txt')
@@ -105,18 +109,25 @@ def train(embeddings, model_name='vanilla', device=0):
     checkpoint = ModelCheckpoint('./models/chunk_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
     csv_logger = CSVLogger('./train_logs/chunk{}.csv'.format(model_name))
     model = Model(net, Adam(net.parameters(), lr=0.001), sequence_cross_entropy, metrics=[acc])
-    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=epochs,
+                        callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))
 
 
-if __name__ == '__main__':
+def train(embeddings, model_name='vanilla', device=0, debug=False):
     for i in range(5):
-        seed = 42 + i  # "Seed" of light
+        # Control of randomization
+        model_name = '{}_i{}'.format(model_name, i)
+        seed = 42 + i
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        logging.getLogger().setLevel(logging.INFO)
-        embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-        train(embeddings, "vanilla_i{}".format(i))
+        launch_train(embeddings, model_name, device, debug)
+
+
+if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+    train(embeddings, 'vanilla')

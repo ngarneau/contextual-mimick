@@ -118,9 +118,9 @@ def get_data_loader(task, debug_mode, embedding_dimension):
         raise NotImplementedError("Task {} as no suitable data loader".format(task))
 
 
-def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
+def main(task_config, n=41, k=1, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     freeze_word_embeddings = False
@@ -180,6 +180,7 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
 
     # Initialize training parameters
     lr = 0.001
+    model_name = '{}_n{}_k{}_d{}_e{}'.format(task_config['name'], n, k, d, epochs)
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
@@ -192,6 +193,11 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         word_embeddings_dimension=d,
         fc_dropout_p=0.5,
     )
+
+    model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
+    handler = logging.FileHandler('{}.log'.format(model_name))
+    logger.addHandler(handler)
+
     model = Model(
         model=net,
         optimizer=Adam(net.parameters(), lr=lr),
@@ -224,7 +230,8 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
 
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device)
+        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device, debug_mode)
+    logger.removeHandler(handler)
 
 
 def get_tasks_configs():
@@ -282,7 +289,10 @@ def get_tasks_configs():
 
 if __name__ == '__main__':
     from time import time
-
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     t = time()
     try:
         parser = argparse.ArgumentParser()
@@ -299,19 +309,8 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for e in [100]:
-            for i in range(5):
-                # Control of randomization
-                seed = 42 + i  # "Seed" of light
-                torch.manual_seed(seed)
-                np.random.seed(seed)
-                random.seed(seed)
-                for task_config in get_tasks_configs():
-                    model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('mimick', task_config['name'], n, k, d, i, e)
-                    handler = logging.FileHandler('{}.log'.format(model_name))
-                    logger.addHandler(handler)
-                    main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=e)
-                    logger.removeHandler(handler)
+        for task_config in get_tasks_configs():
+            main(task_config, n=n, k=k, device=device, d=d, epochs=100)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise

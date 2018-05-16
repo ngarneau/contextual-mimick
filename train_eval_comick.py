@@ -124,7 +124,7 @@ def get_data_loader(task, debug_mode, embedding_dimension):
         raise NotImplementedError("Task {} as no suitable data loader".format(task))
 
 
-def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
+def main(task_config, n=41, k=1, device=0, d=100, epochs=100):
     # Global parameters
     debug_mode = False
     verbose = True
@@ -168,23 +168,9 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     vectorizer = WordsInContextVectorizer(word_to_idx, char_to_idx)
     vectorizer = vectorizer
 
-    # Prepare examples
-    train_loader, valid_loader, test_loader = prepare_data(
-        embeddings=embeddings,
-        test_vocabs=test_vocabs,
-        train_sentences=train_sentences,
-        test_sentences=all_sentences,
-        vectorizer=vectorizer,
-        n=n,
-        use_gpu=use_gpu,
-        k=k,
-        over_population_threshold=over_population_threshold,
-        relative_over_population=relative_over_population,
-        data_augmentation=data_augmentation,
-        verbose=verbose,
-    )
 
     # Initialize training parameters
+    model_name = '{}_n{}_k{}_d{}_e{}'.format(task_config['name'], n, k, d, epochs)
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
@@ -202,7 +188,10 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
         # fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
-    model_name = "{}_{}".format(model_name, net.__class__.__name__.lower())
+    model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
+    handler = logging.FileHandler('{}.log'.format(model_name))
+    logger.addHandler(handler)
+
     model = Model(
         model=net,
         optimizer=Adam(net.parameters(), lr=lr),
@@ -211,6 +200,22 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
     )
     if use_gpu:
         model.cuda()
+
+    # Prepare examples
+    train_loader, valid_loader, test_loader = prepare_data(
+        embeddings=embeddings,
+        test_vocabs=test_vocabs,
+        train_sentences=train_sentences,
+        test_sentences=all_sentences,
+        vectorizer=vectorizer,
+        n=n,
+        use_gpu=use_gpu,
+        k=k,
+        over_population_threshold=over_population_threshold,
+        relative_over_population=relative_over_population,
+        data_augmentation=data_augmentation,
+        verbose=verbose,
+    )
 
     # Set up the callbacks and train
     train(
@@ -235,7 +240,8 @@ def main(model_name, task_config, n=41, k=1, device=0, d=100, epochs=100):
 
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device)
+        task['script'](predicted_evaluation_embeddings, task['name'] + "_" + model_name, device, debug_mode)
+    logger.removeHandler(handler)
 
 
 def get_tasks_configs():
@@ -293,7 +299,10 @@ def get_tasks_configs():
 
 if __name__ == '__main__':
     from time import time
-
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
     t = time()
     try:
         parser = argparse.ArgumentParser()
@@ -313,18 +322,8 @@ if __name__ == '__main__':
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
         for n in [9, 15, 21, 41]:
-            for i in range(5):
-                # Control of randomization
-                seed = 42 + i  # "Seed" of light
-                torch.manual_seed(seed)
-                np.random.seed(seed)
-                random.seed(seed)
-                for task_config in get_tasks_configs():
-                    model_name = '{}_{}_n{}_k{}_d{}_i{}_e{}'.format('comick', task_config['name'], n, k, d, i, epochs)
-                    handler = logging.FileHandler('{}.log'.format(model_name))
-                    logger.addHandler(handler)
-                    main(model_name, task_config, n=n, k=k, device=device, d=d, epochs=epochs)
-                    logger.removeHandler(handler)
+            for task_config in get_tasks_configs():
+                main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise

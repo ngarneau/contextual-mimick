@@ -208,7 +208,7 @@ class LRComick(Module):
                  context_dropout_p=0,
                  ):
         super().__init__()
-        self.version = 1.1
+        self.version = 1.2
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
@@ -257,7 +257,7 @@ class LRComick(Module):
 
         left_rep, right_rep = self.contexts(left_context, right_context)
         context_rep = left_rep + right_rep
-        context_rep = self.fc1(F.tanh(context_rep))
+        context_rep = self.fc1(context_rep)
 
         word_hidden_rep = self.mimick(word)
         word_rep = self.fc2(F.tanh(word_hidden_rep))
@@ -349,7 +349,7 @@ class ComickDev(Module):
                  fc_dropout_p=0.5,
                  ):
         super().__init__()
-        self.version = 2.3
+        self.version = 2.1
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
 
@@ -397,9 +397,9 @@ class ComickDev(Module):
         output = self.dropout(output)
         output = F.tanh(output)
         output = self.fc1(output)
-        output = self.dropout(output)
-        output = F.tanh(output)
-        output = self.fc2(output)
+        # output = self.dropout(output)
+        # output = F.tanh(output)
+        # output = self.fc2(output)
         return output
 
 
@@ -415,6 +415,7 @@ class Mimick(Module):
                  fc_dropout_p=0.5,
                  ):
         super().__init__()
+        self.version = 1.0
         self.characters_vocabulary = characters_vocabulary
 
         self.mimick_lstm = MultiLSTM(

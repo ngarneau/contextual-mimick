@@ -10,11 +10,10 @@ from torch.utils.data import DataLoader
 from torch.nn import CrossEntropyLoss
 
 from downstream_task.models import LSTMClassifier
-from downstream_task.sequence_classification import acc, collate_examples 
+from downstream_task.sequence_classification import acc, collate_examples
 from downstream_task.utils import make_vocab_and_idx
 from utils import load_embeddings
 import torch
-
 
 
 def parse_pickle_file(filename):
@@ -27,8 +26,11 @@ def parse_pickle_file(filename):
     return sentences, labels
 
 
-
-def train(embeddings, model_name='vanilla', device=0):
+def launch_train(embeddings, model_name, device, debug):
+    if debug:
+        epochs = 1
+    else:
+        epochs = 40
     train_sentences, train_tags = parse_pickle_file('./data/sentiment/train.pickle')
     valid_sentences, valid_tags = parse_pickle_file('./data/sentiment/dev.pickle')
     test_sentences, test_tags = parse_pickle_file('./data/sentiment/test.pickle')
@@ -42,7 +44,6 @@ def train(embeddings, model_name='vanilla', device=0):
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
     valid_sentences = [[words_to_idx[word] for word in sentence] for sentence in valid_sentences]
     test_sentences = [[words_to_idx[word] for word in sentence] for sentence in test_sentences]
-
 
     train_dataset = list(zip(train_sentences, train_tags))
     valid_dataset = list(zip(valid_sentences, valid_tags))
@@ -96,22 +97,30 @@ def train(embeddings, model_name='vanilla', device=0):
 
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=5)
-    checkpoint = ModelCheckpoint('./models/sentiment_{}.torch'.format(model_name), save_best_only=True, restore_best=True)
+    checkpoint = ModelCheckpoint('./models/sentiment_{}.torch'.format(model_name), save_best_only=True,
+                                 restore_best=True)
     csv_logger = CSVLogger('./train_logs/sentiment_{}.csv'.format(model_name))
     loss = CrossEntropyLoss()
     model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
-    model.fit_generator(train_loader, valid_loader, epochs=40, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+    model.fit_generator(train_loader, valid_loader, epochs=epochs,
+                        callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))
 
 
-if __name__ == '__main__':
+def train(embeddings, model_name='vanilla', device=0, debug=False):
     for i in range(5):
-        seed = 42 + i  # "Seed" of light
+        # Control of randomization
+        model_name = '{}_i{}'.format(model_name, i)
+        seed = 42 + i
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        logging.getLogger().setLevel(logging.INFO)
-        embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-        train(embeddings, "vanilla_i{}".format(i))
+        launch_train(embeddings, model_name, device, debug)
+
+
+if __name__ == '__main__':
+    logging.getLogger().setLevel(logging.INFO)
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+    train(embeddings, 'vanilla')
