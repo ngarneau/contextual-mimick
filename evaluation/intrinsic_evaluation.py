@@ -91,20 +91,20 @@ def __evaluate(model, loader, embeddings):
 
 
 class Evaluator:
-    def __init__(self, model, loader, idx_to_word=None, word_embeddings=None):
+    def __init__(self, model, loader, idx_to_word=None, idx_to_char=None, word_embeddings=None):
         self.results = {}
         self.results_per_labels = {}
         self.global_results = {}
-        self._build_results(model, loader, idx_to_word, word_embeddings)
+        self._build_results(model, loader, idx_to_word, idx_to_char, word_embeddings)
     
-    def _build_results(self, model, loader, idx_to_word, word_embeddings):
+    def _build_results(self, model, loader, idx_to_word, idx_to_char, word_embeddings):
         model.model.eval()
         
         for x, y in loader:
             embeddings = torch_to_numpy(model.model(tensors_to_variables(x)))
-            for context, label, embedding in zip(x, y, embeddings):
+            for *context, label, embedding in zip(*x, y, embeddings):
                 idx = len(self.results)
-                converted_context = self.convert_context(context, idx_to_word)
+                converted_context = self.convert_context(context, idx_to_word, idx_to_char)
 
                 result = EmbeddingResult(label, embedding.reshape(1,-1), context=converted_context)
                 if word_embeddings != None and label in word_embeddings:
@@ -125,7 +125,7 @@ class Evaluator:
             pred_embed = np.array([self.results[i].embedding for i in results['results_idx']])
             mean_pred_embed = np.mean(pred_embed, axis=0)
             results['mean_of_pred_embed'] = mean_pred_embed
-            true_embedding = word_embeddings[label]
+            true_embedding = word_embeddings[label].reshape(1, -1)
             results['cos_sim_of_mean_pred_embed'] = cos_sim(true_embedding, mean_pred_embed)
             results['eucl_dist_of_mean_pred_embed'] = eucl_dist(true_embedding, mean_pred_embed)
         
@@ -152,13 +152,13 @@ class Evaluator:
         ))
 
     @staticmethod
-    def convert_context(context, idx_to_word):
-        if word_to_idx != None:
+    def convert_context(context, idx_to_word, idx_to_char):
+        if idx_to_word != None:
             CL, w, CR = context
-            CL = ' '.join([idx_to_word[i] for i in CL])
-            CR = ' '.join([idx_to_word[i] for i in CR])
-            w = idx_to_word[w]
-            context = [CL, w, CR]  # To be implemented
+            CL = ' '.join([idx_to_word[i] for i in CL if i != 0])
+            CR = ' '.join([idx_to_word[i] for i in CR if i != 0])
+            w = ''.join([idx_to_char[i] for i in w if i != 0])
+            context = [CL, w, CR]
 
         return context
 

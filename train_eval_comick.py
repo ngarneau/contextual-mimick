@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+import pickle
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -66,7 +67,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     freeze_word_embeddings = True
@@ -172,19 +173,21 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 
     intrinsic_results = Evaluator(model,
                                   test_loader,
-                                  word_to_idx=word_to_idx,
+                                  idx_to_word={v: k for k, v in word_to_idx.items()},
+                                  idx_to_char={v: k for k, v in char_to_idx.items()},
                                   word_embeddings=word_embeddings)
-
-    # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
+    logging.info("{}".format(intrinsic_results.global_results))
+    pickle.dump(intrinsic_results, open('{}_stats.pkl'.format(model_name), 'wb'))
+    predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
     # logging.info("Evaluating embeddings...")
-    # predicted_oov_embeddings.update(word_embeddings)
+    predicted_oov_embeddings.update(word_embeddings)
 
-    # for task in task_config['tasks']:
-    #     logging.info("Using predicted embeddings on {} task...".format(task['name']))
-    #     task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device, debug_mode)
+    for task in task_config['tasks']:
+        logging.info("Using predicted embeddings on {} task...".format(task['name']))
+        task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
 
 
