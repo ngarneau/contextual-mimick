@@ -64,16 +64,9 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def get_data_loader(task, debug_mode, embedding_dimension):
-    if task == 'ner':
-        return CoNLLDataLoader(debug_mode, embedding_dimension)
-    else:
-        raise NotImplementedError("Task {} as no suitable data loader".format(task))
-
-
-def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
+def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     freeze_word_embeddings = True
@@ -186,7 +179,7 @@ def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
 
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device)
+        task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
 
 
@@ -257,7 +250,7 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for n in [9, 15, 21, 41]:
+        for n in [5, 9, 15, 21, 41]:
             for task_config in get_tasks_configs():
                 main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
     except:

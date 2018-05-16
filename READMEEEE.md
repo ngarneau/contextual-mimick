@@ -1,6 +1,7 @@
 First thing to do is to download the datasets by [...how do we do that?]
 Place the dataset in your 'data' directory. It should look like this:
 
+```
 ./data
     /conll
         /train.txt
@@ -22,5 +23,6 @@ Place the dataset in your 'data' directory. It should look like this:
     /__init__.py
     /data_preprocessing.py
     /dataset_manager.py
-    
+```
+
 Run the main in the file 'data_preprocessing.py' to generate the examples and the statistics about the three datasets.

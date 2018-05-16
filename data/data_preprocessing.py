@@ -52,7 +52,7 @@ def preprocess_data(dataset,
                     topn,
                     min_cos_sim):
     path =  './' + dataset.dataset_name + '/examples/'
-    # embeddings = load_embeddings(embeddings_path)
+    embeddings = load_embeddings(embeddings_path)
 
     # Training part
     examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings)

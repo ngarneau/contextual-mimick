@@ -1,8 +1,10 @@
 import logging
+
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import sys
+
 sys.path.append('..')
 
 import numpy as np
@@ -10,11 +12,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 from pytoune import torch_to_numpy, tensors_to_variables
 from utils import save_embeddings
 
+
 def eucl_dist(y_true, y_pred):
     return np.linalg.norm(y_pred - y_true)
 
+
 def cos_sim(y_true, y_pred):
     return float(cosine_similarity(y_pred, y_true))
+
 
 def evaluate(model, test_loader, test_embeddings, save=True, model_name=None):
     mean_pred_embeddings = predict_mean_embeddings(model, test_loader)
@@ -81,8 +86,5 @@ def __evaluate(model, loader, embeddings):
         y_true = embeddings[label]
         predicted_cos_sim[label] = [cos_sim(y_true, y_pred) for y_pred in pred_embeddings]
         predicted_eucl_dist[label] = [eucl_dist(y_true, y_pred) for y_pred in pred_embeddings]
-    
-    pass
 
-    
-        
+    pass
