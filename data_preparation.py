@@ -1,101 +1,47 @@
 import os
 import logging
 
-from gensim.models import KeyedVectors
-from tqdm import tqdm
-
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
-from utils import load_embeddings, parse_conll_file, preprocess_token, ngrams
+from utils import load_embeddings, load_examples
 from utils import collate_fn, collate_x
 from per_class_dataset import *
 import pickle as pkl
 
-
-def load_data(d, corpus, verbose=True):
-    path_embeddings = './data/conll_embeddings_settings/setting1/glove/train/glove.6B.{}d.txt'.format(
-        d)
-    embeddings = load_embeddings(path_embeddings)
-
-    train_sentences = parse_conll_file('./data/conll/train.txt')
-    valid_sentences = parse_conll_file('./data/conll/valid.txt')
-    test_sentences = parse_conll_file('./data/conll/test.txt')
-
-    if verbose:
-        logging.info('Loading ' + str(d) +
-                     'd embeddings from: "' + path_embeddings + '"')
-
-    return embeddings, (train_sentences, valid_sentences, test_sentences)
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
 
 
-def augment_data(examples, embeddings_path):
-    logging.info("Loading embedding model...")
-    word2vec_model = KeyedVectors.load_word2vec_format(embeddings_path)
-    logging.info("Done.")
-
-    labels = sorted(set(label for x, label in examples))
-    logging.info("Computing similar words for {} labels...".format(len(labels)))
-    sim_words = dict()
-    for label in tqdm(labels):
-        sim_words[label] = word2vec_model.most_similar(label, topn=5)
-    logging.info("Done.")
-
-    new_examples = dict()
-    for (left_context, word, right_context), label in tqdm(examples):
-        sim_words_for_label = sim_words[word]
-        for sim_word, cos_sim in sim_words_for_label:
-            # Add new labels, not new examples to already existing labels.
-            if sim_word not in labels and cos_sim >= 0.6:
-                new_example = ((left_context, sim_word, right_context), sim_word)
-                new_examples[new_example] = 1
-    logging.info("Done.")
-    return new_examples
+def truncate_examples(examples, n):
+    m = n // 2
+    truncated_examples = []
+    for (CL, word, CR), label in examples:
+        truncated_examples.append( ((CL[-m:], word, CR[:m]), word) )
+    
+    return truncated_examples
 
 
-def preprocess_examples(examples):
-    preprocessed_examples = list()
-    for (left_context, word, right_context), label in examples:
-        # preprocessed_word = preprocess_token(word)
-        preprocessed_examples.append((
-            (left_context, word, right_context),
-            label
-        ))
-    return preprocessed_examples
-
-
-def prepare_data(embeddings,
-                 test_vocabs,
-                 train_sentences,
-                 test_sentences,
+def prepare_data(dataset,
+                 embeddings,
                  vectorizer,
                  n=15,
                  ratio=.8,
                  use_gpu=False,
                  k=1,
+                 data_augmentation=False,
                  over_population_threshold=100,
                  relative_over_population=True,
+                 debug_mode=False,
                  verbose=True,
-                 data_augmentation=False):
+                 ):
     # Train-validation part
-    examples = dict()
-    examples_without_embeds = dict()
-    for sentence in train_sentences:
-        for ngram in ngrams(sentence, n):
-            key = (ngram, ngram[1])
-            if ngram[1] in embeddings:
-                # Keeps only different ngrams which have a training embeddings
-                examples[key] = 1
-            else:
-                examples_without_embeds[key] = 1
-
+    path = './data/' + dataset.dataset_name + '/examples/'
     if data_augmentation:
-        augmented_examples = augment_data(examples, './data/glove_embeddings/glove.6B.100d.txt')
-        if verbose:
-            logging.info(
-                "Number of non-augmented examples: {}".format(len(examples)))
-        examples.update(augmented_examples)  # Union
-    examples = preprocess_examples(examples)
+        examples = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
+    else:
+        examples = load_examples(path + 'examples.pkl')
+    if debug_mode:
+        examples = list(examples)[:128]
+
+    examples = truncate_examples(examples, n)
 
     transform = vectorizer.vectorize_unknown_example
 
@@ -116,7 +62,6 @@ def prepare_data(embeddings,
         if relative_over_population:
             over_population_threshold = int(
                 train_valid_dataset.stats()['most common labels number of examples'] / over_population_threshold)
-
         def filter_labels_cond(label, N):
             return N <= over_population_threshold
 
@@ -134,22 +79,31 @@ def prepare_data(embeddings,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = set((ngram, ngram[1]) for sentence in test_sentences for ngram in ngrams(sentence, n) if
-                        ngram[1] in test_vocabs)
-    test_examples = preprocess_examples(test_examples)
-
+    test_examples = load_examples(path + 'valid_test_examples.pkl')
+    test_examples = truncate_examples(test_examples, n)
     test_dataset = PerClassDataset(dataset=test_examples,
                                    transform=transform)
     test_loader = PerClassLoader(dataset=test_dataset,
                                  collate_fn=collate_x,
                                  k=-1,
+                                 shuffle=False,
                                  batch_size=64,
                                  use_gpu=use_gpu)
 
+    # OOV part
+    oov_examples = load_examples(path + 'oov_examples.pkl')
+    oov_examples = truncate_examples(oov_examples, n)
+    oov_dataset = PerClassDataset(dataset=oov_examples,
+                                  transform=transform)
+    oov_loader = PerClassLoader(dataset=oov_dataset,
+                                collate_fn=collate_x,
+                                k=-1,
+                                shuffle=False,
+                                batch_size=64,
+                                use_gpu=use_gpu)
+
     if verbose:
         logging.info('Number of unique examples: {}'.format(len(examples)))
-        logging.info('Number of unique examples wo embeds:'.format(
-            len(examples_without_embeds)))
 
         logging.info('\nGlobal statistics:')
         stats = train_valid_dataset.stats()
@@ -174,4 +128,4 @@ def prepare_data(embeddings,
         logging.info('\nFor training, loading ' + str(k) +
                      ' examples per label per epoch.')
 
-    return train_loader, valid_loader, test_loader
+    return train_loader, valid_loader, test_loader, oov_loader

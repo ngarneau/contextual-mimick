@@ -105,7 +105,6 @@ def launch_train(embeddings, model_name, device, debug):
     if use_gpu:
         net.cuda()
 
-
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=5)
     model_path = './models/'

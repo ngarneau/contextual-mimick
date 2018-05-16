@@ -192,20 +192,20 @@ def parse_newsgroup_file(filename):
 
 
 if __name__ == '__main__':
-    # train_entities, train_tokens = parse_conll_file('./conll/train.txt')
-    # validation_entities, validation_tokens = parse_conll_file('./conll/valid.txt')
-    # test_entities, test_tokens = parse_conll_file('./conll/test.txt')
-    # prepare_embeddings('conll', train_tokens, validation_tokens, test_tokens)
+    train_entities, train_tokens = parse_conll_file('./data/conll/train.txt')
+    validation_entities, validation_tokens = parse_conll_file('./data/conll/valid.txt')
+    test_entities, test_tokens = parse_conll_file('./data/conll/test.txt')
+    prepare_embeddings('conll', train_tokens, validation_tokens, test_tokens)
 
     # train_tokens = parse_semeval_files('./data/scienceie/scienceie2017_train/train2')
     # validation_tokens = parse_semeval_files('./data/scienceie/scienceie2017_dev/dev')
     # test_tokens = parse_semeval_files('./data/scienceie/semeval_articles_test')
     # prepare_embeddings('semeval', train_tokens, validation_tokens, test_tokens)
 
-    train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
-    validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
-    test_tokens = parse_sentiment_analysis_file('./data/sentiment/test.pickle')
-    prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
+    # train_tokens = parse_sentiment_analysis_file('./data/sentiment/train.pickle')
+    # validation_tokens = parse_sentiment_analysis_file('./data/sentiment/dev.pickle')
+    # test_tokens = parse_sentiment_analysis_file('./data/sentiment/test.pickle')
+    # prepare_embeddings('sentiment', train_tokens, validation_tokens, test_tokens)
 
     # train_tokens = parse_part_of_speech_file('./data/conll/train.txt')
     # validation_tokens = parse_part_of_speech_file('./data/conll/valid.txt')

@@ -5,6 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch.nn import functional as F
 import re
 import os
+import pickle as pkl
 
 
 def load_embeddings(path):
@@ -23,12 +24,24 @@ def load_embeddings(path):
 
 def save_embeddings(embeddings, filename, path='./predicted_embeddings/'):
     os.makedirs(path, exist_ok=True)
-    with open(path + filename, 'w') as fhandle:
+    with open(path + filename, 'w', encoding='utf-8') as fhandle:
         for word, embedding in embeddings.items():
             str_embedding = ' '.join([str(i) for i in embedding])
             s = "{} {}\n".format(word, str_embedding)
             fhandle.write(s)
 
+
+def load_examples(pathfile):
+    with open(pathfile, 'rb') as file:
+        examples = pkl.load(file)
+    return examples
+
+
+def save_examples(examples, path, filename):
+    os.makedirs(path, exist_ok=True)
+    with open(path + filename + '.pkl', 'wb') as file:
+        pkl.dump(examples, file)
+        
 
 def parse_conll_file(filename):
     sentences = list()
@@ -72,7 +85,7 @@ def make_vocab(sentences):
 
 def load_vocab(path):
     vocab = set()
-    with open(path) as fhandle:
+    with open(path, 'rb') as fhandle:
         for line in fhandle:
             vocab.add(line[:-1])
     return vocab
@@ -83,24 +96,24 @@ class WordsInContextVectorizer:
         self.words_to_idx = words_to_idx
         self.chars_to_idx = chars_to_idx
 
-    def vectorize_sequence(self, word, to_idx):
+    def vectorize_sequence(self, sequence, to_idx):
         if 'UNK' in to_idx:
             unknown_index = to_idx['UNK']
             v = list()
-            for char in word:
-                if char in to_idx:
-                    v.append(to_idx[char])
-                elif char.capitalize() in to_idx:
-                    v.append(to_idx[char.capitalize()])
-                elif char.upper() in to_idx:
-                    v.append(to_idx[char.upper()])
-                elif char.lower() in to_idx:
-                    v.append(to_idx[char.lower()])
+            for item in sequence:
+                if item in to_idx:
+                    v.append(to_idx[item])
+                elif item.capitalize() in to_idx:
+                    v.append(to_idx[item.capitalize()])
+                elif item.upper() in to_idx:
+                    v.append(to_idx[item.upper()])
+                elif item.lower() in to_idx:
+                    v.append(to_idx[item.lower()])
                 else:
                     v.append(to_idx['UNK'])
             return v
         else:
-            return [to_idx[char] for char in word]
+            return [to_idx[item] for item in sequence]
 
     def vectorize_example(self, example):
         x, y = example
@@ -170,16 +183,18 @@ def pad_sequences(vectorized_seqs, seq_lengths):
     return seq_tensor
 
 
-def ngrams(sequence, n, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
+def ngrams(sequence, n=-1, pad_left=1, pad_right=1, left_pad_symbol='<BOS>', right_pad_symbol='<EOS>'):
     sequence = [left_pad_symbol] * pad_left + sequence + [right_pad_symbol] * pad_right
 
     L = len(sequence)
     m = n // 2
+    if n == -1:
+        m = L
     for i, item in enumerate(sequence[pad_left:-pad_right]):
         left_idx = max(0, i - m + pad_left)
         left_side = tuple(sequence[left_idx:i + pad_left])
-        right_idx = min(L, i + m + pad_left + pad_right)
-        right_side = tuple(sequence[i + pad_left + pad_right:right_idx])
+        right_idx = min(L, i + m + pad_left + 1)
+        right_side = tuple(sequence[i + pad_left + 1:right_idx])
         yield (left_side, item, right_side)
 
 
@@ -198,9 +213,9 @@ def square_distance(input, target):
     return F.pairwise_distance(input, target).mean()
 
 
-def cosine_distance(input, target):
-    return F.cosine_similarity(input, target).mean()
-
-
 if __name__ == '__main__':
-    test_preprocessing()
+    # test_preprocessing()
+    ex = 'My name is JS'.split(' ')
+    a = [ngram for ngram in ngrams(ex, -1, pad_left=2, pad_right=4)]
+    for b in a:
+        print(b)

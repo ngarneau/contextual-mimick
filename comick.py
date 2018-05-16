@@ -62,7 +62,7 @@ class MultiLSTM(Module):
         """
         outputs = []
         for x, lstm in zip(xs, self.lstms):
-            lengths = x.data.ne(0).sum(dim=1).long()
+            lengths = x.data.ne(0).long().sum(dim=1)
             seq_lengths, perm_idx = lengths.sort(0, descending=True)
             _, rev_perm_idx = perm_idx.sort(0)
 
@@ -136,7 +136,7 @@ class MirrorLSTM(Module):
 
         outputs = []
         for side in ['left', 'right']:
-            lengths = x[side].data.ne(0).sum(dim=1).long()
+            lengths = x[side].data.ne(0).long().sum(dim=1)
             seq_lengths, perm_idx = lengths.sort(0, descending=True)
             _, rev_perm_idx = perm_idx.sort(0)
 
@@ -413,10 +413,12 @@ class Mimick(Module):
                  characters_embedding_dimension=20,
                  word_embeddings_dimension=50,
                  fc_dropout_p=0.5,
+                 comick_compatibility=True
                  ):
         super().__init__()
         self.version = 1.0
         self.characters_vocabulary = characters_vocabulary
+        self.comick_compatibility = comick_compatibility
 
         self.mimick_lstm = MultiLSTM(
             num_embeddings=len(self.characters_vocabulary),
@@ -439,8 +441,9 @@ class Mimick(Module):
         self.dropout = nn.Dropout(p=fc_dropout_p)
 
     def forward(self, x):
-        left_context, word, right_context = x
-        word_hidden_rep = self.fc_word(self.mimick_lstm(word))
+        if self.comick_compatibility:
+            _CL, x, _CR = x
+        word_hidden_rep = self.fc_word(self.mimick_lstm(x))
         output = self.dropout(word_hidden_rep)
         output = F.tanh(output)
         output = self.fc_output(output)

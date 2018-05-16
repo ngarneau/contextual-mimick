@@ -7,7 +7,7 @@ from data_loaders import CoNLLDataLoader, SentimentDataLoader, SemEvalDataLoader
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-from comick import ComickDev, Mimick
+from comick import Mimick
 from utils import save_embeddings
 from utils import square_distance, cosine_sim
 from utils import make_vocab, WordsInContextVectorizer
