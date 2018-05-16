@@ -38,7 +38,7 @@ def prepare_data(dataset,
     else:
         examples = load_examples(path + 'examples.pkl')
 
-    examples = truncate_examples(examples)
+    examples = truncate_examples(examples, n)
 
     transform = vectorizer.vectorize_unknown_example
 
@@ -77,30 +77,30 @@ def prepare_data(dataset,
 
     # Test part
     test_examples = load_examples(path + 'valid_test_examples.pkl')
-    test_examples = truncate_examples(test_examples)
+    test_examples = truncate_examples(test_examples, n)
     test_dataset = PerClassDataset(dataset=test_examples,
-                                   transform=transform,
-                                   target_transform=target_transform)
+                                   transform=transform)
     test_loader = PerClassLoader(dataset=test_dataset,
-                                 collate_fn=collate_fn,
+                                 collate_fn=collate_x,
                                  k=-1,
+                                 shuffle=False,
                                  batch_size=64,
                                  use_gpu=use_gpu)
 
+    # OOV part
     oov_examples = load_examples(path + 'oov_examples.pkl')
-    oov_examples = truncate_examples(oov_examples)
+    oov_examples = truncate_examples(oov_examples, n)
     oov_dataset = PerClassDataset(dataset=oov_examples,
-                                   transform=transform)
+                                  transform=transform)
     oov_loader = PerClassLoader(dataset=oov_dataset,
-                                 collate_fn=collate_x,
-                                 k=-1,
-                                 batch_size=64,
-                                 use_gpu=use_gpu)
+                                collate_fn=collate_x,
+                                k=-1,
+                                shuffle=False,
+                                batch_size=64,
+                                use_gpu=use_gpu)
 
     if verbose:
         logging.info('Number of unique examples: {}'.format(len(examples)))
-        logging.info('Number of unique examples wo embeds:'.format(
-            len(examples_without_embeds)))
 
         logging.info('\nGlobal statistics:')
         stats = train_valid_dataset.stats()
