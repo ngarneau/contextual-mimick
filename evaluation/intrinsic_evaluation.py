@@ -1,8 +1,13 @@
+import logging
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
+
+import sys
+sys.path.append('..')
+
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from pytoune import torch_to_numpy, tensors_to_variables
-import sys
-sys.path.append('..')
 from utils import save_embeddings
 
 def eucl_dist(y_true, y_pred):

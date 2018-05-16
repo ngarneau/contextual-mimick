@@ -29,6 +29,7 @@ def prepare_data(dataset,
                  data_augmentation=False,
                  over_population_threshold=100,
                  relative_over_population=True,
+                 debug_mode=False,
                  verbose=True,
                  ):
     # Train-validation part
@@ -37,6 +38,8 @@ def prepare_data(dataset,
         examples = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
     else:
         examples = load_examples(path + 'examples.pkl')
+    if debug_mode:
+        examples = list(examples)[:128]
 
     examples = truncate_examples(examples, n)
 

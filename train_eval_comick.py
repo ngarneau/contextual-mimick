@@ -123,6 +123,7 @@ def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
         over_population_threshold=over_population_threshold,
         relative_over_population=relative_over_population,
         data_augmentation=data_augmentation,
+        debug_mode=debug_mode,
         verbose=verbose,
     )
 
@@ -134,15 +135,15 @@ def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = LRComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         # characters_embeddings=chars_embeddings,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        context_dropout_p=0.5,
-        fc_dropout_p=0.5,
+        # context_dropout_p=0.5,
+        # fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
     model_name = "{}_v{}".format(model_name, net.version)
@@ -166,7 +167,7 @@ def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
     test_embeddings = evaluate(
         model,
         test_loader=test_loader,
-        test_embeddings=test_embeddings,
+        test_embeddings=word_embeddings,
         save=save,
         model_name=model_name + '.txt'
     )
@@ -176,7 +177,7 @@ def main(model_name, task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
     logging.info("Evaluating embeddings...")
-    predicted_oov_embeddings.update(embeddings)
+    predicted_oov_embeddings.update(word_embeddings)
 
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
