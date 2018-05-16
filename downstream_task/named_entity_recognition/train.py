@@ -125,7 +125,7 @@ def launch_train(embeddings, model_name, device, debug):
 
 
 def train(embeddings, model_name='vanilla', device=0, debug=False):
-    for i in range(5):
+    for i in range(10):
         # Control of randomization
         model_name = '{}_i{}'.format(model_name, i)
         seed = 42 + i
