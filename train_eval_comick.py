@@ -13,7 +13,7 @@ from torch.optim import Adam
 
 from data.dataset_manager import CoNLL, Sentiment, SemEval
 from data_preparation import prepare_data
-from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings
+from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings, Evaluator
 from per_class_dataset import *
 
 from comick import ComickDev, ComickUniqueContext, LRComick
@@ -86,7 +86,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     logging.info("Data augmentation: {}".format(data_augmentation))
 
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -162,24 +162,29 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs=epochs,
     )
 
-    test_embeddings = evaluate(
-        model,
-        test_loader=test_loader,
-        test_embeddings=word_embeddings,
-        save=save,
-        model_name=model_name + '.txt'
-    )
+    # test_embeddings = evaluate(
+    #     model,
+    #     test_loader=test_loader,
+    #     test_embeddings=word_embeddings,
+    #     save=save,
+    #     model_name=model_name + '.txt'
+    # )
 
-    predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
+    intrinsic_results = Evaluator(model,
+                                  test_loader,
+                                  word_to_idx=word_to_idx,
+                                  word_embeddings=word_embeddings)
+
+    # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
-    logging.info("Evaluating embeddings...")
-    predicted_oov_embeddings.update(word_embeddings)
+    # logging.info("Evaluating embeddings...")
+    # predicted_oov_embeddings.update(word_embeddings)
 
-    for task in task_config['tasks']:
-        logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device, debug_mode)
+    # for task in task_config['tasks']:
+    #     logging.info("Using predicted embeddings on {} task...".format(task['name']))
+    #     task['script'](predicted_oov_embeddings, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
 
 

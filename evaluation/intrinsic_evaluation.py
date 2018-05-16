@@ -88,3 +88,93 @@ def __evaluate(model, loader, embeddings):
         predicted_eucl_dist[label] = [eucl_dist(y_true, y_pred) for y_pred in pred_embeddings]
 
     pass
+
+
+class Evaluator:
+    def __init__(self, model, loader, idx_to_word=None, word_embeddings=None):
+        self.results = {}
+        self.results_per_labels = {}
+        self.global_results = {}
+        self._build_results(model, loader, idx_to_word, word_embeddings)
+    
+    def _build_results(self, model, loader, idx_to_word, word_embeddings):
+        model.model.eval()
+        
+        for x, y in loader:
+            embeddings = torch_to_numpy(model.model(tensors_to_variables(x)))
+            for context, label, embedding in zip(x, y, embeddings):
+                idx = len(self.results)
+                converted_context = self.convert_context(context, idx_to_word)
+
+                result = EmbeddingResult(label, embedding.reshape(1,-1), context=converted_context)
+                if word_embeddings != None and label in word_embeddings:
+                    result.compute_metrics(
+                        word_embeddings[label].reshape(1, -1))
+                self.results[idx] = result
+                
+                if label in self.results_per_labels:
+                    self.results_per_labels[label]['results_idx'].append(idx)
+                else:
+                    self.results_per_labels[label] = {'results_idx':[idx]}
+        
+        if word_embeddings != None:
+            self._compute_metrics(word_embeddings)
+    
+    def _compute_metrics(self, word_embeddings):
+        for label, results in self.results_per_labels.items():
+            pred_embed = np.array([self.results[i].embedding for i in results['results_idx']])
+            mean_pred_embed = np.mean(pred_embed, axis=0)
+            results['mean_of_pred_embed'] = mean_pred_embed
+            true_embedding = word_embeddings[label]
+            results['cos_sim_of_mean_pred_embed'] = cos_sim(true_embedding, mean_pred_embed)
+            results['eucl_dist_of_mean_pred_embed'] = eucl_dist(true_embedding, mean_pred_embed)
+        
+            pred_cos_sim = np.array([self.results[i].cos_sim for i in results['results_idx']])
+            results['mean_of_cos_sim'] = np.mean(pred_cos_sim)
+            results['var_of_cos_sim'] = np.std(pred_cos_sim)
+            pred_eucl_dist = np.array([self.results[i].eucl_dist for i in results['results_idx']])
+            results['mean_of_eucl_dist'] = np.mean(pred_eucl_dist)
+            results['var_of_eucl_dist'] = np.std(pred_eucl_dist)
+        
+
+        self.global_results['mean_of_mean_of_cos_sim'] = np.mean(np.array(
+            [result['mean_of_cos_sim'] for result in self.results_per_labels.values()]
+        ))
+        self.global_results['mean_of_mean_of_eucl_dist'] = np.mean(np.array(
+            [result['mean_of_eucl_dist'] for result in self.results_per_labels.values()]
+        ))
+
+        self.global_results['mean_of_cos_sim_of_mean_pred_embed'] = np.mean(np.array(
+            [result['cos_sim_of_mean_pred_embed'] for result in self.results_per_labels.values()]
+        ))
+        self.global_results['mean_of_eucl_dist_of_mean_pred_embed'] = np.mean(np.array(
+            [result['eucl_dist_of_mean_pred_embed'] for result in self.results_per_labels.values()]
+        ))
+
+    @staticmethod
+    def convert_context(context, idx_to_word):
+        if word_to_idx != None:
+            CL, w, CR = context
+            CL = ' '.join([idx_to_word[i] for i in CL])
+            CR = ' '.join([idx_to_word[i] for i in CR])
+            w = idx_to_word[w]
+            context = [CL, w, CR]  # To be implemented
+
+        return context
+
+    def __getitem__(self, label):
+        """
+        Returns a list of EmbeddingResult objects for the given label.
+        """
+        return self.results_per_labels[label]
+
+
+class EmbeddingResult:
+    def __init__(self, label, embedding, context=None):
+        self.label = label
+        self.embedding = embedding
+        self.context = context
+    
+    def compute_metrics(self, true_embedding):
+        self.cos_sim = cos_sim(true_embedding, self.embedding)
+        self.eucl_dist = eucl_dist(true_embedding, self.embedding)

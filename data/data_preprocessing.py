@@ -144,7 +144,6 @@ def compute_statistics(dataset, relative_threshold):
 
 
 if __name__ == '__main__':
-    d = 50
     topn = 5
     min_cos_sim = .6
     relative_threshold = 100
