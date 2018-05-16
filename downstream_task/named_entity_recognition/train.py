@@ -135,6 +135,13 @@ def train(embeddings, model_name='vanilla', device=0, debug=False):
         launch_train(embeddings, model_name, device, debug)
 
 
+def train_mimick(embeddings, device=0, debug=False):
+    previous_mimick_embeddings = load_embeddings('./mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
+    embeddings.update(previous_mimick_embeddings)
+    model_name = 'mimick'
+    train(embeddings, model_name, device, debug)
+
+
 def train_previous_mimick(embeddings, device=0, debug=False):
     previous_mimick_embeddings = load_embeddings('./data/previous_mimick/conll_model_output')
     embeddings.update(previous_mimick_embeddings)
@@ -149,4 +156,4 @@ def train_baseline(embeddings, device=0, debug=False):
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-    train_previous_mimick(embeddings)
+    train_mimick(embeddings)
