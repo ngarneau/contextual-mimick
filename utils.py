@@ -156,7 +156,6 @@ def preprocess_token(token):
 
 
 def collate_fn(batch):
-    print(batch)
     x, y = collate_x(batch)
     return (x, torch.FloatTensor(np.array(y)))
 
