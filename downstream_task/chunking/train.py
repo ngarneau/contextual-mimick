@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 
 from downstream_task.models import LSTMTagger
 from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx
+from downstream_task.utils import train_with_comick, train_without_comick
 from utils import load_embeddings
 import torch
 import numpy as np
@@ -33,7 +34,7 @@ def parse_chunk_file(filename):
     return sentences, targets
 
 
-def launch_train(embeddings, model_name, device, debug):
+def launch_train(model, n, oov_words, model_name, device, debug):
     if debug:
         epochs = 1
     else:
@@ -42,7 +43,10 @@ def launch_train(embeddings, model_name, device, debug):
     valid_sentences, valid_tags = parse_chunk_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_chunk_file('./data/conll/test.txt')
 
-    words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+
+    # words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    words_to_idx = model.words_vocabulary
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
@@ -98,7 +102,11 @@ def launch_train(embeddings, model_name, device, debug):
         100,
         50,
         words_to_idx,
-        len(tags_to_idx)
+        len(tags_to_idx),
+        model,
+        oov_words,
+        n,
+        use_gpu
     )
     net.load_words_embeddings(embeddings)
     if use_gpu:
@@ -122,34 +130,27 @@ def launch_train(embeddings, model_name, device, debug):
     logging.info("Test metric: {}".format(metric))
 
 
-def train(embeddings, model_name='vanilla', device=0, debug=False):
-    for i in range(10):
-        # Control of randomization
-        model_name = '{}_i{}'.format(model_name, i)
-        seed = 42 + i
-        torch.manual_seed(seed)
-        np.random.seed(seed)
-        random.seed(seed)
-        launch_train(embeddings, model_name, device, debug)
+def train(model, model_state_path, n, oov_words, model_name='vanilla', device=0, debug=False):
+    train_with_comick(launch_train, model, model_state_path, n, oov_words, model_name, device, debug)
 
 
 def train_mimick(embeddings, device=0, debug=False):
     previous_mimick_embeddings = load_embeddings('./mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
     embeddings.update(previous_mimick_embeddings)
     model_name = 'mimick'
-    train(embeddings, model_name, device, debug)
+    train_without_comick(embeddings, model_name, device, debug)
 
 
 def train_previous_mimick(embeddings, device=0, debug=False):
     previous_mimick_embeddings = load_embeddings('./data/previous_mimick/conll_model_output')
     embeddings.update(previous_mimick_embeddings)
     model_name = 'previous_mimick'
-    train(embeddings, model_name, device, debug)
+    train_without_comick(embeddings, model_name, device, debug)
 
 
 def train_baseline(embeddings, device=0, debug=False):
     model_name = 'baseline'
-    train(embeddings, model_name, device, debug)
+    train_without_comick(embeddings, model_name, device, debug)
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)

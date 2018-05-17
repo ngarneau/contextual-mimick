@@ -173,9 +173,21 @@ class LSTMClassifier(LSTMSequence):
             words_hidden_dimension,
             words_vocabulary,
             tagset_size,
+            comick,
+            oov_words,
+            n,
             use_cuda=False
     ):
-        super(LSTMClassifier, self).__init__(words_embedding_dimension, words_hidden_dimension, words_vocabulary, tagset_size, use_cuda)
+        super(LSTMClassifier, self).__init__(
+            words_embedding_dimension,
+            words_hidden_dimension,
+            words_vocabulary,
+            tagset_size,
+            comick,
+            oov_words,
+            n,
+            use_cuda
+        )
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, sentence):
@@ -185,8 +197,16 @@ class LSTMClassifier(LSTMSequence):
         _, rev_perm_idx = perm_idx.sort(0)
         sentence = sentence[perm_idx]
 
+        oov_to_predict = self.get_oov(sentence)
+        if len(oov_to_predict) > 0:
+            embeddings_to_replace = list(self.predict_embeddings(oov_to_predict))
+
         embeds = self.word_embeddings(sentence)
-        embeds = self.dropout(embeds)
+
+        if len(oov_to_predict) > 0:
+            for si, i, embed in embeddings_to_replace:
+                embeds[si, i] = embed
+        # embeds = self.dropout(embeds)
 
         packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
         _, (hidden_states, cell_states) = self.word_lstm(packed_input)

@@ -31,12 +31,12 @@ from downstream_task.sentiment_classification.train import train as train_sent
 from downstream_task.chunking.train import train as train_chunk
 from downstream_task.semeval.train import train as train_semeval
 
+model_path = './models/'
 
 def train(model, model_name, train_loader, valid_loader, epochs=1000):
     # Create callbacks and checkpoints
     lrscheduler = ReduceLROnPlateau(patience=3)
     early_stopping = EarlyStopping(patience=10, min_delta=1e-4)
-    model_path = './models/'
 
     os.makedirs(model_path, exist_ok=True)
     ckpt_best = ModelCheckpoint(model_path + 'best_' + model_name + '.torch',
@@ -67,7 +67,6 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
-    epochs = 1
     # Global parameters
     debug_mode = False
     verbose = True
@@ -189,9 +188,10 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # logging.info("Evaluating embeddings...")
     predicted_oov_embeddings.update(word_embeddings)
 
+    model_state_path = "{}last_{}.torch".format(model_path, model_name)
     for task in task_config['tasks']:
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
-        task['script'](net, n, oov_words, task['name'] + "_" + model_name, device, debug_mode)
+        task['script'](net, model_state_path, n, oov_words, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
 
 
