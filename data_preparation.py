@@ -12,11 +12,11 @@ logging.getLogger().setLevel(logging.INFO)
 
 def truncate_examples(examples, n):
     m = n // 2
-    truncated_examples = []
+    truncated_examples = set()
     for (CL, word, CR), label in examples:
-        truncated_examples.append( ((CL[-m:], word, CR[:m]), word) )
+        truncated_examples.add( ((CL[-m:], word, CR[:m]), word) )
     
-    return truncated_examples
+    return sorted(truncated_examples)
 
 
 def prepare_data(dataset,
