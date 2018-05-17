@@ -175,10 +175,13 @@ def pad_sequences(vectorized_seqs, seq_lengths):
     """
     Pads vectorized ngrams so that they occupy the same space in a LongTensor.
     """
+    use_gpu = torch.cuda.is_available()
     seq_tensor = torch.zeros((len(vectorized_seqs), seq_lengths.max())).long()
     for idx, (seq, seqlen) in enumerate(zip(vectorized_seqs, seq_lengths)):
-        seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
-
+        if isinstance(seq, torch.cuda.LongTensor):
+            seq = seq.cpu()
+        t = torch.LongTensor(seq)
+        seq_tensor[idx, :seqlen] = t
     return seq_tensor
 
 

@@ -115,7 +115,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = LRComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,

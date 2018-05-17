@@ -108,9 +108,9 @@ class LSTMSequence(Module):
 
         use_gpu = torch.cuda.is_available()
         if use_gpu:
-            padded_left.cuda()
-            padded_words.cuda()
-            padded_right.cuda()
+            padded_left = padded_left.cuda()
+            padded_words = padded_words.cuda()
+            padded_right = padded_right.cuda()
 
         embeddings = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
 
