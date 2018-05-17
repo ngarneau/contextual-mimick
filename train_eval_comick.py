@@ -247,12 +247,14 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
+        parser.add_argument("n", default=5, nargs='?')
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("e", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
+        n = int(args.n)
         k = int(args.k)
         device = int(args.device)
         d = int(args.d)
@@ -262,9 +264,8 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for n in [5, 9, 15, 21, 41]:
-            for task_config in get_tasks_configs():
-                main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
+        for task_config in get_tasks_configs():
+            main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
