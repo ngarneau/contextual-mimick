@@ -14,8 +14,8 @@ def truncate_examples(examples, n):
     m = n // 2
     truncated_examples = set()
     for (CL, word, CR), label in examples:
-        truncated_examples.add( ((CL[-m:], word, CR[:m]), word) )
-    
+        truncated_examples.add(((CL[-m:], word, CR[:m]), word))
+
     return sorted(truncated_examples)
 
 
@@ -31,13 +31,28 @@ def prepare_data(dataset,
                  relative_over_population=True,
                  debug_mode=False,
                  verbose=True,
+                 no_number=False
                  ):
     # Train-validation part
     path = './data/' + dataset.dataset_name + '/examples/'
-    if data_augmentation:
-        examples = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
+
+    # Paths to example files
+    examples_path_file = path + 'examples{}.pkl'
+    augmented_path_file = path + 'augmented_examples_topn5_cos_sim0.6{}.pkl'
+    test_path_file = path + "valid_test_examples{}.pkl"
+    if no_number:
+        examples_path_file = examples_path_file.format("_nonumbers")
+        augmented_path_file = augmented_path_file.format("_nonumbers")
+        test_path_file = test_path_file.format("_nonumbers")
     else:
-        examples = load_examples(path + 'examples.pkl')
+        examples_path_file = examples_path_file.format("")
+        augmented_path_file = augmented_path_file.format("")
+        test_path_file = test_path_file.format("")
+
+    if data_augmentation:
+        examples = load_examples(augmented_path_file)
+    else:
+        examples = load_examples(examples_path_file)
     if debug_mode:
         examples = list(examples)[:128]
 
@@ -62,6 +77,7 @@ def prepare_data(dataset,
         if relative_over_population:
             over_population_threshold = int(
                 train_valid_dataset.stats()['most common labels number of examples'] / over_population_threshold)
+
         def filter_labels_cond(label, N):
             return N <= over_population_threshold
 
@@ -79,7 +95,7 @@ def prepare_data(dataset,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = load_examples(path + 'valid_test_examples.pkl')
+    test_examples = load_examples(test_path_file)
     test_examples = truncate_examples(test_examples, n)
     test_dataset = PerClassDataset(dataset=test_examples,
                                    transform=transform)
@@ -89,18 +105,6 @@ def prepare_data(dataset,
                                  shuffle=False,
                                  batch_size=64,
                                  use_gpu=use_gpu)
-
-    # OOV part
-    oov_examples = load_examples(path + 'oov_examples.pkl')
-    oov_examples = truncate_examples(oov_examples, n)
-    oov_dataset = PerClassDataset(dataset=oov_examples,
-                                  transform=transform)
-    oov_loader = PerClassLoader(dataset=oov_dataset,
-                                collate_fn=collate_x,
-                                k=-1,
-                                shuffle=False,
-                                batch_size=64,
-                                use_gpu=use_gpu)
 
     if verbose:
         logging.info('Number of unique examples: {}'.format(len(examples)))
@@ -128,4 +132,4 @@ def prepare_data(dataset,
         logging.info('\nFor training, loading ' + str(k) +
                      ' examples per label per epoch.')
 
-    return train_loader, valid_loader, test_loader, oov_loader
+    return train_loader, valid_loader, test_loader

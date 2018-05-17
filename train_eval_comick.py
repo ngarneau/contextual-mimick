@@ -140,7 +140,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         model.cuda()
 
     # Prepare examples
-    train_loader, valid_loader, test_loader, oov_loader = prepare_data(
+    train_loader, valid_loader, test_loader = prepare_data(
         dataset=dataset,
         embeddings=word_embeddings,
         vectorizer=vectorizer,
@@ -152,6 +152,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         data_augmentation=data_augmentation,
         debug_mode=debug_mode,
         verbose=verbose,
+        no_number=True
     )
 
     # Set up the callbacks and train
@@ -175,12 +176,13 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
                                   idx_to_word={v: k for k, v in word_to_idx.items()},
                                   idx_to_char={v: k for k, v in char_to_idx.items()},
                                   word_embeddings=word_embeddings)
-    for k, v in intrinsic_results.global_results:
+    for k, v in intrinsic_results.global_results.items():
         logging.info("{} {}".format(k, v))
     
-    results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
+    results_pathfile = './evaluation/intrinsic/'
+    fname = 'intrinsic_{}.pkl'.format(model_name)
     os.makedirs(results_pathfile, exist_ok=True)
-    pickle.dump(intrinsic_results, open(results_pathfile, 'wb'))
+    pickle.dump(intrinsic_results, open(results_pathfile + fname, 'wb'))
 
     oov_words = set(dataset.get_oov)
     
@@ -255,7 +257,7 @@ if __name__ == '__main__':
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
-        parser.add_argument("e", default=100, nargs='?')
+        parser.add_argument("e", default=5, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
         k = int(args.k)

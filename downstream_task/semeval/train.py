@@ -116,6 +116,8 @@ def launch_train(model, n, oov_words, model_name, device, debug):
     early_stopping = EarlyStopping(patience=5)
     model_path = './models/'
     checkpoint = ModelCheckpoint(model_path + 'semeval_' + model_name + '.torch',
+                                 monitor='val_f1',
+                                 mode='max',
                                  save_best_only=True,
                                  restore_best=True,
                                  temporary_filename=model_path + 'tmp_semeval_' + model_name + '.torch',

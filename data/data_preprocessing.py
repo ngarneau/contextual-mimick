@@ -111,26 +111,48 @@ def create_oov(dataset, embeddings_path):
         file.write('\n'.join(oov)+'\n')
 
 
-def compute_statistics(dataset, relative_threshold):
+def compute_statistics(dataset, relative_threshold, no_number=True):
     path = './' + dataset.dataset_name + '/examples/'
-    
-    na_ex = load_examples(path+'examples.pkl')
+
+    # Paths to example files
+    examples_path_file = path + 'examples{}.pkl'
+    augmented_path_file = path + 'augmented_examples_topn5_cos_sim0.6{}.pkl'
+    valid_path_file = path + "valid_examples{}.pkl"
+    test_path_file = path + "test_examples{}.pkl"
+    valid_test_path_file = path + "valid_test_examples{}.pkl"
+    oov_path_file = path + "oov_examples{}.pkl"
+    if no_number:
+        examples_path_file = examples_path_file.format("_nonumbers")
+        augmented_path_file = augmented_path_file.format("_nonumbers")
+        valid_test_path_file = valid_test_path_file.format("_nonumbers")
+        test_path_file = test_path_file.format("_nonumbers")
+        valid_path_file = valid_path_file.format("_nonumbers")
+        oov_path_file = oov_path_file.format("_nonumbers")
+    else:
+        examples_path_file = examples_path_file.format("")
+        augmented_path_file = augmented_path_file.format("")
+        valid_test_path_file = valid_test_path_file.format("")
+        test_path_file = test_path_file.format("")
+        valid_path_file = valid_path_file.format("")
+        oov_path_file = oov_path_file.format("")
+
+    na_ex = load_examples(examples_path_file)
     na_train = PerClassDataset(na_ex)
 
-    a_ex = load_examples(path+'augmented_examples_topn5_cos_sim0.6.pkl')
+    a_ex = load_examples(augmented_path_file)
     a_train = PerClassDataset(a_ex)
     threshold = int(a_train.stats()['most common labels number of examples'] / relative_threshold)
 
-    valid_ex = load_examples(path+'valid_examples.pkl')
+    valid_ex = load_examples(valid_path_file)
     valid = PerClassDataset(valid_ex)
 
-    test_ex = load_examples(path+'test_examples.pkl')
+    test_ex = load_examples(test_path_file)
     test = PerClassDataset(test_ex)
 
-    val_test_ex = load_examples(path+'valid_test_examples.pkl')
+    val_test_ex = load_examples(valid_test_path_file)
     val_test = PerClassDataset(val_test_ex)
 
-    oov_ex = load_examples(path+'oov_examples.pkl')
+    oov_ex = load_examples(oov_path_file)
     oov = PerClassDataset(oov_ex)
 
     stats = {'non-augmented':na_train.stats(),
@@ -147,7 +169,12 @@ def compute_statistics(dataset, relative_threshold):
     
     filepath = './'+dataset.dataset_name+'/'
     os.makedirs(filepath, exist_ok=True)
-    with open(filepath + 'statistics.json', 'w') as file:
+    stats_filename = 'statistics{}.json'
+    if no_number:
+        stats_filename = stats_filename.format("_nonumbers")
+    else:
+        stats_filename = stats_filename.format("")
+    with open(filepath + stats_filename, 'w') as file:
         json.dump(stats, file, indent=4)
 
 
@@ -169,5 +196,5 @@ if __name__ == '__main__':
                     Sentiment(),
                     SemEval(),
                     ]:
-        preprocess_data(dataset, embeddings_path, topn, min_cos_sim)
+        # preprocess_data(dataset, embeddings_path, topn, min_cos_sim)
         compute_statistics(dataset, relative_threshold)
