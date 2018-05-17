@@ -116,6 +116,9 @@ data/semeval_embeddings_settings/
 data/sentiment/
 data/sentiment_embeddings_settings/
 
+evaluation/intrinsic/
+evaluation/top_n/
+
 temp.py
 test.py
 

@@ -47,6 +47,10 @@ def augment_data(examples, embeddings_path, filter_cond=None, topn=5, min_cos_si
     return new_examples
 
 
+def isnumber(string):
+    return all(char in '0123456789.,:-+/' for char in string)
+
+
 def preprocess_data(dataset,
                     embeddings_path,
                     topn,
@@ -55,40 +59,44 @@ def preprocess_data(dataset,
     embeddings = load_embeddings(embeddings_path)
 
     # Training part
-    examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings)
-    save_examples(examples, path, 'examples')
+    examples = set((ngram, ngram[1]) for sentence in dataset.get_train_sentences for ngram in ngrams(sentence) if ngram[1] in embeddings and not isnumber(ngram[1]))
+    save_examples(examples, path, 'examples_nonumbers')
     # examples = load_examples(path+'examples.pkl')
     na_dataset = PerClassDataset(examples)
 
     # Validation part
-    valid_examples = set((ngram, ngram[1]) for sentence in dataset.get_valid_sentences for ngram in ngrams(sentence) if ngram[1] not in na_dataset and ngram[1] in embeddings)
-    save_examples(valid_examples, path, 'valid_examples')
+    valid_examples = set((ngram, ngram[1]) for sentence in dataset.get_valid_sentences for ngram in ngrams(
+        sentence) if ngram[1] not in na_dataset and ngram[1] in embeddings and not isnumber(ngram[1]))
+    save_examples(valid_examples, path, 'valid_examples_nonumbers')
     valid_dataset = PerClassDataset(valid_examples)
 
     tr_val_dataset = na_dataset | valid_dataset
 
     # Test part
     test_examples = set((ngram, ngram[1]) for sentence in dataset.get_test_sentences for ngram in ngrams(
-        sentence) if ngram[1] not in tr_val_dataset and ngram[1] in embeddings)
-    save_examples(test_examples, path, 'test_examples')
+        sentence) if ngram[1] not in tr_val_dataset and ngram[1] in embeddings and not isnumber(ngram[1]))
+    save_examples(test_examples, path, 'test_examples_nonumbers')
     test_dataset = PerClassDataset(test_examples)
 
     # valid_examples = load_examples(path+'valid_examples.pkl')
     # test_examples = load_examples(path+'test_examples.pkl')
-    save_examples(test_examples | valid_examples, path, 'valid_test_examples')
+    save_examples(test_examples | valid_examples, path, 'valid_test_examples_nonumbers')
 
     # OOV part
     all_sentences = dataset.get_train_sentences + dataset.get_valid_sentences + dataset.get_test_sentences
-    oov_examples = set((ngram, ngram[1]) for sentence in all_sentences for ngram in ngrams(sentence) if ngram[1] not in embeddings)
-    save_examples(oov_examples, path, 'oov_examples')
+    oov_examples = set((ngram, ngram[1]) for sentence in all_sentences for ngram in ngrams(
+        sentence) if ngram[1] not in embeddings and not isnumber(ngram[1]))
+    save_examples(oov_examples, path, 'oov_examples_nonumbers')
 
     # Augmented part
     all_dataset = tr_val_dataset | test_dataset
-    filter_cond = lambda label: label not in all_dataset
+
+    def filter_cond(label): return label not in all_dataset and not isnumber(label)
 
     augmented_examples = augment_data(examples, embeddings_path, filter_cond=filter_cond, topn=topn, min_cos_sim=min_cos_sim)    
     augmented_examples |= examples  # Union
-    save_examples(augmented_examples, path, 'augmented_examples_topn{topn}_cos_sim{cs}'.format(topn=topn, cs=min_cos_sim))
+    save_examples(augmented_examples, path, 'augmented_examples_topn{topn}_cos_sim{cs}_nonumbers'.format(
+        topn=topn, cs=min_cos_sim))
 
 
 def create_oov(dataset, embeddings_path):
