@@ -176,6 +176,9 @@ class Evaluator:
             raise ValueError('Unvalid attribute.')
 
         return sorted_list
+    
+    def get_mean_predicted_embeddings():
+        return {label: r['mean_of_pred_embed'] for label, r in self.results_per_labels.items()}
 
 class EmbeddingResult:
     def __init__(self, label, embedding, context=None):

@@ -178,9 +178,14 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
                                   word_embeddings=word_embeddings)
     for k, v in intrinsic_results.global_results:
         logging.info("{} {}".format(k, v))
-    pickle.dump(intrinsic_results, open('./evaluation/intrinsic_{}.pkl'.format(model_name), 'wb'))
     
-    predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
+    results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
+    os.makedirs(results_pathfile, exist_ok=True)
+    pickle.dump(intrinsic_results, open(results_pathfile, 'wb'))
+    
+    oov_results = Evaluator(model, oov_loader)
+    predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
+    # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
