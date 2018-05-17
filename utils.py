@@ -98,7 +98,6 @@ class WordsInContextVectorizer:
 
     def vectorize_sequence(self, sequence, to_idx):
         if 'UNK' in to_idx:
-            unknown_index = to_idx['UNK']
             v = list()
             for item in sequence:
                 if item in to_idx:

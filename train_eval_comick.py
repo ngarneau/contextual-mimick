@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+import pickle
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -13,10 +14,10 @@ from torch.optim import Adam
 
 from data.dataset_manager import CoNLL, Sentiment, SemEval
 from data_preparation import prepare_data
-from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings
+from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings, Evaluator
 from per_class_dataset import *
 
-from comick import ComickDev, ComickUniqueContext, LRComick
+from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly
 
 from utils import load_embeddings
 from utils import square_distance, cosine_sim
@@ -66,7 +67,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = True
+    debug_mode = False
     verbose = True
     save = True
     freeze_word_embeddings = True
@@ -86,7 +87,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     logging.info("Data augmentation: {}".format(data_augmentation))
 
     use_gpu = torch.cuda.is_available()
-    # use_gpu = False
+    use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -115,7 +116,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = LRComick(
+    net = LRComickContextOnly(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
@@ -162,19 +163,28 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs=epochs,
     )
 
-    test_embeddings = evaluate(
-        model,
-        test_loader=test_loader,
-        test_embeddings=word_embeddings,
-        save=save,
-        model_name=model_name + '.txt'
-    )
+    # test_embeddings = evaluate(
+    #     model,
+    #     test_loader=test_loader,
+    #     test_embeddings=word_embeddings,
+    #     save=save,
+    #     model_name=model_name + '.txt'
+    # )
 
+    intrinsic_results = Evaluator(model,
+                                  test_loader,
+                                  idx_to_word={v: k for k, v in word_to_idx.items()},
+                                  idx_to_char={v: k for k, v in char_to_idx.items()},
+                                  word_embeddings=word_embeddings)
+    for k, v in intrinsic_results.global_results:
+        logging.info("{} {}".format(k, v))
+    pickle.dump(intrinsic_results, open('./evaluation/intrinsic_{}.pkl'.format(model_name), 'wb'))
+    
     predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
-    logging.info("Evaluating embeddings...")
+    # logging.info("Evaluating embeddings...")
     predicted_oov_embeddings.update(word_embeddings)
 
     for task in task_config['tasks']:
