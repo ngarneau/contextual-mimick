@@ -33,7 +33,7 @@ def parse_conll_file(filename):
     return sentences, targets
 
 
-def launch_train(embeddings, model_name, device, debug):
+def launch_train(model, n, oov_words, model_name, device, debug):
     if debug:
         epochs = 1
     else:
@@ -42,7 +42,10 @@ def launch_train(embeddings, model_name, device, debug):
     valid_sentences, valid_tags = parse_conll_file('./data/conll/valid.txt')
     test_sentences, test_tags = parse_conll_file('./data/conll/test.txt')
 
-    words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
+
+    # words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    words_to_idx = model.words_vocabulary
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
@@ -99,6 +102,9 @@ def launch_train(embeddings, model_name, device, debug):
         50,
         words_to_idx,
         len(tags_to_idx),
+        model,
+        oov_words,
+        n,
         use_gpu
     )
     net.load_words_embeddings(embeddings)
@@ -124,7 +130,7 @@ def launch_train(embeddings, model_name, device, debug):
     logging.info("Test metric: {}".format(metric))
 
 
-def train(embeddings, model_name='vanilla', device=0, debug=False):
+def train(model, n, oov_words, model_name='vanilla', device=0, debug=False):
     for i in range(10):
         # Control of randomization
         model_name = '{}_i{}'.format(model_name, i)
@@ -132,7 +138,8 @@ def train(embeddings, model_name='vanilla', device=0, debug=False):
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        launch_train(embeddings, model_name, device, debug)
+        model.load_state_dict(torch.load(model_path))
+        launch_train(model, n, oov_words, model_name, device, debug)
 
 
 def train_mimick(embeddings, device=0, debug=False):
