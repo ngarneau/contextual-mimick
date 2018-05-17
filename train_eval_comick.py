@@ -181,15 +181,17 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
     os.makedirs(results_pathfile, exist_ok=True)
     pickle.dump(intrinsic_results, open(results_pathfile, 'wb'))
+
+    oov_words = set(dataset.get_oov)
     
-    oov_results = Evaluator(model, oov_loader)
-    predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
+    # oov_results = Evaluator(model, oov_loader)
+    # predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
     # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
     # logging.info("Evaluating embeddings...")
-    predicted_oov_embeddings.update(word_embeddings)
+    # predicted_oov_embeddings.update(word_embeddings)
 
     model_state_path = "{}last_{}.torch".format(model_path, model_name)
     for task in task_config['tasks']:
