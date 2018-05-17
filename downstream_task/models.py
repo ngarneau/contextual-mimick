@@ -106,6 +106,12 @@ class LSTMSequence(Module):
         right_contexts_length = torch.LongTensor([len(c) for c in right_contexts])
         padded_right = pad_sequences(vectorized_right_contexts, right_contexts_length)
 
+        use_gpu = torch.cuda.is_available()
+        if use_gpu:
+            padded_left.cuda()
+            padded_words.cuda()
+            padded_right.cuda()
+
         embeddings = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
 
         for si, i, embedding in zip(batches_i, sents_i, embeddings):
