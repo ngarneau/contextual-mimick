@@ -177,7 +177,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
                                   idx_to_char={v: k for k, v in char_to_idx.items()},
                                   word_embeddings=word_embeddings)
     logging.info("{}".format(intrinsic_results.global_results))
-    pickle.dump(intrinsic_results, open('{}_stats.pkl'.format(model_name), 'wb'))
+    pickle.dump(intrinsic_results, open('./evaluation/intrinsic_{}.pkl'.format(model_name), 'wb'))
     predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
