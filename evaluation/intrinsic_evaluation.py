@@ -4,13 +4,13 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 import sys
-
 sys.path.append('..')
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from pytoune import torch_to_numpy, tensors_to_variables
 from utils import save_embeddings
+import pickle as pkl
 
 
 def eucl_dist(y_true, y_pred):
@@ -75,19 +75,6 @@ def predict_mean_embeddings(model, loader):
         mean_pred_embeddings[label] = np.mean(
             np.array(predicted_embeddings[label]), axis=0)
     return mean_pred_embeddings
-
-
-def __evaluate(model, loader, embeddings):
-    predicted_embeddings = predict_embeddings(model, loader)
-
-    predicted_cos_sim = {}
-    predicted_eucl_dist = {}
-    for label, pred_embeddings in predicted_embeddings:
-        y_true = embeddings[label]
-        predicted_cos_sim[label] = [cos_sim(y_true, y_pred) for y_pred in pred_embeddings]
-        predicted_eucl_dist[label] = [eucl_dist(y_true, y_pred) for y_pred in pred_embeddings]
-
-    pass
 
 
 class Evaluator:
@@ -164,10 +151,31 @@ class Evaluator:
 
     def __getitem__(self, label):
         """
-        Returns a list of EmbeddingResult objects for the given label.
+        Returns a dictionary of the results for the given label, and a list of individual results in the form of EmbeddingResult objects.
         """
-        return self.results_per_labels[label]
+        label_results = [self.results[i] for i in self.results_per_labels[label]['results_idx']]
+        return self.results_per_labels[label], label_results
 
+    def sort_by(self, attribute, reverse=False):
+        """
+        Sort results by the given 'attribute'. If 'attribute' is 'cos_sim' or 'eucl_dist', a list of individual instances of EmbeddingResult is returned, else it is a list of tuples (label, dict_of_results).
+        """
+        if attribute in ['cos_sim',
+                         'eucl_dist']:
+            keygetter = lambda r: getattr(r, attribute)
+            sorted_list = sorted(self.results.values(), key=keygetter, reverse=reverse)
+        elif attribute in ['cos_sim_of_mean_pred_embed',
+                           'eucl_dist_of_mean_pred_embed',
+                           'mean_of_cos_sim',
+                           'var_of_cos_sim',
+                           'mean_of_eucl_dist',
+                           'var_of_eucl_dist']:
+            keygetter = lambda label_res: label_res[1][attribute]
+            sorted_list = sorted(self.results_per_labels.items(), key=keygetter, reverse=reverse)
+        else:
+            raise ValueError('Unvalid attribute.')
+
+        return sorted_list
 
 class EmbeddingResult:
     def __init__(self, label, embedding, context=None):
@@ -178,3 +186,27 @@ class EmbeddingResult:
     def compute_metrics(self, true_embedding):
         self.cos_sim = cos_sim(true_embedding, self.embedding)
         self.eucl_dist = eucl_dist(true_embedding, self.embedding)
+    
+    def __str__(self):
+        return self.label + '\n' + ' '.join(self.context) + '\n' + 'cos_sim ' + str(self.cos_sim) + '\n' + 'eucl_dist ' + str(self.eucl_dist) + '\n'
+
+
+if __name__ == '__main__':
+    model_name = 'testing_conll_n5_k2_d100_e100_lrcomick_v1.2'
+    filepath = './intrinsic_{}.pkl'.format(model_name)
+    with open(filepath, 'rb') as file:
+        results = pkl.load(file)
+    
+    print(results.global_results)
+    cos_sim_res = results.sort_by('cos_sim', reverse=True)
+    print(cos_sim_res[0], cos_sim_res[-1])
+
+    eucl_dist_res = results.sort_by('eucl_dist')
+    print(eucl_dist_res[0], eucl_dist_res[-1])
+
+    var_cos_sim = results.sort_by('var_of_cos_sim')
+    filtered_var_cos_sim = [(l, r) for l, r in var_cos_sim if len(r['results_idx']) >= 3]
+
+    for l, r in filtered_var_cos_sim[:-6:-1]:
+        print(l, len(r['results_idx']), 'var of cos sim', r['var_of_cos_sim'])
+
