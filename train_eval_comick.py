@@ -2,7 +2,6 @@ import os
 import argparse
 import logging
 import pickle
-
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
@@ -95,8 +94,8 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         logging.info('Using GPU')
 
     # Load dataset
-    dataset = task_config['dataset'](False, relative_path='./data/')
-
+    dataset = task_config['dataset'](debug_mode, relative_path='./data/')
+    
     all_sentences = dataset.get_train_sentences + dataset.get_valid_sentences + dataset.get_test_sentences
 
     word_embeddings = load_embeddings('./data/glove_embeddings/glove.6B.{}d.txt'.format(d))
@@ -171,18 +170,22 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     #     model_name=model_name + '.txt'
     # )
 
-    if not debug_mode:
-        intrinsic_results = Evaluator(model,
-                                      test_loader,
-                                      idx_to_word={v: k for k, v in word_to_idx.items()},
-                                      idx_to_char={v: k for k, v in char_to_idx.items()},
-                                      word_embeddings=word_embeddings)
-        for k, v in intrinsic_results.global_results.items():
-            logging.info("{} {}".format(k, v))
-        pickle.dump(intrinsic_results, open('./evaluation/intrinsic_{}.pkl'.format(model_name), 'wb'))
+    intrinsic_results = Evaluator(model,
+                                  test_loader,
+                                  idx_to_word={v: k for k, v in word_to_idx.items()},
+                                  idx_to_char={v: k for k, v in char_to_idx.items()},
+                                  word_embeddings=word_embeddings)
+    for k, v in intrinsic_results.global_results:
+        logging.info("{} {}".format(k, v))
+    
+    results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
+    os.makedirs(results_pathfile, exist_ok=True)
+    pickle.dump(intrinsic_results, open(results_pathfile, 'wb'))
+    
+    oov_results = Evaluator(model, oov_loader)
+    predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
+    # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
-    predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
-    oov_words = set(predicted_oov_embeddings.keys())
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
     # logging.info("Evaluating embeddings...")
@@ -240,7 +243,6 @@ def get_tasks_configs():
 
 if __name__ == '__main__':
     from time import time
-
     seed = 42
     torch.manual_seed(seed)
     np.random.seed(seed)
