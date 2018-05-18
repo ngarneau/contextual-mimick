@@ -405,14 +405,15 @@ class ComickDev(Module):
 
 class Mimick(Module):
     """
-    This is the Mimick architecture.
+    This is Pinter's Mimick architecture.
     """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  characters_embedding_dimension=20,
-                 word_embeddings_dimension=128,
-                 fc_dropout_p=0.5,
+                 word_embeddings_dimension=100,
+                 hidden_state_dimension=128,
+                 fc_dropout_p=0,
                  comick_compatibility=True
                  ):
         super().__init__()
@@ -423,11 +424,11 @@ class Mimick(Module):
         self.mimick_lstm = MultiLSTM(
             num_embeddings=len(self.characters_vocabulary),
             embedding_dim=characters_embedding_dimension,
-            hidden_state_dim=word_embeddings_dimension
+            hidden_state_dim=hidden_state_dimension
         )
 
         self.fc_word = nn.Linear(
-            in_features=2 * word_embeddings_dimension,
+            in_features=2*hidden_state_dimension,
             out_features=word_embeddings_dimension
         )
         kaiming_uniform(self.fc_word.weight)

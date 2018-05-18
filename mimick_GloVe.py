@@ -73,14 +73,14 @@ def collate_x(batch):
     return padded_x, y
 
 
-def predict_OOV(model, char_to_idx, OOV_path, filename):
-    OOVs = load_vocab(OOV_path)
+def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu):
+    OOVs = sorted(load_vocab(OOV_path))
 
     vectorizer = Vectorizer(char_to_idx)
     examples = [(vectorizer.vectorize_sequence(word), word) for word in OOVs]
     loader = DataLoader(examples,
                         collate_fn=collate_x,
-                        use_gpu=False,
+                        use_gpu=use_gpu,
                         batch_size=1)
 
     model.model.eval()
@@ -185,7 +185,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
+def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=20, debug_mode=False):
     # Global parameters
     debug_mode = debug_mode
     verbose = True
@@ -199,7 +199,7 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
     logging.info("Verbose: {}".format(verbose))
 
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -251,7 +251,7 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
 
     for dataset in ['conll', 'scienceie', 'sentiment']:
         path = './data/'+dataset+'/oov.txt'
-        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt')
+        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt', use_gpu)
 
 
 if __name__ == '__main__':
