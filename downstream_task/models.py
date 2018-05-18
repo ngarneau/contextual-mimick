@@ -47,7 +47,7 @@ class LSTMSequence(Module):
         self.oov_words = oov_words
         self.comick = comick
         if freeze_comick:
-            for p in self.comick.parameters():
+            for p in self.comick.parameters(requires_grad_only=False):
                 p.requires_grad = False
 
         self.word_embeddings = nn.Embedding(self.words_vocabulary_size, words_embedding_dimension)
