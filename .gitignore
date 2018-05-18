@@ -103,6 +103,7 @@ ENV/
 .idea/
 
 predicted_embeddings/
+mimick_oov_predicted_embeddings/
 
 models/
 

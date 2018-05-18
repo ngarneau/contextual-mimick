@@ -32,14 +32,14 @@ def collate_x(batch):
     return padded_x, y
 
 
-def predict_OOV(model, char_to_idx, OOV_path, filename):
-    OOVs = load_vocab(OOV_path)
+def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu, filepath='./mimick_oov_predicted_embeddings/'):
+    OOVs = sorted(load_vocab(OOV_path))
 
     vectorizer = Vectorizer(char_to_idx)
     examples = [(vectorizer.vectorize_sequence(word), word) for word in OOVs]
     loader = DataLoader(examples,
                         collate_fn=collate_x,
-                        use_gpu=False,
+                        use_gpu=use_gpu,
                         batch_size=1)
 
     model.model.eval()
@@ -50,7 +50,7 @@ def predict_OOV(model, char_to_idx, OOV_path, filename):
         for label, embedding in zip(y, embeddings):
             predicted_embeddings[label] = embedding
             
-    save_embeddings(predicted_embeddings, filename)
+    save_embeddings(predicted_embeddings, filename, filepath)
 
 
 if __name__ == '__main__':
@@ -58,7 +58,6 @@ if __name__ == '__main__':
     d = 100
     c = 20
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
     verbose = False
     debug_mode = False
 
@@ -82,15 +81,14 @@ if __name__ == '__main__':
     else:
         map_location = lambda storage, loc: storage
 
-    model_name = 'mimick_glove_d{0}_c{1}'.format(d, c)
+    model_name = 'Pinter_mimick_glove_d{0}_c{1}'.format(d, c)
     model_path = './models/best_' + model_name + '.torch'
     print("Loading model from: " + model_path)
+    # Load the model
     net = Mimick(
         characters_vocabulary=char_to_idx,
         characters_embedding_dimension=c,
-        word_embeddings_dimension=d,
-        fc_dropout_p=0.5,
-        comick_compatibility=False,
+        comick_compatibility=False
     )
     net.load_state_dict(torch.load(model_path, map_location))
     model = Model(
@@ -99,14 +97,17 @@ if __name__ == '__main__':
         loss_function=square_distance,
         metrics=[cosine_sim],
     )
+    if use_gpu:
+        model.cuda()
     print('Done.')
 
     # Evaluation
     evaluate(model, test_loader)
 
-    # save_char_embeddings(model, char_to_idx, 'char_'+model_name)
+    save_char_embeddings(model, char_to_idx, 'char_'+model_name)
 
-    # for dataset in ['conll', 'semeval', 'sentiment']:
-    #     path = './data/'+dataset+'_embeddings_settings/setting1/glove/oov.txt'
-    #     predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt')
+    for dataset in ['conll', 'scienceie', 'sentiment']:
+        oov_path = './data/'+dataset+'/oov.txt'
+        filename = dataset+'_OOV_embeddings_'+model_name+'.txt'
+        predict_OOV(model, char_to_idx, oov_path, filename, use_gpu)
 

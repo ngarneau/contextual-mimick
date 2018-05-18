@@ -85,7 +85,7 @@ def make_vocab(sentences):
 
 def load_vocab(path):
     vocab = set()
-    with open(path, 'r') as fhandle:
+    with open(path, 'r', encoding='utf-8') as fhandle:
         for line in fhandle:
             vocab.add(line[:-1])
     return vocab

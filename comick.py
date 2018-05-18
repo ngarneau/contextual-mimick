@@ -457,13 +457,13 @@ class Mimick(Module):
 class TheFinalComick(Mimick):
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
-                 characters_embedding_dimension=20,
-                 char_hidden_state_dimension=128,
-                 char_embeddings=None,
                  words_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
                  word_embeddings_dimension=100,
+                 char_hidden_state_dimension=128,
                  word_hidden_state_dimension=128,
-                 word_embeddings=None)
+                 char_embeddings=None,
+                 word_embeddings=None):
         super().__init__(characters_vocabulary=characters_vocabulary,
                          characters_embedding_dimension=characters_embedding_dimension,
                          word_embeddings_dimension=word_embeddings_dimension,

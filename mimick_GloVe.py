@@ -73,7 +73,7 @@ def collate_x(batch):
     return padded_x, y
 
 
-def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu):
+def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu, filepath='./mimick_oov_predicted_embeddings/'):
     OOVs = sorted(load_vocab(OOV_path))
 
     vectorizer = Vectorizer(char_to_idx)
@@ -91,7 +91,7 @@ def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu):
         for label, embedding in zip(y, embeddings):
             predicted_embeddings[label] = embedding
 
-    save_embeddings(predicted_embeddings, filename)
+    save_embeddings(predicted_embeddings, filename, filepath)
 
 
 def evaluate(model, test_loader):
