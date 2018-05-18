@@ -11,11 +11,17 @@ class Module(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def parameters(self):
+    def parameters(self, requires_grad_only=True):
         """
         Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
         """
-        return (param for param in super().parameters() if param.requires_grad)
+        def filter_cond(
+            param): return param.requires_grad if requires_grad_only else True
+        return (param for param in super().parameters() if filter_cond(param))
+
+    def reset_requires_grad_to_true(self):
+        for param in super().parameters():
+            param.requires_grad = True
 
 
 class MultiLSTM(Module):
