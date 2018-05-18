@@ -127,5 +127,5 @@ class SemEval(DatasetManager):
 
 
 if __name__ == '__main__':
-    c = Sentiment(debug_mode=True)
+    c = CoNLL(debug_mode=True)
     print(c.get_valid_sentences)

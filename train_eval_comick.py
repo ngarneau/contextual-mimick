@@ -116,7 +116,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = LRComickContextOnly(
+    net = ComickDev(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
@@ -179,13 +179,14 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     for k, v in intrinsic_results.global_results.items():
         logging.info("{} {}".format(k, v))
     
-    results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
+    results_pathfile = './evaluation/intrinsic/'
+    fname = 'intrinsic_{}.pkl'.format(model_name)
     os.makedirs(results_pathfile, exist_ok=True)
-    pickle.dump(intrinsic_results, open(results_pathfile, 'wb'))
+    pickle.dump(intrinsic_results, open(results_pathfile + fname, 'wb'))
     
-    oov_results = Evaluator(model, oov_loader)
-    predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
-    # predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
+    # oov_results = Evaluator(model, oov_loader)
+    # predicted_oov_embeddings = oov_results.get_mean_predicted_embeddings()
+    predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
 
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
@@ -200,6 +201,16 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 
 def get_tasks_configs():
     return [
+        {
+            'name': 'sent',
+            'dataset': Sentiment,
+            'tasks': [
+                {
+                    'name': 'sent',
+                    'script': train_sent
+                },
+            ]
+        },
         {
             'name': 'conll',
             'dataset': CoNLL,
@@ -226,16 +237,6 @@ def get_tasks_configs():
                     'name': 'semeval',
                     'script': train_semeval
                 }
-            ]
-        },
-        {
-            'name': 'sent',
-            'dataset': Sentiment,
-            'tasks': [
-                {
-                    'name': 'sent',
-                    'script': train_sent
-                },
             ]
         },
     ]
@@ -265,7 +266,7 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for n in [5, 9, 15, 21, 41]:
+        for n in [5, 41]:
             for task_config in get_tasks_configs():
                 main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
     except:

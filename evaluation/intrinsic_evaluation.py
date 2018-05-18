@@ -177,7 +177,7 @@ class Evaluator:
 
         return sorted_list
     
-    def get_mean_predicted_embeddings():
+    def get_mean_predicted_embeddings(self):
         return {label: r['mean_of_pred_embed'] for label, r in self.results_per_labels.items()}
 
 class EmbeddingResult:
