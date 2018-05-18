@@ -204,8 +204,6 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
     net = Mimick(
         characters_vocabulary=char_to_idx,
         characters_embedding_dimension=char_embedding_dimension,
-        word_embeddings_dimension=d,
-        fc_dropout_p=0.5,
         comick_compatibility=False
     )
     model = Model(
@@ -251,7 +249,7 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
-        parser.add_argument("d", default=50, nargs='?')
+        parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         args = parser.parse_args()
         device = int(args.device)
@@ -260,7 +258,7 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for e in [100]:
+        for e in [60]:
             for i in range(1):
                 # Control of randomization
                 seed = 42 + i

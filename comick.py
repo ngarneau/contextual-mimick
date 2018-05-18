@@ -411,7 +411,7 @@ class Mimick(Module):
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  characters_embedding_dimension=20,
-                 word_embeddings_dimension=50,
+                 word_embeddings_dimension=128,
                  fc_dropout_p=0.5,
                  comick_compatibility=True
                  ):
@@ -444,7 +444,7 @@ class Mimick(Module):
         if self.comick_compatibility:
             _CL, x, _CR = x
         word_hidden_rep = self.fc_word(self.mimick_lstm(x))
-        output = self.dropout(word_hidden_rep)
+        output = word_hidden_rep
         output = F.tanh(output)
         output = self.fc_output(output)
         return output
