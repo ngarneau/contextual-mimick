@@ -67,7 +67,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     freeze_word_embeddings = True
@@ -120,11 +120,8 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
-        # characters_embeddings=chars_embeddings,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        # context_dropout_p=0.5,
-        # fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
     model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
@@ -202,16 +199,6 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 def get_tasks_configs():
     return [
         {
-            'name': 'sent',
-            'dataset': Sentiment,
-            'tasks': [
-                {
-                    'name': 'sent',
-                    'script': train_sent
-                },
-            ]
-        },
-        {
             'name': 'conll',
             'dataset': CoNLL,
             'tasks': [
@@ -226,6 +213,16 @@ def get_tasks_configs():
                 {
                     'name': 'chunk',
                     'script': train_chunk
+                },
+            ]
+        },
+        {
+            'name': 'sent',
+            'dataset': Sentiment,
+            'tasks': [
+                {
+                    'name': 'sent',
+                    'script': train_sent
                 },
             ]
         },
@@ -251,12 +248,14 @@ if __name__ == '__main__':
     t = time()
     try:
         parser = argparse.ArgumentParser()
+        parser.add_argument("n", default=5, nargs='?')
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
         parser.add_argument("e", default=100, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
+        n = int(args.n)
         k = int(args.k)
         device = int(args.device)
         d = int(args.d)
@@ -266,9 +265,8 @@ if __name__ == '__main__':
             raise ValueError(
                 "The embedding dimension 'd' should of 50, 100, 200 or 300.")
         logger = logging.getLogger()
-        for n in [5, 41]:
-            for task_config in get_tasks_configs():
-                main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
+        for task_config in get_tasks_configs():
+            main(task_config, n=n, k=k, device=device, d=d, epochs=epochs)
     except:
         logging.info('Execution stopped after {:.2f} seconds.'.format(time() - t))
         raise
