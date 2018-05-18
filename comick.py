@@ -11,11 +11,17 @@ class Module(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def parameters(self):
+    def parameters(self, requires_grad_only=True):
         """
         Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
         """
-        return (param for param in super().parameters() if param.requires_grad)
+        def filter_cond(
+            param): return param.requires_grad if requires_grad_only else True
+        return (param for param in super().parameters() if filter_cond(param))
+
+    def reset_requires_grad_to_true(self):
+        for param in super().parameters():
+            param.requires_grad = True
 
 
 class MultiLSTM(Module):
@@ -446,3 +452,52 @@ class Mimick(Module):
         output = F.tanh(output)
         output = self.fc_output(output)
         return output
+
+
+class TheFinalComick(Mimick):
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 char_hidden_state_dimension=128,
+                 char_embeddings=None,
+                 words_vocabulary: Dict[str, int],
+                 word_embeddings_dimension=100,
+                 word_hidden_state_dimension=128,
+                 word_embeddings=None)
+        super().__init__(characters_vocabulary=characters_vocabulary,
+                         characters_embedding_dimension=characters_embedding_dimension,
+                         word_embeddings_dimension=word_embeddings_dimension,
+                         hidden_state_dimension=char_hidden_state_dimension)
+        
+        self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
+                                   embedding_dim=word_embeddings_dimension,
+                                   hidden_state_dim=word_embeddings_dimension,
+                                   freeze_embeddings=freeze_word_embeddings,
+                                   dropout=0)
+
+        if word_embeddings != None:
+            self.load_words_embeddings(words_embeddings)
+        if char_embeddings != None:
+            self.load_chars_embeddings(char_embeddings)
+
+        self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
+                                     embedding_dim=characters_embedding_dimension,
+                                     hidden_state_dim=128)
+
+        self.fc_context = nn.Linear(in_features=2 * word_embeddings_dimension,
+                                    out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_context.weight)
+
+        self.fc_word = nn.Linear(in_features=2 * 128,
+                                 out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_word.weight)
+
+        self.fc1 = nn.Linear(in_features=2 * word_embeddings_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc1.weight)
+
+        self.fc2 = nn.Linear(in_features=word_embeddings_dimension,
+                             out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc2.weight)
+
+        self.dropout = nn.Dropout(p=fc_dropout_p)
