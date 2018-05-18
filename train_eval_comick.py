@@ -176,7 +176,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
                                   idx_to_word={v: k for k, v in word_to_idx.items()},
                                   idx_to_char={v: k for k, v in char_to_idx.items()},
                                   word_embeddings=word_embeddings)
-    for k, v in intrinsic_results.global_results:
+    for k, v in intrinsic_results.global_results.items():
         logging.info("{} {}".format(k, v))
     
     results_pathfile = './evaluation/intrinsic/intrinsic_{}.pkl'.format(model_name)
