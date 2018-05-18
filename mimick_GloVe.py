@@ -64,6 +64,52 @@ def collate_fn(batch):
     return (padded_x, torch.FloatTensor(np.array(y)))
 
 
+def collate_x(batch):
+    x, y = zip(*batch)
+
+    x_lengths = torch.LongTensor([len(item) for item in x])
+    padded_x = pad_sequences(x, x_lengths)
+
+    return padded_x, y
+
+
+def predict_OOV(model, char_to_idx, OOV_path, filename, use_gpu):
+    OOVs = sorted(load_vocab(OOV_path))
+
+    vectorizer = Vectorizer(char_to_idx)
+    examples = [(vectorizer.vectorize_sequence(word), word) for word in OOVs]
+    loader = DataLoader(examples,
+                        collate_fn=collate_x,
+                        use_gpu=use_gpu,
+                        batch_size=1)
+
+    model.model.eval()
+    predicted_embeddings = {}
+    for x, y in loader:
+        x = tensors_to_variables(x)
+        embeddings = torch_to_numpy(model.model(x))
+        for label, embedding in zip(y, embeddings):
+            predicted_embeddings[label] = embedding
+
+    save_embeddings(predicted_embeddings, filename)
+
+
+def evaluate(model, test_loader):
+    eucl_dist, [cos_sim] = model.evaluate_generator(test_loader)
+
+    logging.info('\nResults on the test:')
+    logging.info('Mean euclidean dist: {}'.format(eucl_dist))
+    logging.info('Mean cosine sim: {}'.format(cos_sim))
+
+
+def save_char_embeddings(model, char_to_idx, filename='mimick_char_embeddings'):
+    char_embeddings = {}
+    for char, idx in char_to_idx.items():
+        char_embeddings[char] = torch_to_numpy(
+            model.model.mimick_lstm.embeddings.weight.data[idx])
+    save_embeddings(char_embeddings, filename)
+
+
 def prepare_data(d,
                  split_ratios=[.8,.1,.1],
                  use_gpu=False,
@@ -139,31 +185,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
                         epochs=epochs, callbacks=callbacks)
 
 
-def evaluate(model, test_loader):
-    eucl_dist, [cos_sim] = model.evaluate_generator(test_loader)
-    # if save:
-    #     if model_name == None:
-    #         raise ValueError('A filename should be provided.')
-    #     save_embeddings(mean_pred_embeddings, model_name)
-
-    # print(eucl_dist, cos_sim)
-    logging.info('\nResults on the test:')
-    logging.info('Mean euclidean dist: {}'.format(eucl_dist))
-    # logging.info('Variance of euclidean dist: {}'.format(np.std(euclidean_distances)))
-    logging.info('Mean cosine sim: {}'.format(cos_sim))
-    # logging.info('Variance of cosine sim: {}'.format(np.std(cos_sims)))
-    # logging.info('Number of labels evaluated: {}'.format(nb_of_pred))
-    # return mean_pred_embeddings
-
-
-def save_char_embeddings(model, char_to_idx, filename='mimick_char_embeddings'):
-    char_embeddings = {}
-    for char, idx in char_to_idx.items():
-        char_embeddings[char] = torch_to_numpy(model.model.mimick_lstm.embeddings.weight.data[idx])
-    save_embeddings(char_embeddings, filename)
-
-
-def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, debug_mode=True):
+def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=20, debug_mode=False):
     # Global parameters
     debug_mode = debug_mode
     verbose = True
@@ -177,7 +199,7 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
     logging.info("Verbose: {}".format(verbose))
 
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
+    # use_gpu = False
     if use_gpu:
         cuda_device = device
         torch.cuda.set_device(cuda_device)
@@ -227,21 +249,10 @@ def main(model_name, device=0, d=100, epochs=100, char_embedding_dimension=16, d
 
     save_char_embeddings(model, char_to_idx, 'char_'+model_name)
 
-    # for dataset, OOV_path in [('conll', './data/conll/all_oov.txt')]:
-    #     predict_OOV(model, char_to_idx, OOV_path, dataset+'_OOV_embeddings_'+model_name)
+    for dataset in ['conll', 'scienceie', 'sentiment']:
+        path = './data/'+dataset+'/oov.txt'
+        predict_OOV(model, char_to_idx, path, dataset+'_OOV_embeddings_'+model_name+'.txt', use_gpu)
 
-    # predicted_evaluation_embeddings = evaluate(
-    #     model,
-    #     test_loader=test_loader,
-    #     test_embeddings=test_embeddings,
-    #     save=save,
-    #     model_name=model_name + '.txt'
-    # )
-
-    # Override embeddings with the training ones
-    # Make sure we only have embeddings from the corpus data
-    # logging.info("Evaluating embeddings...")
-    # predicted_evaluation_embeddings.update(embeddings)
 
 if __name__ == '__main__':
     from time import time
