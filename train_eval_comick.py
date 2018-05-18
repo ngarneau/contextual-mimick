@@ -188,7 +188,14 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     predicted_oov_embeddings.update(word_embeddings)
 
     model_state_path = "{}last_{}.torch".format(model_path, model_name)
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        map_location = lambda storage, loc: storage.cuda(device)
+    else:
+        map_location = lambda storage, loc: storage
     for task in task_config['tasks']:
+        logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
+        net.load_state_dict(torch.load(model_state_path, map_location))
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
         task['script'](net, model_state_path, n, oov_words, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
@@ -251,7 +258,7 @@ if __name__ == '__main__':
         parser.add_argument("k", default=2, nargs='?')
         parser.add_argument("device", default=0, nargs='?')
         parser.add_argument("d", default=100, nargs='?')
-        parser.add_argument("e", default=100, nargs='?')
+        parser.add_argument("e", default=1, nargs='?')
         parser.add_argument("t", default='ner', nargs='?')
         args = parser.parse_args()
         n = int(args.n)
