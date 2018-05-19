@@ -115,15 +115,12 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = LRComick(
+    net = ComickDev(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
-        # characters_embeddings=chars_embeddings,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        # context_dropout_p=0.5,
-        # fc_dropout_p=0.5,
         freeze_word_embeddings=freeze_word_embeddings
     )
     model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)

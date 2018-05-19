@@ -364,13 +364,13 @@ class ComickDev(Module):
 
         self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
                                      embedding_dim=characters_embedding_dimension,
-                                     hidden_state_dim=word_embeddings_dimension)
+                                     hidden_state_dim=128)
 
         self.fc_context = nn.Linear(in_features=2 * word_embeddings_dimension,
                                     out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context.weight)
 
-        self.fc_word = nn.Linear(in_features=2 * word_embeddings_dimension,
+        self.fc_word = nn.Linear(in_features=2 * 128,
                                  out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_word.weight)
 

@@ -21,7 +21,7 @@ def make_vocab_and_idx(sequences):
 
 
 def train_with_comick(train_func, model, model_state_path, n, oov_words, model_name='vanilla', device=0, debug=False):
-    for i in range(10):
+    for i in range(5):
         # Control of randomization
         model_name = '{}_i{}'.format(model_name, i)
         seed = 42 + i
