@@ -11,11 +11,16 @@ class Module(nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def parameters(self):
+    def parameters(self, requires_grad_only=True):
         """
         Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
         """
-        return (param for param in super().parameters() if param.requires_grad)
+        filter_cond = lambda param: param.requires_grad if requires_grad_only else True
+        return (param for param in super().parameters() if filter_cond(param))
+    
+    def reset_requires_grad_to_true(self):
+        for param in super().parameters():
+            param.requires_grad = True
 
 
 class LSTMSequence(Module):
@@ -28,7 +33,8 @@ class LSTMSequence(Module):
             comick,
             oov_words,
             n,
-            use_cuda=False
+            use_cuda=False,
+            freeze_comick=False
     ):
         super(LSTMSequence, self).__init__()
         self.n_gram = n
@@ -40,8 +46,9 @@ class LSTMSequence(Module):
         self.idx_to_word = {i: word for word, i in self.words_vocabulary.items()}
         self.oov_words = oov_words
         self.comick = comick
-        for p in self.comick.parameters():
-            p.requires_grad = True
+        if freeze_comick:
+            for p in self.comick.parameters(requires_grad_only=False):
+                p.requires_grad = False
 
         self.word_embeddings = nn.Embedding(self.words_vocabulary_size, words_embedding_dimension)
         self.word_lstm = nn.LSTM(
