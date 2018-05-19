@@ -509,13 +509,10 @@ class TheFinalComick(Mimick, Module):
 
         word_hidden_rep = self.mimick_lstm(word)
         word_rep = F.tanh(self.fc_word(word_hidden_rep))
-        print('shape word_rep', word_rep.shape)
 
         left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
         left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
         right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
-        print('shape left_context_rep', left_context_rep.shape)
-        print('shape left_ponderation', self.left_ponderation.weight.shape)
 
         output = word_rep + self.left_ponderation.weight*left_context_rep + self.right_ponderation.weight*right_context_rep
         output = self.fc_output(output)
