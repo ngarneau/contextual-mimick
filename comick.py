@@ -454,7 +454,7 @@ class Mimick(Module):
         return output
 
 
-class TheFinalComick(Mimick):
+class TheFinalComick(Mimick, Module):
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -463,11 +463,15 @@ class TheFinalComick(Mimick):
                  char_hidden_state_dimension=128,
                  word_hidden_state_dimension=128,
                  char_embeddings=None,
-                 word_embeddings=None):
+                 words_embeddings=None,
+                 freeze_word_embeddings=True):
         super().__init__(characters_vocabulary=characters_vocabulary,
                          characters_embedding_dimension=characters_embedding_dimension,
                          word_embeddings_dimension=word_embeddings_dimension,
                          hidden_state_dimension=char_hidden_state_dimension)
+        self.words_vocabulary = words_vocabulary
+        self.characters_vocabulary = characters_vocabulary
+        self.version = 1.0
         
         self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
                                    embedding_dim=word_embeddings_dimension,
@@ -475,29 +479,42 @@ class TheFinalComick(Mimick):
                                    freeze_embeddings=freeze_word_embeddings,
                                    dropout=0)
 
-        if word_embeddings != None:
+        if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
-        if char_embeddings != None:
-            self.load_chars_embeddings(char_embeddings)
+        # if char_embeddings != None:
+        #     self.load_chars_embeddings(char_embeddings)
 
-        self.mimick_lstm = MultiLSTM(num_embeddings=len(self.characters_vocabulary),
-                                     embedding_dim=characters_embedding_dimension,
-                                     hidden_state_dim=128)
+        self.fc_context_left = nn.Linear(in_features=2 * word_embeddings_dimension,
+                                         out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_context_left.weight)
 
-        self.fc_context = nn.Linear(in_features=2 * word_embeddings_dimension,
-                                    out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc_context.weight)
+        self.fc_context_right = nn.Linear(in_features=2 * word_embeddings_dimension,
+                                          out_features=word_embeddings_dimension)
+        kaiming_uniform(self.fc_context_right.weight)
 
-        self.fc_word = nn.Linear(in_features=2 * 128,
-                                 out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc_word.weight)
+        self.left_ponderation = nn.Linear(in_features=1, out_features=word_embeddings_dimension)
+        constant(self.left_ponderation.weight, 0.25)
 
-        self.fc1 = nn.Linear(in_features=2 * word_embeddings_dimension,
-                             out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc1.weight)
+        self.right_ponderation = nn.Linear(in_features=1, out_features=word_embeddings_dimension)
+        constant(self.right_ponderation.weight, 0.25)
 
-        self.fc2 = nn.Linear(in_features=word_embeddings_dimension,
-                             out_features=word_embeddings_dimension)
-        kaiming_uniform(self.fc2.weight)
+    def load_words_embeddings(self, words_embeddings):
+        for word, embedding in words_embeddings.items():
+            if word in self.words_vocabulary:
+                idx = self.words_vocabulary[word]
+                self.contexts.set_item_embedding(idx, embedding)
 
-        self.dropout = nn.Dropout(p=fc_dropout_p)
+    def forward(self, x):
+        left_context, word, right_context = x
+
+        word_hidden_rep = self.mimick_lstm(word)
+        word_rep = F.tanh(self.fc_word(word_hidden_rep))
+
+        left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
+        left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
+        right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
+
+        output = word_rep + self.left_ponderation*left_context_rep + self.right_ponderation*right_context_rep
+        output = self.fc_output(output)
+
+        return output

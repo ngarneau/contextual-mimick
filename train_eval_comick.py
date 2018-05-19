@@ -17,7 +17,7 @@ from data_preparation import prepare_data
 from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings, Evaluator
 from per_class_dataset import *
 
-from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly
+from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly, TheFinalComick
 
 from utils import load_embeddings
 from utils import square_distance, cosine_sim
@@ -67,7 +67,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     # Global parameters
-    debug_mode = False
+    debug_mode = True
     verbose = True
     save = True
     freeze_word_embeddings = True
@@ -116,7 +116,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = TheFinalComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
