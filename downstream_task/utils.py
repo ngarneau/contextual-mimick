@@ -21,6 +21,11 @@ def make_vocab_and_idx(sequences):
 
 
 def train_with_comick(train_func, model, model_state_path, n, oov_words, model_name='vanilla', device=0, debug=False):
+    use_gpu = torch.cuda.is_available()
+    if use_gpu:
+        map_location = lambda storage, loc: storage.cuda(device)
+    else:
+        map_location = lambda storage, loc: storage
     for i in range(5):
         # Control of randomization
         model_name = '{}_i{}'.format(model_name, i)
@@ -28,8 +33,8 @@ def train_with_comick(train_func, model, model_state_path, n, oov_words, model_n
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        # logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
-        # model.load_state_dict(torch.load(model_state_path, map_location))
+        logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
+        model.load_state_dict(torch.load(model_state_path, map_location))
         train_func(model, n, oov_words, model_name, device, debug)
 
 

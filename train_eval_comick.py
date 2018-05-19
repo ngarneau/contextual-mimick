@@ -191,8 +191,8 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     else:
         map_location = lambda storage, loc: storage
     for task in task_config['tasks']:
-        logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
-        net.load_state_dict(torch.load(model_state_path, map_location))
+        # logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
+        # net.load_state_dict(torch.load(model_state_path, map_location))
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
         task['script'](net, model_state_path, n, oov_words, task['name'] + "_" + model_name, device, debug_mode)
     logger.removeHandler(handler)
