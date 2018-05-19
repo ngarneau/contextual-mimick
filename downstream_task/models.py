@@ -139,7 +139,8 @@ class LSTMTagger(LSTMSequence):
             comick,
             oov_words,
             n,
-            use_cuda=False
+            use_cuda=False,
+            freeze_comick=False
     ):
         super(LSTMTagger, self).__init__(
             words_embedding_dimension,
@@ -149,7 +150,8 @@ class LSTMTagger(LSTMSequence):
             comick,
             oov_words,
             n,
-            use_cuda
+            use_cuda,
+            freeze_comick
         )
 
     def forward(self, sentence):
@@ -189,7 +191,8 @@ class LSTMClassifier(LSTMSequence):
             comick,
             oov_words,
             n,
-            use_cuda=False
+            use_cuda=False,
+            freeze_comick=False
     ):
         super(LSTMClassifier, self).__init__(
             words_embedding_dimension,
@@ -199,7 +202,8 @@ class LSTMClassifier(LSTMSequence):
             comick,
             oov_words,
             n,
-            use_cuda
+            use_cuda,
+            freeze_comick
         )
         self.dropout = nn.Dropout(0.5)
 

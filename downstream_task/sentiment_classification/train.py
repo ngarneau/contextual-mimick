@@ -96,7 +96,8 @@ def launch_train(model, n, oov_words, model_name, device, debug):
         model,
         oov_words,
         n,
-        use_gpu
+        use_gpu,
+        freeze_comick=True
     )
     net.load_words_embeddings(embeddings)
     if use_gpu:
