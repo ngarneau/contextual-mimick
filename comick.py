@@ -3,6 +3,7 @@ from torch import nn, autograd
 from torch.nn import functional as F
 from torch.nn.init import kaiming_uniform, constant
 from torch.nn.utils.rnn import pack_padded_sequence
+import logging
 
 from typing import Dict
 
@@ -417,6 +418,7 @@ class Mimick(Module):
                  word_embeddings_dimension=100,
                  hidden_state_dimension=128,
                  fc_dropout_p=0,
+                 lstm_dropout=0,
                  comick_compatibility=True
                  ):
         super().__init__()
@@ -427,7 +429,8 @@ class Mimick(Module):
         self.mimick_lstm = MultiLSTM(
             num_embeddings=len(self.characters_vocabulary),
             embedding_dim=characters_embedding_dimension,
-            hidden_state_dim=hidden_state_dimension
+            hidden_state_dim=hidden_state_dimension,
+            dropout=lstm_dropout,
         )
 
         self.fc_word = nn.Linear(
@@ -454,7 +457,7 @@ class Mimick(Module):
         return output
 
 
-class TheFinalComick(Mimick, Module):
+class TheFinalComick(Module):
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  words_vocabulary: Dict[str, int],
@@ -462,41 +465,77 @@ class TheFinalComick(Mimick, Module):
                  word_embeddings_dimension=100,
                  char_hidden_state_dimension=128,
                  word_hidden_state_dimension=128,
-                 char_embeddings=None,
+                 chars_embeddings=None,
                  words_embeddings=None,
-                 freeze_word_embeddings=True):
-        super().__init__(characters_vocabulary=characters_vocabulary,
-                         characters_embedding_dimension=characters_embedding_dimension,
-                         word_embeddings_dimension=word_embeddings_dimension,
-                         hidden_state_dimension=char_hidden_state_dimension)
+                 lstm_dropout=.3,
+                 freeze_word_embeddings=True,
+                 freeze_mimick=False,
+                 mimick_model_path='',
+                 use_gpu=False):
+        super().__init__()
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
-        self.version = 1.0
+        self.version = 3.0
         
+        self.mimick = Mimick(characters_vocabulary=characters_vocabulary,
+                             characters_embedding_dimension=characters_embedding_dimension,
+                             word_embeddings_dimension=word_embeddings_dimension,
+                             hidden_state_dimension=char_hidden_state_dimension,
+                             lstm_dropout=0.5)
+        if mimick_model_path != '':
+            self.load_mimick(mimick_model_path, use_gpu)
+        if chars_embeddings != None:
+            self.load_chars_embeddings(chars_embeddings)
+        if freeze_mimick:
+            self.freeze_mimick()
+            logging.info('Freezing Mimick')
+
         self.contexts = MirrorLSTM(num_embeddings=len(self.words_vocabulary),
                                    embedding_dim=word_embeddings_dimension,
                                    hidden_state_dim=word_embeddings_dimension,
                                    freeze_embeddings=freeze_word_embeddings,
-                                   dropout=0)
+                                   dropout=0.3)
 
         if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
-        # if char_embeddings != None:
-        #     self.load_chars_embeddings(char_embeddings)
 
-        self.fc_context_left = nn.Linear(in_features=2 * word_embeddings_dimension,
+        self.fc_context_left = nn.Linear(in_features=2*word_embeddings_dimension,
                                          out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context_left.weight)
 
-        self.fc_context_right = nn.Linear(in_features=2 * word_embeddings_dimension,
+        self.fc_context_right = nn.Linear(in_features=2*word_embeddings_dimension,
                                           out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context_right.weight)
 
-        self.left_ponderation = nn.Linear(in_features=word_embeddings_dimension, out_features=1)
+        self.left_ponderation = nn.Linear(in_features=word_embeddings_dimension,
+                                          out_features=1)
         constant(self.left_ponderation.weight, 0.25)
 
-        self.right_ponderation = nn.Linear(in_features=word_embeddings_dimension, out_features=1)
+        self.right_ponderation = nn.Linear(in_features=word_embeddings_dimension,
+                                           out_features=1)
         constant(self.right_ponderation.weight, 0.25)
+
+    def load_mimick(self, model_path, use_gpu):
+        if use_gpu:
+            map_location = lambda storage, loc: storage.cuda(0)
+        else:
+            map_location = lambda storage, loc: storage
+        state_dict = torch.load(model_path, map_location)
+        # Make sure the dimensions fit
+        state_dict['mimick_lstm.embeddings.weight'] = self.mimick.mimick_lstm.embeddings.weight
+        self.mimick.load_state_dict(state_dict)
+
+    def load_chars_embeddings(self, chars_embeddings):
+        for word, embedding in chars_embeddings.items():
+            if word in self.characters_vocabulary:
+                idx = self.characters_vocabulary[word]
+                self.mimick.mimick_lstm.set_item_embedding(idx, embedding)
+
+    def freeze_mimick(self):
+        for param in self.mimick.parameters():
+            param.requires_grad = False
+        self.mimick.fc_output.weight.requires_grad = True
+        self.mimick.fc_output.bias.requires_grad = True
 
     def load_words_embeddings(self, words_embeddings):
         for word, embedding in words_embeddings.items():
@@ -507,14 +546,14 @@ class TheFinalComick(Mimick, Module):
     def forward(self, x):
         left_context, word, right_context = x
 
-        word_hidden_rep = self.mimick_lstm(word)
-        word_rep = F.tanh(self.fc_word(word_hidden_rep))
+        word_hidden_rep = self.mimick.mimick_lstm(word)
+        word_rep = F.tanh(self.mimick.fc_word(word_hidden_rep))
 
         left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
         left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
         right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
         output = word_rep + self.left_ponderation.weight*left_context_rep + self.right_ponderation.weight*right_context_rep
-        output = self.fc_output(output)
+        output = self.mimick.fc_output(output)
 
         return output

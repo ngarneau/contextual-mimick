@@ -122,7 +122,12 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        freeze_word_embeddings=freeze_word_embeddings
+        chars_embeddings=chars_embeddings,
+        freeze_word_embeddings=freeze_word_embeddings,
+        freeze_mimick=True,
+        mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
+        use_gpu=use_gpu,
+        lstm_dropout=0
     )
     model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
     handler = logging.FileHandler('{}.log'.format(model_name))
