@@ -135,7 +135,7 @@ def train(embeddings, model_name='vanilla', device=0, debug=False):
 
 
 def train_mimick(embeddings, device=0, debug=False):
-    previous_mimick_embeddings = load_embeddings('./mimick_oov_predicted_embeddings/semeval_OOV_embeddings_mimick_glove_d100_c20.txt')
+    previous_mimick_embeddings = load_embeddings('./mimick_oov_predicted_embeddings/semeval_OOV_embeddings_Pinter_mimick_glove_d100_c20.txt')
     embeddings.update(previous_mimick_embeddings)
     model_name = 'mimick'
     train(embeddings, model_name, device, debug)
