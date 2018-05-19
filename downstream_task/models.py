@@ -17,7 +17,14 @@ class Module(nn.Module):
         """
         filter_cond = lambda param: param.requires_grad if requires_grad_only else True
         return (param for param in super().parameters() if filter_cond(param))
-    
+
+    def named_parameters(self, memo=None, prefix='', requires_grad_only=True):
+        """
+        Overloads the parameters iterator function so only variable 'requires_grad' set to True are iterated over.
+        """
+        filter_cond = lambda param: param.requires_grad if requires_grad_only else True
+        return ((name, param) for (name, param) in super().named_parameters() if filter_cond(param))
+
     def reset_requires_grad_to_true(self):
         for param in super().parameters():
             param.requires_grad = True

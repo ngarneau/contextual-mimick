@@ -201,24 +201,6 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 def get_tasks_configs():
     return [
         {
-            'name': 'conll',
-            'dataset': CoNLL,
-            'tasks': [
-                {
-                    'name': 'ner',
-                    'script': train_ner
-                },
-                {
-                    'name': 'pos',
-                    'script': train_pos
-                },
-                {
-                    'name': 'chunk',
-                    'script': train_chunk
-                },
-            ]
-        },
-        {
             'name': 'semeval',
             'dataset': SemEval,
             'tasks': [
@@ -235,6 +217,24 @@ def get_tasks_configs():
                 {
                     'name': 'sent',
                     'script': train_sent
+                },
+            ]
+        },
+        {
+            'name': 'conll',
+            'dataset': CoNLL,
+            'tasks': [
+                {
+                    'name': 'ner',
+                    'script': train_ner
+                },
+                {
+                    'name': 'pos',
+                    'script': train_pos
+                },
+                {
+                    'name': 'chunk',
+                    'script': train_chunk
                 },
             ]
         },
