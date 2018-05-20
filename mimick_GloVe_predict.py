@@ -58,7 +58,6 @@ if __name__ == '__main__':
     d = 100
     c = 20
     use_gpu = torch.cuda.is_available()
-    use_gpu = False
     verbose = False
     debug_mode = False
 

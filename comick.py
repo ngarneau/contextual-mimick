@@ -411,15 +411,18 @@ class ComickDev(Module):
 
 class Mimick(Module):
     """
-    This is the Mimick architecture.
+    This is Pinter's Mimick architecture.
     """
 
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
                  characters_embedding_dimension=20,
-                 word_embeddings_dimension=50,
-                 fc_dropout_p=0.5,
-                 comick_compatibility=True
+                 word_embeddings_dimension=100,
+                 hidden_state_dimension=128,
+                 fc_dropout_p=0,
+                 lstm_dropout=0,
+                 comick_compatibility=True,
+                 freeze_embeddings=False
                  ):
         super().__init__()
         self.version = 1.0
@@ -429,11 +432,13 @@ class Mimick(Module):
         self.mimick_lstm = MultiLSTM(
             num_embeddings=len(self.characters_vocabulary),
             embedding_dim=characters_embedding_dimension,
-            hidden_state_dim=word_embeddings_dimension
+            hidden_state_dim=hidden_state_dimension,
+            dropout=lstm_dropout,
+            freeze_embeddings=freeze_embeddings
         )
 
         self.fc_word = nn.Linear(
-            in_features=2 * word_embeddings_dimension,
+            in_features=2*hidden_state_dimension,
             out_features=word_embeddings_dimension
         )
         kaiming_uniform(self.fc_word.weight)
@@ -446,11 +451,28 @@ class Mimick(Module):
 
         self.dropout = nn.Dropout(p=fc_dropout_p)
 
+    def load_mimick(self, model_path, use_gpu):
+        if use_gpu:
+            map_location = lambda storage, loc: storage.cuda(0)
+        else:
+            map_location = lambda storage, loc: storage
+        state_dict = torch.load(model_path, map_location)
+        # Make sure the dimensions fit
+        state_dict['mimick_lstm.embeddings.weight'] = self.mimick_lstm.embeddings.weight
+        self.load_state_dict(state_dict)
+
+    def load_chars_embeddings(self, chars_embeddings):
+        for word, embedding in chars_embeddings.items():
+            if word in self.characters_vocabulary:
+                idx = self.characters_vocabulary[word]
+                self.mimick_lstm.set_item_embedding(idx, embedding)
+
     def forward(self, x):
         if self.comick_compatibility:
             _CL, x, _CR = x
         word_hidden_rep = self.fc_word(self.mimick_lstm(x))
-        output = self.dropout(word_hidden_rep)
+        output = word_hidden_rep
         output = F.tanh(output)
         output = self.fc_output(output)
         return output
+

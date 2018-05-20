@@ -5,10 +5,11 @@ from sklearn.model_selection import train_test_split
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 
+from comick import Mimick
 from downstream_task.models import LSTMTagger
 from downstream_task.sequence_tagging import sequence_cross_entropy, acc, collate_examples, make_vocab_and_idx
-from downstream_task.utils import train_with_comick, train_without_comick
-from utils import load_embeddings
+from downstream_task.utils import train_with_comick, train_without_comick, make_idx, refresh_mimick
+from utils import load_embeddings, load_vocab
 import torch
 import numpy as np
 import random
@@ -45,8 +46,8 @@ def launch_train(model, n, oov_words, model_name, device, debug):
 
     embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
 
-    # words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
-    words_to_idx = model.words_vocabulary
+    words_vocab, words_to_idx = make_vocab_and_idx(train_sentences + valid_sentences + test_sentences)
+    # words_to_idx = model.words_vocabulary
     tags_vocab, tags_to_idx = make_vocab_and_idx(train_tags + valid_tags + test_tags)
 
     train_sentences = [[words_to_idx[word] for word in sentence] for sentence in train_sentences]
@@ -135,6 +136,17 @@ def train(model, model_state_path, n, oov_words, model_name='vanilla', device=0,
     train_with_comick(launch_train, model, model_state_path, n, oov_words, model_name, device, debug)
 
 
+def train_mimick_on_the_fly(device=0, debug=False):
+    oov_words = load_vocab('./data/conll/oov.txt')
+    model_state_path = './models/best_Pinter_mimick_glove_d100_c20.torch'
+    characters_embeddings = load_embeddings('./predicted_char_embeddings/char_Pinter_mimick_glove_d100_c20')
+    characters_vocab = make_idx(set(characters_embeddings.keys()))
+    mimick = Mimick(characters_vocabulary=characters_vocab, lstm_dropout=0.5, freeze_embeddings=True)
+    mimick.load_chars_embeddings(characters_embeddings)
+    model_name = 'mimick_on_the_fly'
+    train_with_comick(launch_train, mimick, model_state_path, refresh_mimick, 5, oov_words, model_name, device, debug)
+
+
 def train_mimick(embeddings, device=0, debug=False):
     previous_mimick_embeddings = load_embeddings('./mimick_oov_predicted_embeddings/conll_OOV_embeddings_mimick_glove_d100_c20.txt')
     embeddings.update(previous_mimick_embeddings)
@@ -156,4 +168,4 @@ def train_baseline(embeddings, device=0, debug=False):
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     embeddings = load_embeddings('./data/glove_embeddings/glove.6B.100d.txt')
-    train_mimick(embeddings)
+    train_mimick_on_the_fly(device=0)

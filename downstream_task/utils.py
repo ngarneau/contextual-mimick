@@ -20,12 +20,26 @@ def make_vocab_and_idx(sequences):
     return words_vocab, words_to_idx
 
 
-def train_with_comick(train_func, model, model_state_path, n, oov_words, model_name='vanilla', device=0, debug=False):
+def get_map_location(device):
     use_gpu = torch.cuda.is_available()
     if use_gpu:
         map_location = lambda storage, loc: storage.cuda(device)
     else:
         map_location = lambda storage, loc: storage
+    return map_location
+
+
+def refresh_mimick(model, model_state_path):
+    use_gpu = torch.cuda.is_available()
+    model.load_mimick(model_state_path, use_gpu)
+
+
+def refresh_comick(model, model_state_path, device=0):
+    model.load_state_dict(torch.load(model_state_path, get_map_location(device)))
+
+
+def train_with_comick(train_func, model, model_state_path, refresh_func, n, oov_words, model_name='vanilla', device=0,
+                      debug=False):
     for i in range(5):
         # Control of randomization
         model_name = '{}_i{}'.format(model_name, i)
@@ -33,8 +47,8 @@ def train_with_comick(train_func, model, model_state_path, n, oov_words, model_n
         torch.manual_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
-        model.load_state_dict(torch.load(model_state_path, map_location))
+        logging.info('Reloading fresh Model with {} weights'.format(model_state_path))
+        refresh_func(model, model_state_path)
         train_func(model, n, oov_words, model_name, device, debug)
 
 
