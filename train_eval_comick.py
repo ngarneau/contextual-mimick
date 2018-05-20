@@ -99,7 +99,7 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     all_sentences = dataset.get_train_sentences + dataset.get_valid_sentences + dataset.get_test_sentences
 
     word_embeddings = load_embeddings('./data/glove_embeddings/glove.6B.{}d.txt'.format(d))
-    chars_embeddings = load_embeddings('./predicted_char_embeddings/char_mimick_glove_d100_c20')
+    chars_embeddings = load_embeddings('./predicted_char_embeddings/char_Pinter_mimick_glove_d100_c20')
 
     # Prepare vectorizer
     word_to_idx, char_to_idx = make_vocab(all_sentences)
@@ -124,12 +124,12 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         words_embeddings=word_embeddings,
         chars_embeddings=chars_embeddings,
         freeze_word_embeddings=freeze_word_embeddings,
-        freeze_mimick=True,
+        freeze_mimick=False,
         mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
         use_gpu=use_gpu,
-        lstm_dropout=0
+        lstm_dropout=0.3
     )
-    model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
+    model_name = "{}_{}_v{}_dropout0.3_finetune_mimick".format(model_name, net.__class__.__name__.lower(), net.version)
     handler = logging.FileHandler('{}.log'.format(model_name))
     logger.addHandler(handler)
 
