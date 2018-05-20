@@ -131,7 +131,7 @@ def train_mimick_on_the_fly(device=0, debug=False):
     model_state_path = './models/best_Pinter_mimick_glove_d100_c20.torch'
     characters_embeddings = load_embeddings('./predicted_char_embeddings/char_Pinter_mimick_glove_d100_c20')
     characters_vocab = make_idx(set(characters_embeddings.keys()))
-    mimick = Mimick(characters_vocabulary=characters_vocab, lstm_dropout=0.5, freeze_embeddings=True)
+    mimick = Mimick(characters_vocabulary=characters_vocab, lstm_dropout=0.5)
     model_name = 'mimick_on_the_fly'
     train_with_comick(launch_train, mimick, model_state_path, refresh_mimick, 5, oov_words, model_name, device, debug)
 
