@@ -5,6 +5,8 @@ import numpy as np
 
 import torch
 
+from utils import load_embeddings
+
 
 def make_idx(vocab: set):
     idx = dict()
@@ -31,7 +33,10 @@ def get_map_location(device):
 
 def refresh_mimick(model, model_state_path):
     use_gpu = torch.cuda.is_available()
+    characters_embeddings = load_embeddings('./predicted_char_embeddings/char_Pinter_mimick_glove_d100_c20')
+    characters_vocab = make_idx(set(characters_embeddings.keys()))
     model.load_mimick(model_state_path, use_gpu)
+    model.load_chars_embeddings(characters_embeddings)
 
 
 def refresh_comick(model, model_state_path, device=0):
