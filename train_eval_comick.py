@@ -18,7 +18,7 @@ from data_preparation import prepare_data
 from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings, Evaluator
 from per_class_dataset import *
 
-from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly
+from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly, TheFinalComick
 
 from utils import load_embeddings
 from utils import square_distance, cosine_sim
@@ -115,15 +115,20 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    net = ComickDev(
+    net = TheFinalComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        freeze_word_embeddings=freeze_word_embeddings
+        # chars_embeddings=chars_embeddings,
+        freeze_word_embeddings=freeze_word_embeddings,
+        freeze_mimick=False,
+        # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
+        use_gpu=use_gpu,
+        lstm_dropout=0.3
     )
-    model_name = "{}_{}_v{}".format(model_name, net.__class__.__name__.lower(), net.version)
+    model_name = "{}_{}_v{}_dropout0.3_finetune_mimick".format(model_name, net.__class__.__name__.lower(), net.version)
     handler = logging.FileHandler('{}.log'.format(model_name))
     logger.addHandler(handler)
 

@@ -112,8 +112,14 @@ def launch_train(model, n, oov_words, model_name, device, debug):
                                  temporary_filename=model_path+'tmp_sentiment_'+model_name+'.torch',
                                  verbose=True)
     csv_logger = CSVLogger('./train_logs/sentiment_{}.csv'.format(model_name))
+    comick_params = [t[1] for t in net.named_parameters() if 'comick' in t[0]]
+    model_params = [t[1] for t in net.named_parameters() if 'comick' not in t[0]]
+    params = [
+        {'params': comick_params, 'lr': 0.0001},
+        {'params': model_params, }
+    ]
     loss = CrossEntropyLoss()
-    model = Model(net, Adam(net.parameters(), lr=0.001), loss, metrics=[acc])
+    model = Model(net, Adam(params, lr=0.001), loss, metrics=[acc])
     model.fit_generator(train_loader, valid_loader, epochs=epochs,
                         callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
     loss, metric = model.evaluate_generator(test_loader)
