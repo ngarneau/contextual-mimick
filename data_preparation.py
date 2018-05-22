@@ -12,11 +12,11 @@ logging.getLogger().setLevel(logging.INFO)
 
 def truncate_examples(examples, n):
     m = n // 2
-    truncated_examples = set()
+    truncated_examples = []
     for (CL, word, CR), label in examples:
-        truncated_examples.add( ((CL[-m:], word, CR[:m]), word) )
-    
-    return sorted(truncated_examples)
+        truncated_examples.append( ((CL[-m:], word, CR[:m]), word) )
+
+    return truncated_examples
 
 
 def prepare_data(dataset,
@@ -54,8 +54,8 @@ def prepare_data(dataset,
         target_transform=target_transform,
     )
 
-    train_dataset, valid_dataset = train_valid_dataset.split(
-        ratio=.8, shuffle=True, reuse_label_mappings=False)
+    train_dataset, valid_dataset = train_valid_dataset.split(ratio=.8, shuffle=True, reuse_label_mappings=False)
+    valid_dataset, test_dataset = valid_dataset.split(ratio=.5, shuffle=True, reuse_label_mappings=False)
 
     filter_labels_cond = None
     if over_population_threshold != None:
@@ -79,10 +79,11 @@ def prepare_data(dataset,
                                   filter_labels_cond=filter_labels_cond)
 
     # Test part
-    test_examples = load_examples(path + 'valid_test_examples.pkl')
-    test_examples = truncate_examples(test_examples, n)
-    test_dataset = PerClassDataset(dataset=test_examples,
-                                   transform=transform)
+    # test_examples = load_examples(path + 'valid_test_examples.pkl')
+    # test_examples = truncate_examples(test_examples, n)
+    # test_dataset = PerClassDataset(dataset=test_examples,
+    #                                transform=transform)
+    test_dataset.target_transform = lambda x: x
     test_loader = PerClassLoader(dataset=test_dataset,
                                  collate_fn=collate_x,
                                  k=-1,
