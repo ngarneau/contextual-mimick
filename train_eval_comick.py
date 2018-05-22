@@ -115,27 +115,27 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs = 3
 
     # Create the model
-    # net = TheFinalComick(
-    #     characters_vocabulary=char_to_idx,
-    #     words_vocabulary=word_to_idx,
-    #     characters_embedding_dimension=20,
-    #     word_embeddings_dimension=d,
-    #     words_embeddings=word_embeddings,
-    #     # chars_embeddings=chars_embeddings,
-    #     freeze_word_embeddings=freeze_word_embeddings,
-    #     freeze_mimick=False,
-    #     # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
-    #     use_gpu=use_gpu,
-    #     lstm_dropout=0.3
-    # )
-    net = ComickDev(
+    net = TheFinalComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        freeze_word_embeddings=freeze_word_embeddings
+        # chars_embeddings=chars_embeddings,
+        freeze_word_embeddings=freeze_word_embeddings,
+        freeze_mimick=False,
+        # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
+        use_gpu=use_gpu,
+        lstm_dropout=0.3
     )
+    # net = ComickDev(
+    #     characters_vocabulary=char_to_idx,
+    #     words_vocabulary=word_to_idx,
+    #     characters_embedding_dimension=20,
+    #     word_embeddings_dimension=d,
+    #     words_embeddings=word_embeddings,
+    #     freeze_word_embeddings=freeze_word_embeddings
+    # )
 
     model_name = "{}_{}_v{}_dropout0.3_finetune_mimick".format(model_name, net.__class__.__name__.lower(), net.version)
     handler = logging.FileHandler('{}.log'.format(model_name))
@@ -205,6 +205,20 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     else:
         map_location = lambda storage, loc: storage
     for task in task_config['tasks']:
+        # Ugly hack to test e=0
+        net = TheFinalComick(
+            characters_vocabulary=char_to_idx,
+            words_vocabulary=word_to_idx,
+            characters_embedding_dimension=20,
+            word_embeddings_dimension=d,
+            words_embeddings=word_embeddings,
+            # chars_embeddings=chars_embeddings,
+            freeze_word_embeddings=freeze_word_embeddings,
+            freeze_mimick=False,
+            # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
+            use_gpu=use_gpu,
+            lstm_dropout=0.3
+        )
         # logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
         # net.load_state_dict(torch.load(model_state_path, map_location))
         logging.info("Using predicted embeddings on {} task...".format(task['name']))
