@@ -225,16 +225,6 @@ def get_tasks_configs():
             ]
         },
         {
-            'name': 'sent',
-            'dataset': Sentiment,
-            'tasks': [
-                {
-                    'name': 'sent',
-                    'script': train_sent
-                },
-            ]
-        },
-        {
             'name': 'conll',
             'dataset': CoNLL,
             'tasks': [
