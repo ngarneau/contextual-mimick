@@ -398,6 +398,8 @@ class ComickDev(Module):
 
     def forward(self, x):
         left_context, word, right_context = x
+
+
         left_rep, right_rep = self.contexts(left_context, right_context)
         context_rep = self.fc_context(left_rep + right_rep)
         word_hidden_rep = self.fc_word(self.mimick_lstm(word))
@@ -405,6 +407,7 @@ class ComickDev(Module):
         output = self.dropout(output)
         output = F.tanh(output)
         output = self.fc1(output)
+
         # output = self.dropout(output)
         # output = F.tanh(output)
         # output = self.fc2(output)
@@ -474,8 +477,10 @@ class TheFinalComick(Module):
                  freeze_word_embeddings=True,
                  freeze_mimick=False,
                  mimick_model_path='',
+                 stats=None,
                  use_gpu=False):
         super().__init__()
+        self.stats = stats
         self.words_vocabulary = words_vocabulary
         self.characters_vocabulary = characters_vocabulary
         self.version = 3.0
@@ -518,6 +523,13 @@ class TheFinalComick(Module):
                                            out_features=1)
         constant(self.right_ponderation.weight, 0.25)
 
+        self.middle_ponderation = nn.Linear(in_features=word_embeddings_dimension,
+                                           out_features=1)
+        constant(self.middle_ponderation.weight, 0.5)
+
+        self.attention_layer = nn.Linear(300, 3)
+
+
     def load_mimick(self, model_path, use_gpu):
         if use_gpu:
             map_location = lambda storage, loc: storage.cuda(0)
@@ -546,6 +558,13 @@ class TheFinalComick(Module):
                 idx = self.words_vocabulary[word]
                 self.contexts.set_item_embedding(idx, embedding)
 
+    def log_stats(self, left_context, word, right_context, attention):
+        if self.stats:
+            self.stats.update(left_context, word, right_context, attention)
+
+    def get_stats(self):
+        return self.stats
+
     def forward(self, x):
         left_context, word, right_context = x
 
@@ -556,7 +575,15 @@ class TheFinalComick(Module):
         left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
         right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
-        output = word_rep + self.left_ponderation.weight * left_context_rep + self.right_ponderation.weight * right_context_rep
+        attn_input = torch.cat([word_rep, left_context_rep, right_context_rep], dim=1)
+        attn_logits = self.attention_layer(attn_input.view(-1, 300))
+        attn_pond = F.softmax(attn_logits)
+
+        self.log_stats(left_context, word, right_context, attn_pond)
+
+        # output = self.middle_ponderation.weight * word_rep + self.left_ponderation.weight * left_context_rep + self.right_ponderation.weight * right_context_rep
+        # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
+        output = word_rep + left_context_rep + right_context_rep
         output = self.mimick.fc_output(output)
 
         return output

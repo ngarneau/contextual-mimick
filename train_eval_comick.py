@@ -8,7 +8,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from pytoune import torch_to_numpy, tensors_to_variables
+from pytoune import torch_to_numpy
 from pytoune.framework import Model
 from pytoune.framework.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, CSVLogger
 from torch.optim import Adam
@@ -17,6 +17,7 @@ from data.dataset_manager import CoNLL, Sentiment, SemEval
 from data_preparation import prepare_data
 from evaluation.intrinsic_evaluation import evaluate, predict_mean_embeddings, Evaluator
 from per_class_dataset import *
+from stats import AttentionStats
 
 from comick import ComickDev, ComickUniqueContext, LRComick, LRComickContextOnly, TheFinalComick
 
@@ -62,8 +63,7 @@ def train(model, model_name, train_loader, valid_loader, epochs=1000):
     ]
 
     # Fit the model
-    model.fit_generator(train_loader, valid_loader,
-                        epochs=epochs, callbacks=callbacks)
+    model.fit_generator(train_loader, valid_loader, epochs=epochs, callbacks=callbacks)
 
 
 def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
@@ -107,35 +107,40 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
     vectorizer = vectorizer
 
     # Initialize training parameters
-    model_name = '{}_n{}_k{}_d{}_e{}'.format(task_config['name'], n, k, d, epochs)
+    model_name = '{}_n{}_k{}_d{}_e1'.format(task_config['name'], n, k, d, epochs)
     lr = 0.001
     if debug_mode:
         model_name = 'testing_' + model_name
         save = False
         epochs = 3
 
+    stats = AttentionStats(
+        word_to_idx, char_to_idx
+    )
+
     # Create the model
-    # net = TheFinalComick(
-    #     characters_vocabulary=char_to_idx,
-    #     words_vocabulary=word_to_idx,
-    #     characters_embedding_dimension=20,
-    #     word_embeddings_dimension=d,
-    #     words_embeddings=word_embeddings,
-    #     # chars_embeddings=chars_embeddings,
-    #     freeze_word_embeddings=freeze_word_embeddings,
-    #     freeze_mimick=False,
-    #     # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
-    #     use_gpu=use_gpu,
-    #     lstm_dropout=0.3
-    # )
-    net = ComickDev(
+    net = TheFinalComick(
         characters_vocabulary=char_to_idx,
         words_vocabulary=word_to_idx,
         characters_embedding_dimension=20,
         word_embeddings_dimension=d,
         words_embeddings=word_embeddings,
-        freeze_word_embeddings=freeze_word_embeddings
+        # chars_embeddings=chars_embeddings,
+        freeze_word_embeddings=freeze_word_embeddings,
+        freeze_mimick=False,
+        # mimick_model_path='./models/best_Pinter_mimick_glove_d100_c20.torch',
+        use_gpu=use_gpu,
+        lstm_dropout=0.3,
+        stats=stats
     )
+    # net = ComickDev(
+    #     characters_vocabulary=char_to_idx,
+    #     words_vocabulary=word_to_idx,
+    #     characters_embedding_dimension=20,
+    #     word_embeddings_dimension=d,
+    #     words_embeddings=word_embeddings,
+    #     freeze_word_embeddings=freeze_word_embeddings
+    # )
 
     model_name = "{}_{}_v{}_dropout0.3_finetune_mimick".format(model_name, net.__class__.__name__.lower(), net.version)
     handler = logging.FileHandler('{}.log'.format(model_name))
@@ -173,14 +178,6 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
         epochs=epochs,
     )
 
-    # test_embeddings = evaluate(
-    #     model,
-    #     test_loader=test_loader,
-    #     test_embeddings=word_embeddings,
-    #     save=save,
-    #     model_name=model_name + '.txt'
-    # )
-
     if not debug_mode:
         intrinsic_results = Evaluator(model,
                                       test_loader,
@@ -193,17 +190,21 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 
     predicted_oov_embeddings = predict_mean_embeddings(model, oov_loader)
     oov_words = set(predicted_oov_embeddings.keys())
+    oov_words = set()
+    for _, y in oov_loader:
+        for word in y:
+            oov_words.add(word)
     # Override embeddings with the training ones
     # Make sure we only have embeddings from the corpus data
     # logging.info("Evaluating embeddings...")
-    predicted_oov_embeddings.update(word_embeddings)
+    # predicted_oov_embeddings.update(word_embeddings)
 
     model_state_path = "{}last_{}.torch".format(model_path, model_name)
-    use_gpu = torch.cuda.is_available()
-    if use_gpu:
-        map_location = lambda storage, loc: storage.cuda(device)
-    else:
-        map_location = lambda storage, loc: storage
+    # use_gpu = torch.cuda.is_available()
+    # if use_gpu:
+    #     map_location = lambda storage, loc: storage.cuda(device)
+    # else:
+    #     map_location = lambda storage, loc: storage
     for task in task_config['tasks']:
         # logging.info('Reloading fresh Comick model with {} weights'.format(model_state_path))
         # net.load_state_dict(torch.load(model_state_path, map_location))
@@ -214,16 +215,6 @@ def main(task_config, n=21, k=2, device=0, d=100, epochs=100):
 
 def get_tasks_configs():
     return [
-        {
-            'name': 'semeval',
-            'dataset': SemEval,
-            'tasks': [
-                {
-                    'name': 'semeval',
-                    'script': train_semeval
-                }
-            ]
-        },
         {
             'name': 'conll',
             'dataset': CoNLL,
@@ -240,6 +231,16 @@ def get_tasks_configs():
                     'name': 'chunk',
                     'script': train_chunk
                 },
+            ]
+        },
+        {
+            'name': 'semeval',
+            'dataset': SemEval,
+            'tasks': [
+                {
+                    'name': 'semeval',
+                    'script': train_semeval
+                }
             ]
         },
     ]

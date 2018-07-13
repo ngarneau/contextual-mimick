@@ -8,7 +8,7 @@ sys.path.append('..')
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from pytoune import torch_to_numpy, tensors_to_variables
+from pytoune import torch_to_numpy
 from utils import save_embeddings
 import pickle as pkl
 
@@ -56,7 +56,7 @@ def predict_embeddings(model, loader):
     model.model.eval()
     predicted_embeddings = {}
     for x, y in loader:
-        x = tensors_to_variables(x)
+        # x = tensors_to_variables(x)
         embeddings = torch_to_numpy(model.model(x))
         for label, embedding in zip(y, embeddings):
             if label in predicted_embeddings:
@@ -69,7 +69,6 @@ def predict_embeddings(model, loader):
 
 def predict_mean_embeddings(model, loader):
     predicted_embeddings = predict_embeddings(model, loader)
-
     mean_pred_embeddings = {}
     for label in predicted_embeddings:
         mean_pred_embeddings[label] = np.mean(
@@ -88,7 +87,8 @@ class Evaluator:
         model.model.eval()
         
         for x, y in loader:
-            embeddings = torch_to_numpy(model.model(tensors_to_variables(x)))
+            embeddings = torch_to_numpy(model.model(x))
+            # embeddings = torch_to_numpy(model.model(tensors_to_variables(x)))
             for *context, label, embedding in zip(*x, y, embeddings):
                 idx = len(self.results)
                 converted_context = self.convert_context(context, idx_to_word, idx_to_char)
@@ -142,9 +142,9 @@ class Evaluator:
     def convert_context(context, idx_to_word, idx_to_char):
         if idx_to_word != None:
             CL, w, CR = context
-            CL = ' '.join([idx_to_word[i] for i in CL if i != 0])
-            CR = ' '.join([idx_to_word[i] for i in CR if i != 0])
-            w = ''.join([idx_to_char[i] for i in w if i != 0])
+            CL = ' '.join([idx_to_word[int(i)] for i in CL if i != 0])
+            CR = ' '.join([idx_to_word[int(i)] for i in CR if i != 0])
+            w = ''.join([idx_to_char[int(i)] for i in w if i != 0])
             context = [CL, w, CR]
 
         return context

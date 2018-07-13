@@ -84,9 +84,9 @@ class LSTMSequence(Module):
         L = len(sequence)
         m = self.n_gram // 2
         left_idx = max(0, i - m)
-        left_side = tuple(sequence[left_idx:i]) if i != 0 else tuple(Variable(torch.LongTensor([1])))
+        left_side = tuple(sequence[left_idx:i]) if i != 0 else tuple(Variable(torch.LongTensor([2])))
         right_idx = min(L, i + m + 1)
-        right_side = tuple(sequence[i+1:right_idx]) if i != L-1 else tuple(Variable(torch.LongTensor([2])))
+        right_side = tuple(sequence[i+1:right_idx]) if i != L-1 else tuple(Variable(torch.LongTensor([3])))
         return left_side, right_side
 
     def get_oov(self, sentences):
@@ -99,9 +99,11 @@ class LSTMSequence(Module):
         for si, sentence in enumerate(sentences):
             sent_length = sentence.data.ne(0).long().sum()
             for i, idx in enumerate(sentence):
-                word = self.idx_to_word[idx.data[0]]
+                word = self.idx_to_word[int(idx.data[0])]
                 if word in self.oov_words:
                     left_context, right_context = self.make_ngram(sentence[:sent_length], i)
+                    left_context = [c.view(1) for c in left_context]
+                    right_context = [c.view(1) for c in right_context]
                     words_to_drop.append((si, i, word, torch.cat(left_context), torch.cat(right_context)))
         return words_to_drop
 

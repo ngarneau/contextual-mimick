@@ -116,7 +116,7 @@ def launch_train(model, n, oov_words, model_name, device, debug):
     lrscheduler = ReduceLROnPlateau(patience=2)
     early_stopping = EarlyStopping(patience=5)
     model_path = './models/'
-    checkpoint = ModelCheckpoint(model_path + 'ner_' + model_name + '.torch',
+    checkpoint = ModelCheckpoint(model_path + 'ner_' + model_name + '_epoch{epoch}.torch',
                                  save_best_only=True,
                                  restore_best=True,
                                  temporary_filename=model_path + 'tmp_ner_' + model_name + '.torch',
@@ -130,9 +130,11 @@ def launch_train(model, n, oov_words, model_name, device, debug):
         {'params': model_params, }
     ]
     model = Model(net, Adam(params, lr=0.001), sequence_cross_entropy, metrics=[f1])
-    model.fit_generator(train_loader, valid_loader, epochs=epochs,
-                        callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
 
+
+    model.fit_generator(train_loader, valid_loader, epochs=epochs, callbacks=[lrscheduler, checkpoint, early_stopping, csv_logger])
+
+    loss, metric = model.evaluate_generator(valid_loader)
     loss, metric = model.evaluate_generator(test_loader)
     logging.info("Test loss: {}".format(loss))
     logging.info("Test metric: {}".format(metric))
