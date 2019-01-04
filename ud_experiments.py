@@ -4,6 +4,8 @@ import collections
 from collections import defaultdict
 from polyglot import text
 
+import numpy as np
+
 import torch
 from torch import nn
 
@@ -180,7 +182,7 @@ def read_file(filename, w2i, t2is, c2i, options):
                 slen = len(sentence)
                 for seq in tags.values():
                     if len(seq) < slen:
-                        seq.extend([0] * (slen - len(seq))) # 0 guaranteed below to represent NONE_TAG
+                        seq.extend([1] * (slen - len(seq))) # 0 guaranteed below to represent NONE_TAG
 
                 # add sentence to dataset
                 instances.append(Instance(source, sentence, tags))
@@ -215,7 +217,7 @@ def read_file(filename, w2i, t2is, c2i, options):
                         c2i[c] = len(c2i)
                 for key, val in morphotags.items():
                     if key not in t2is:
-                        t2is[key] = {NONE_TAG:0}
+                        t2is[key] = {PADDING_WORD: 0, NONE_TAG: 1}
                     mt2i = t2is[key]
                     if val not in mt2i:
                         mt2i[val] = len(mt2i)
@@ -227,13 +229,17 @@ def read_file(filename, w2i, t2is, c2i, options):
                     mtags = tags[k]
                     # pad backwards to latest seen
                     missing_tags = idx - len(mtags) - 1
-                    mtags.extend([0] * missing_tags) # 0 guaranteed above to represent NONE_TAG
+                    mtags.extend([1] * missing_tags) # 0 guaranteed above to represent NONE_TAG
                     mtags.append(t2is[k][v])
 
     return instances, vocab_counter
 
 
 def main():
+
+    np.random.seed(42)
+    torch.manual_seed(42)
+
     languages = [
         # LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
         # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),

@@ -302,7 +302,8 @@ class SimpleLSTMTagger(nn.Module):
         self.loss_function = sequence_cross_entropy
         self.metrics = [acc]
 
-    def forward(self, sentence):
+    def forward(self, input):
+        sentence, tags_to_produce = input
         # Sort sentences in decreasing order
         lengths = sentence.data.ne(0).long().sum(dim=1)
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
