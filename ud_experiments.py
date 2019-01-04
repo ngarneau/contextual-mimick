@@ -298,7 +298,7 @@ def read_file(filename, w2i, t2is, c2i, options):
     return instances, vocab_counter
 
 @experiment.command
-def train(_run, seed, batch_size, lstm_hidden_layer, language):
+def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
@@ -319,20 +319,20 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language):
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=32,
+        batch_size=batch_size,
         shuffle=True,
         collate_fn=collate_examples_multiple_tags
     )
 
     valid_loader = DataLoader(
         dev_dataset,
-        batch_size=32,
+        batch_size=batch_size,
         collate_fn=collate_examples_multiple_tags
     )
 
     test_loader = DataLoader(
         test_dataset,
-        batch_size=32,
+        batch_size=batch_size,
         collate_fn=collate_examples_multiple_tags
     )
 
@@ -341,7 +341,7 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language):
 
     model = SimpleLSTMTagger(
         embedding_layer,
-        128,
+        lstm_hidden_layer,
         {label: len(tags) for label, tags in language.tags_to_index.items()}
     )
 
@@ -366,7 +366,7 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language):
     ]
 
     try:
-        expt.train(train_loader, valid_loader, callbacks=callbacks, seed=42, epochs=1000)
+        expt.train(train_loader, valid_loader, callbacks=callbacks, seed=42, epochs=epochs)
     except KeyboardInterrupt:
         print('-' * 89)
         print('Exiting from training early')
