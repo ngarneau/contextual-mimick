@@ -42,28 +42,28 @@ experiment.observers.append(MongoObserver.create(
 
 languages = {
     'kk': ('kk', 'UD_Kazakh', 'kk-ud'),
-    # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),
-    # LanguageDataset('lv', 'UD_Latvian', 'lv-ud'),
-    # LanguageDataset('vi', 'UD_Vietnamese', 'vi-ud'),
-    # LanguageDataset('hu', 'UD_Hungarian', 'hu-ud'),
-    # LanguageDataset('tr', 'UD_Turkish', 'tr-ud'),
-    # LanguageDataset('el', 'UD_Greek', 'el-ud'),
-    # LanguageDataset('bg', 'UD_Bulgarian', 'bg-ud'),
-    # LanguageDataset('sv', 'UD_Swedish', 'sv-ud'),
-    # LanguageDataset('eu', 'UD_Basque', 'eu-ud'),
-    # LanguageDataset('ru', 'UD_Russian', 'ru-ud'),
-    # LanguageDataset('da', 'UD_Danish', 'da-ud'),
-    # LanguageDataset('id', 'UD_Indonesian', 'id-ud'),
-    # LanguageDataset('zh', 'UD_Chinese', 'zh-ud'),
-    # LanguageDataset('fa', 'UD_Persian', 'fa-ud'),
-    # LanguageDataset('he', 'UD_Hebrew', 'he-ud'),
-    # LanguageDataset('ro', 'UD_Romanian', 'ro-ud'),
-    # LanguageDataset('en', 'UD_English', 'en-ud'),
-    # LanguageDataset('ar', 'UD_Arabic', 'ar-ud'),
-    # LanguageDataset('hi', 'UD_Hindi', 'hi-ud'),
-    # LanguageDataset('it', 'UD_Italian', 'it-ud'),
-    # LanguageDataset('es', 'UD_Spanish', 'es-ud'),
-    # LanguageDataset('cs', 'UD_Czech', 'cs-ud'),
+    'ta': ('ta', 'UD_Tamil', 'ta-ud'),
+    'lv': ('lv', 'UD_Latvian', 'lv-ud'),
+    'vi': ('vi', 'UD_Vietnamese', 'vi-ud'),
+    'hu': ('hu', 'UD_Hungarian', 'hu-ud'),
+    'tr': ('tr', 'UD_Turkish', 'tr-ud'),
+    'el': ('el', 'UD_Greek', 'el-ud'),
+    'bg': ('bg', 'UD_Bulgarian', 'bg-ud'),
+    'sv': ('sv', 'UD_Swedish', 'sv-ud'),
+    'eu': ('eu', 'UD_Basque', 'eu-ud'),
+    'ru': ('ru', 'UD_Russian', 'ru-ud'),
+    'da': ('da', 'UD_Danish', 'da-ud'),
+    'id': ('id', 'UD_Indonesian', 'id-ud'),
+    'zh': ('zh', 'UD_Chinese', 'zh-ud'),
+    'fa': ('fa', 'UD_Persian', 'fa-ud'),
+    'he': ('he', 'UD_Hebrew', 'he-ud'),
+    'ro': ('ro', 'UD_Romanian', 'ro-ud'),
+    'en': ('en', 'UD_English', 'en-ud'),
+    'ar': ('ar', 'UD_Arabic', 'ar-ud'),
+    'hi': ('hi', 'UD_Hindi', 'hi-ud'),
+    'it': ('it', 'UD_Italian', 'it-ud'),
+    'es': ('es', 'UD_Spanish', 'es-ud'),
+    'cs': ('cs', 'UD_Czech', 'cs-ud'),
 }
 
 
@@ -77,10 +77,10 @@ class MetricsCallback(Callback):
             self.logger.log_scalar("{}.grad.mean".format(parameter), float(values.mean()))
             self.logger.log_scalar("{}.grad.std".format(parameter), float(values.std()))
 
-    def on_batch_end(self, batch, logs):
-        self.logger.log_scalar("steps.train.loss", logs['loss'])
-        if 'acc' in logs:
-            self.logger.log_scalar("steps.train.acc", logs['acc'])
+    # def on_batch_end(self, batch, logs):
+    #     self.logger.log_scalar("steps.train.loss", logs['loss'])
+    #     if 'acc' in logs:
+    #         self.logger.log_scalar("steps.train.acc", logs['acc'])
 
     def on_epoch_end(self, epoch, logs):
         self.logger.log_scalar("epochs.train.loss", logs['loss'])

@@ -1,7 +1,7 @@
 {
     "seed": 42,
-    "batch_size": 32,
+    "batch_size": 1,
     "lstm_hidden_layer": 128,
     "language": "kk",
-    "epochs": 1000
+    "epochs": 300
 }
