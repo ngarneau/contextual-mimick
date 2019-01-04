@@ -9,12 +9,16 @@ import numpy as np
 import torch
 from torch import nn
 
+import sacred
+from sacred import Experiment
+from sacred.observers import MongoObserver
+
 from torch.utils.data import DataLoader
 from downstream_task.sequence_tagging import collate_examples
 from downstream_task.models import SimpleLSTMTagger
 
 from pytoune.framework import Experiment as PytouneExperiment
-from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau
+from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback
 
 
 UNK_TAG = "<UNK>"
@@ -26,6 +30,35 @@ PADDING_CHAR = "<*>"
 POS_KEY = "POS"
 
 Instance = collections.namedtuple("Instance", ["source", "sentence", "tags"])
+
+# Logging thangs
+base_config_file = './configs/base.json'
+experiment = Experiment('ud_tagging_model')
+experiment.add_config(base_config_file)
+experiment.observers.append(MongoObserver.create(
+    url=os.environ['DB_URL'],
+    db_name=os.environ['DB_NAME']))
+
+class MetricsCallback(Callback):
+    def __init__(self, logger):
+        super(MetricsCallback, self).__init__()
+        self.logger = logger
+
+    def on_backward_end(self, batch):
+        for parameter, values in self.model.model.named_parameters():
+            self.logger.log_scalar("{}.grad.mean".format(parameter), float(values.mean()))
+            self.logger.log_scalar("{}.grad.std".format(parameter), float(values.std()))
+
+    def on_batch_end(self, batch, logs):
+        self.logger.log_scalar("steps.train.loss", logs['loss'])
+        self.logger.log_scalar("steps.train.acc", logs['acc'])
+
+    def on_epoch_end(self, epoch, logs):
+        self.logger.log_scalar("epochs.train.loss", logs['loss'])
+        self.logger.log_scalar("epochs.train.acc", logs['acc'])
+        self.logger.log_scalar("epochs.val.loss", logs['val_loss'])
+        self.logger.log_scalar("epochs.val.acc", logs['val_acc'])
+
 
 class MyEmbeddings(nn.Embedding):
     def __init__(self, word_to_idx, embedding_dim):
@@ -234,14 +267,14 @@ def read_file(filename, w2i, t2is, c2i, options):
 
     return instances, vocab_counter
 
-
-def main():
+@experiment.automain
+def main(_run):
 
     np.random.seed(42)
     torch.manual_seed(42)
 
     languages = [
-        # LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
+        LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
         # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),
         # LanguageDataset('lv', 'UD_Latvian', 'lv-ud'),
         # LanguageDataset('vi', 'UD_Vietnamese', 'vi-ud'),
@@ -259,7 +292,7 @@ def main():
         # LanguageDataset('he', 'UD_Hebrew', 'he-ud'),
         # LanguageDataset('ro', 'UD_Romanian', 'ro-ud'),
         # LanguageDataset('en', 'UD_English', 'en-ud'),
-        LanguageDataset('ar', 'UD_Arabic', 'ar-ud'),
+        # LanguageDataset('ar', 'UD_Arabic', 'ar-ud'),
         # LanguageDataset('hi', 'UD_Hindi', 'hi-ud'),
         # LanguageDataset('it', 'UD_Italian', 'it-ud'),
         # LanguageDataset('es', 'UD_Spanish', 'es-ud'),
@@ -326,6 +359,7 @@ def main():
         callbacks = [
             ClipNorm(model.parameters(), 0.25),
             ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
+            MetricsCallback(_run)
         ]
 
         try:
