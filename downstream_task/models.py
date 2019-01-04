@@ -286,23 +286,49 @@ class BOWClassifier(nn.Module):
 
 class SimpleLSTMTagger(nn.Module):
 
-    def __init__(self, embedding_layer, hidden_dim, tagset_size):
+    def __init__(self, embedding_layer, hidden_dim, tags):
         super().__init__()
         self.embedding_layer = embedding_layer
-        self.tagset_size = tagset_size
         self.hidden_dim = hidden_dim
         self.word_lstm = nn.LSTM(
-            self.embedding_layer.embedding_dim,
-            self.hidden_dim,
-            batch_first=True,
-            bidirectional=True
-        )
+                    self.embedding_layer.embedding_dim,
+                    self.hidden_dim,
+                    batch_first=True,
+                    bidirectional=True
+                )
 
-        self.hidden2tag = nn.Linear(self.hidden_dim*2, tagset_size)
-        self.loss_function = sequence_cross_entropy
-        self.metrics = [acc]
+        # self.lstms = nn.ModuleDict()
+        self.hidden2tags = nn.ModuleDict()
+        for tag, tagset_size in tags.items():
+            # self.lstms.add_module(
+            #     tag,
+            #     nn.LSTM(
+            #         self.embedding_layer.embedding_dim,
+            #         self.hidden_dim,
+            #         batch_first=True,
+            #         bidirectional=True
+            #     )
+            # )
+            self.hidden2tags.add_module(
+                tag,
+                nn.Linear(self.hidden_dim*2, tagset_size)
+            )
 
-    def forward(self, sentence):
+        self.metrics = [self.acc]
+
+
+    def loss_function(self, y_pred, y):
+        losses = list()
+        for label, output in y_pred.items():
+            loss = sequence_cross_entropy(output, y[label])
+            losses.append(loss)
+        return sum(losses)
+
+    def acc(self, y_pred, y):
+        return acc(y_pred['POS'], y['POS'])
+
+    def forward(self, input):
+        sentence, tags_to_produce = input
         # Sort sentences in decreasing order
         lengths = sentence.data.ne(0).long().sum(dim=1)
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
@@ -315,6 +341,10 @@ class SimpleLSTMTagger(nn.Module):
         packed_output, (hidden_states, cell_states) = self.word_lstm(packed_input)
         lstm_out, _ = pad_packed_sequence(packed_output, batch_first=True)
         lstm_out = lstm_out[rev_perm_idx]
-        tag_space = self.hidden2tag(lstm_out)
 
-        return tag_space
+        outputs = dict()
+        for label in tags_to_produce:
+            tag_space = self.hidden2tags[label](lstm_out)
+            outputs[label] = tag_space
+
+        return outputs

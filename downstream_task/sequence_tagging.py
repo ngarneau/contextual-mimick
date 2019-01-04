@@ -1,3 +1,4 @@
+from collections import defaultdict
 import numpy as np
 from pytoune import torch_to_numpy, torch
 from sklearn.metrics import f1_score, classification_report
@@ -57,6 +58,35 @@ def collate_examples(samples):
 
     return (
         padded_words,
+        padded_labels
+    )
+
+
+def collate_examples_multiple_tags(samples):
+    words, labels = list(zip(*samples))
+
+    seq_lengths = torch.LongTensor([len(s) for s in words])
+    padded_words = pad_sequences(words, seq_lengths)
+
+    tags_to_produce = set()
+    for example in labels:
+        tags_to_produce.update(example.keys())
+
+    labels_splitted = defaultdict(list)
+    for tag in tags_to_produce:
+        for example in labels:
+            if tag in example:
+                labels_splitted[tag].append(example[tag])
+            else:
+                labels_splitted[tag].append([0])
+
+    padded_labels = dict()
+    for label, tags in labels_splitted.items():
+        padded_labels[label] = pad_sequences(tags, seq_lengths)
+        tags_to_produce.add(label)
+
+    return (
+        (padded_words, tags_to_produce),
         padded_labels
     )
 

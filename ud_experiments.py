@@ -14,7 +14,7 @@ from sacred import Experiment
 from sacred.observers import MongoObserver
 
 from torch.utils.data import DataLoader
-from downstream_task.sequence_tagging import collate_examples
+from downstream_task.sequence_tagging import collate_examples_multiple_tags
 from downstream_task.models import SimpleLSTMTagger
 
 from pytoune.framework import Experiment as PytouneExperiment
@@ -33,11 +33,39 @@ Instance = collections.namedtuple("Instance", ["source", "sentence", "tags"])
 
 # Logging thangs
 base_config_file = './configs/base.json'
-experiment = Experiment('ud_tagging_model')
+experiment = Experiment('ud_tagging_model_multiple_tags')
 experiment.add_config(base_config_file)
 experiment.observers.append(MongoObserver.create(
     url=os.environ['DB_URL'],
     db_name=os.environ['DB_NAME']))
+
+
+languages = {
+    'kk': ('kk', 'UD_Kazakh', 'kk-ud'),
+    # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),
+    # LanguageDataset('lv', 'UD_Latvian', 'lv-ud'),
+    # LanguageDataset('vi', 'UD_Vietnamese', 'vi-ud'),
+    # LanguageDataset('hu', 'UD_Hungarian', 'hu-ud'),
+    # LanguageDataset('tr', 'UD_Turkish', 'tr-ud'),
+    # LanguageDataset('el', 'UD_Greek', 'el-ud'),
+    # LanguageDataset('bg', 'UD_Bulgarian', 'bg-ud'),
+    # LanguageDataset('sv', 'UD_Swedish', 'sv-ud'),
+    # LanguageDataset('eu', 'UD_Basque', 'eu-ud'),
+    # LanguageDataset('ru', 'UD_Russian', 'ru-ud'),
+    # LanguageDataset('da', 'UD_Danish', 'da-ud'),
+    # LanguageDataset('id', 'UD_Indonesian', 'id-ud'),
+    # LanguageDataset('zh', 'UD_Chinese', 'zh-ud'),
+    # LanguageDataset('fa', 'UD_Persian', 'fa-ud'),
+    # LanguageDataset('he', 'UD_Hebrew', 'he-ud'),
+    # LanguageDataset('ro', 'UD_Romanian', 'ro-ud'),
+    # LanguageDataset('en', 'UD_English', 'en-ud'),
+    # LanguageDataset('ar', 'UD_Arabic', 'ar-ud'),
+    # LanguageDataset('hi', 'UD_Hindi', 'hi-ud'),
+    # LanguageDataset('it', 'UD_Italian', 'it-ud'),
+    # LanguageDataset('es', 'UD_Spanish', 'es-ud'),
+    # LanguageDataset('cs', 'UD_Czech', 'cs-ud'),
+}
+
 
 class MetricsCallback(Callback):
     def __init__(self, logger):
@@ -51,13 +79,15 @@ class MetricsCallback(Callback):
 
     def on_batch_end(self, batch, logs):
         self.logger.log_scalar("steps.train.loss", logs['loss'])
-        self.logger.log_scalar("steps.train.acc", logs['acc'])
+        if 'acc' in logs:
+            self.logger.log_scalar("steps.train.acc", logs['acc'])
 
     def on_epoch_end(self, epoch, logs):
         self.logger.log_scalar("epochs.train.loss", logs['loss'])
-        self.logger.log_scalar("epochs.train.acc", logs['acc'])
         self.logger.log_scalar("epochs.val.loss", logs['val_loss'])
-        self.logger.log_scalar("epochs.val.acc", logs['val_acc'])
+        if 'acc' in logs:
+            self.logger.log_scalar("epochs.train.acc", logs['acc'])
+            self.logger.log_scalar("epochs.val.acc", logs['val_acc'])
 
 
 class MyEmbeddings(nn.Embedding):
@@ -267,14 +297,87 @@ def read_file(filename, w2i, t2is, c2i, options):
 
     return instances, vocab_counter
 
-@experiment.automain
-def main(_run):
+@experiment.command
+def train(_run, seed, batch_size, lstm_hidden_layer, language):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
-    np.random.seed(42)
-    torch.manual_seed(42)
+    language = LanguageDataset(*languages[language])
 
-    languages = [
-        LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
+    train_sentences = [instance.sentence for instance in language.training_instances]
+    train_tags = [instance.tags for instance in language.training_instances]
+
+    dev_sentences = [instance.sentence for instance in language.dev_instances]
+    dev_tags = [instance.tags for instance in language.dev_instances]
+
+    test_sentences = [instance.sentence for instance in language.test_instances]
+    test_tags = [instance.tags for instance in language.test_instances]
+
+    train_dataset = list(zip(train_sentences, train_tags))
+    dev_dataset = list(zip(dev_sentences, dev_tags))
+    test_dataset = list(zip(test_sentences, test_tags))
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=32,
+        shuffle=True,
+        collate_fn=collate_examples_multiple_tags
+    )
+
+    valid_loader = DataLoader(
+        dev_dataset,
+        batch_size=32,
+        collate_fn=collate_examples_multiple_tags
+    )
+
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=32,
+        collate_fn=collate_examples_multiple_tags
+    )
+
+    embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
+    embedding_layer.load_words_embeddings(language.embeddings)
+
+    model = SimpleLSTMTagger(
+        embedding_layer,
+        128,
+        {label: len(tags) for label, tags in language.tags_to_index.items()}
+    )
+
+    model_name = "{}".format(language.polyglot_abbreviation)
+    expt_name = './expt_{}'.format(model_name)
+    expt_dir = get_experiment_directory(expt_name)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, nesterov=True)
+    expt = PytouneExperiment(
+        expt_dir,
+        model,
+        device=None,
+        optimizer=optimizer,
+        monitor_metric='val_loss',
+        monitor_mode='min'
+    )
+
+    callbacks = [
+        ClipNorm(model.parameters(), 0.25),
+        ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
+        MetricsCallback(_run)
+    ]
+
+    try:
+        expt.train(train_loader, valid_loader, callbacks=callbacks, seed=42, epochs=1000)
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early')
+
+    print("Testing on test set...")
+    expt.test(test_loader)
+
+@experiment.main
+def main():
+    # languages = [
+    #     LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
         # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),
         # LanguageDataset('lv', 'UD_Latvian', 'lv-ud'),
         # LanguageDataset('vi', 'UD_Vietnamese', 'vi-ud'),
@@ -297,79 +400,11 @@ def main(_run):
         # LanguageDataset('it', 'UD_Italian', 'it-ud'),
         # LanguageDataset('es', 'UD_Spanish', 'es-ud'),
         # LanguageDataset('cs', 'UD_Czech', 'cs-ud'),
-    ]
+    # ]
 
     for language in languages:
+        run = experiment.run_command('train', config_updates={'language': language})
 
-        train_sentences = [instance.sentence for instance in language.training_instances]
-        train_tags = [instance.tags['POS'] for instance in language.training_instances]
-
-        dev_sentences = [instance.sentence for instance in language.dev_instances]
-        dev_tags = [instance.tags['POS'] for instance in language.dev_instances]
-
-        test_sentences = [instance.sentence for instance in language.test_instances]
-        test_tags = [instance.tags['POS'] for instance in language.test_instances]
-
-        train_dataset = list(zip(train_sentences, train_tags))
-        dev_dataset = list(zip(dev_sentences, dev_tags))
-        test_dataset = list(zip(test_sentences, test_tags))
-
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=1,
-            shuffle=True,
-            collate_fn=collate_examples
-        )
-
-        valid_loader = DataLoader(
-            dev_dataset,
-            batch_size=32,
-            collate_fn=collate_examples
-        )
-
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=32,
-            collate_fn=collate_examples
-        )
-
-        embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
-        embedding_layer.load_words_embeddings(language.embeddings)
-
-        model = SimpleLSTMTagger(
-            embedding_layer,
-            128,
-            len(language.tags_to_index['POS'])
-        )
-
-        model_name = "{}".format(language.polyglot_abbreviation)
-        expt_name = './expt_{}'.format(model_name)
-        expt_dir = get_experiment_directory(expt_name)
-
-        optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, nesterov=True)
-        expt = PytouneExperiment(
-            expt_dir,
-            model,
-            device=None,
-            optimizer=optimizer,
-            monitor_metric='val_loss',
-            monitor_mode='min'
-        )
-
-        callbacks = [
-            ClipNorm(model.parameters(), 0.25),
-            ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
-            MetricsCallback(_run)
-        ]
-
-        try:
-            expt.train(train_loader, valid_loader, callbacks=callbacks, seed=42, epochs=1000)
-        except KeyboardInterrupt:
-            print('-' * 89)
-            print('Exiting from training early')
-
-        print("Testing on test set...")
-        expt.test(test_loader)
 
 
 
