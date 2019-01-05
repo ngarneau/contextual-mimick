@@ -290,12 +290,15 @@ class SimpleLSTMTagger(nn.Module):
         super().__init__()
         self.embedding_layer = embedding_layer
         self.hidden_dim = hidden_dim
+        self.num_layers = 2
         self.word_lstm = nn.LSTM(
-                    self.embedding_layer.embedding_dim,
-                    self.hidden_dim,
-                    batch_first=True,
-                    bidirectional=True
-                )
+            self.embedding_layer.embedding_dim,
+            self.hidden_dim,
+            batch_first=True,
+            bidirectional=True,
+            num_layers=self.num_layers,
+            dropout=0.5
+        )
 
         # self.lstms = nn.ModuleDict()
         self.hidden2tags = nn.ModuleDict()
