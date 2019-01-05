@@ -71,18 +71,19 @@ class MetricsCallback(Callback):
     def __init__(self, logger):
         super(MetricsCallback, self).__init__()
         self.logger = logger
+        self.stats = defaultdict(list)
 
     def on_backward_end(self, batch):
         for parameter, values in self.model.model.named_parameters():
-            self.logger.log_scalar("{}.grad.mean".format(parameter), float(values.mean()))
-            self.logger.log_scalar("{}.grad.std".format(parameter), float(values.std()))
-
-    # def on_batch_end(self, batch, logs):
-    #     self.logger.log_scalar("steps.train.loss", logs['loss'])
-    #     if 'acc' in logs:
-    #         self.logger.log_scalar("steps.train.acc", logs['acc'])
+            self.stats["{}.grad.mean".format(parameter)].append(float(values.mean()))
+            self.stats["{}.grad.std".format(parameter)].append(float(values.std()))
 
     def on_epoch_end(self, epoch, logs):
+        # Log gradient stats
+        for stat, values in self.stats.items():
+            self.logger.log_scalar(stat, np.mean(values))
+        self.stats = defaultdict(list)
+
         self.logger.log_scalar("epochs.train.loss", logs['loss'])
         self.logger.log_scalar("epochs.val.loss", logs['val_loss'])
         if 'acc' in logs:
