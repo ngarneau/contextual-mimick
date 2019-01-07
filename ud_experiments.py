@@ -20,6 +20,8 @@ from downstream_task.models import SimpleLSTMTagger, CharRNN
 from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback
 
+from comick import LRComick, TheFinalComick
+
 
 UNK_TAG = "<UNK>"
 NONE_TAG = "<NONE>"
@@ -97,6 +99,7 @@ class MyEmbeddings(nn.Embedding):
         self.embedding_dim = embedding_dim
         self.vocab_size = len(word_to_idx)
         self.word_to_idx = word_to_idx
+        self.idx_to_word = {i: w for w, i in self.word_to_idx.items()}
 
     def set_item_embedding(self, idx, embedding):
         self.weight.data[idx] = torch.FloatTensor(embedding)
@@ -345,20 +348,32 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
         collate_fn=collate_examples_multiple_tags
     )
 
+    comick = TheFinalComick(
+        language.char_to_index,
+        language.word_to_index,
+        word_embeddings_dimension=64,
+        word_hidden_state_dimension=64,
+    )
+
     embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer.load_words_embeddings(language.embeddings)
+
+    oovs = language.word_to_index.keys() - language.embeddings.keys()
 
     char_model = CharRNN(
         language.char_to_index,
         20,
-        lstm_hidden_layer
+        lstm_hidden_layer,
     )
 
     model = SimpleLSTMTagger(
         char_model,
         embedding_layer,
         lstm_hidden_layer,
-        {label: len(tags) for label, tags in language.tags_to_index.items()}
+        {label: len(tags) for label, tags in language.tags_to_index.items()},
+        comick,
+        oovs,
+        n=5
     )
 
     model_name = "{}".format(language.polyglot_abbreviation)

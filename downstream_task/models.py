@@ -286,21 +286,18 @@ class BOWClassifier(nn.Module):
 
 class SimpleLSTMTagger(nn.Module):
 
-    def __init__(self, char_layer, embedding_layer, hidden_dim, tags):
+    def __init__(self, char_layer, embedding_layer, hidden_dim, tags, comick, oov_words, n):
         super().__init__()
         self.char_layer = char_layer
         self.embedding_layer = embedding_layer
         self.hidden_dim = hidden_dim
         self.num_layers = 2
         self.tags = tags
-        # self.word_lstm = nn.LSTM(
-        #     self.embedding_layer.embedding_dim,
-        #     self.hidden_dim,
-        #     batch_first=True,
-        #     bidirectional=True,
-        #     num_layers=self.num_layers,
-        #     dropout=0.5
-        # )
+
+        # Comick params
+        self.n_gram = n
+        self.oov_words = oov_words
+        self.comick = comick
 
         self.lstms = nn.ModuleDict()
         self.hidden2tags = nn.ModuleDict()
@@ -334,6 +331,59 @@ class SimpleLSTMTagger(nn.Module):
     def acc(self, y_pred, y):
         return acc(y_pred['POS'], y['POS'])
 
+    def make_ngram(self, sequence, i):
+        L = len(sequence)
+        m = self.n_gram // 2
+        left_idx = max(0, i - m)
+        left_side = tuple(sequence[left_idx:i]) if i != 0 else tuple(Variable(torch.LongTensor([2])))
+        right_idx = min(L, i + m + 1)
+        right_side = tuple(sequence[i+1:right_idx]) if i != L-1 else tuple(Variable(torch.LongTensor([3])))
+        return left_side, right_side
+
+    def get_oov(self, sentences):
+        """
+        Returns for each batch for each sentences oov words to predict
+        :param sentences:
+        :return:
+        """
+        words_to_drop = list()
+        for si, sentence in enumerate(sentences):
+            sent_length = sentence.data.ne(0).long().sum()
+            for i, idx in enumerate(sentence):
+                word = self.embedding_layer.idx_to_word[int(idx.data[0])]
+                if word in self.oov_words:
+                    left_context, right_context = self.make_ngram(sentence[:sent_length], i)
+                    left_context = [c.view(1) for c in left_context]
+                    right_context = [c.view(1) for c in right_context]
+                    words_to_drop.append((si, i, word, torch.cat(left_context), torch.cat(right_context)))
+        return words_to_drop
+
+    def predict_embeddings(self, words_to_drop):
+        batches_i, sents_i, words, left_contexts, right_contexts = list(zip(*words_to_drop))
+
+        vectorized_words = [[self.comick.characters_vocabulary[c] for c in w] for w in words]
+        words_lengths = torch.LongTensor([len(w) for w in words])
+        padded_words = pad_sequences(vectorized_words, words_lengths)
+
+        vectorized_left_contexts = [l.data for l in left_contexts]
+        left_contexts_length = torch.LongTensor([len(c) for c in left_contexts])
+        padded_left = pad_sequences(vectorized_left_contexts, left_contexts_length)
+
+        vectorized_right_contexts = [l.data for l in right_contexts]
+        right_contexts_length = torch.LongTensor([len(c) for c in right_contexts])
+        padded_right = pad_sequences(vectorized_right_contexts, right_contexts_length)
+
+        use_gpu = torch.cuda.is_available()
+        if use_gpu:
+            padded_left = padded_left.cuda()
+            padded_words = padded_words.cuda()
+            padded_right = padded_right.cuda()
+
+        embeddings = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
+
+        for si, i, embedding in zip(batches_i, sents_i, embeddings):
+            yield (si, i, embedding)
+
     def forward(self, input):
         sentence, chars, tags_to_produce = input
         # Sort sentences in decreasing order
@@ -345,7 +395,17 @@ class SimpleLSTMTagger(nn.Module):
         zipped_chars = zip(rev_perm_idx, chars)
         sorted_chars_by_sent_length = [x for _, x in sorted(zipped_chars)]
 
+        # Predict embeddings
+        oov_to_predict = self.get_oov(sentence_sorted)
+        if len(oov_to_predict) > 0:
+            embeddings_to_replace = list(self.predict_embeddings(oov_to_predict))
+
         embeds = self.embedding_layer(sentence_sorted)
+
+        # Replace by predicted embeddings
+        if len(oov_to_predict) > 0:
+            for si, i, embed in embeddings_to_replace:
+                embeds[si, i] = embed
 
         chars_representation = list()
         for c in sorted_chars_by_sent_length:
