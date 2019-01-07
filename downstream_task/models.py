@@ -286,8 +286,9 @@ class BOWClassifier(nn.Module):
 
 class SimpleLSTMTagger(nn.Module):
 
-    def __init__(self, embedding_layer, hidden_dim, tags):
+    def __init__(self, char_layer, embedding_layer, hidden_dim, tags):
         super().__init__()
+        self.char_layer = char_layer
         self.embedding_layer = embedding_layer
         self.hidden_dim = hidden_dim
         self.num_layers = 2
@@ -307,7 +308,7 @@ class SimpleLSTMTagger(nn.Module):
             self.lstms.add_module(
                 tag,
                 nn.LSTM(
-                    self.embedding_layer.embedding_dim,
+                    self.embedding_layer.embedding_dim + self.hidden_dim * 2,
                     self.hidden_dim,
                     batch_first=True,
                     bidirectional=True,
@@ -334,18 +335,29 @@ class SimpleLSTMTagger(nn.Module):
         return acc(y_pred['POS'], y['POS'])
 
     def forward(self, input):
-        sentence, tags_to_produce = input
+        sentence, chars, tags_to_produce = input
         # Sort sentences in decreasing order
         lengths = sentence.data.ne(0).long().sum(dim=1)
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
         _, rev_perm_idx = perm_idx.sort(0)
         sentence_sorted = sentence[perm_idx]
 
+        zipped_chars = zip(rev_perm_idx, chars)
+        sorted_chars_by_sent_length = [x for _, x in sorted(zipped_chars)]
+
         embeds = self.embedding_layer(sentence_sorted)
+
+        chars_representation = list()
+        for c in sorted_chars_by_sent_length:
+            chars_rep = self.char_layer(c)
+            padded_chars_rep = F.pad(chars_rep, (0, 0, 0, embeds.shape[1] - chars_rep.shape[0]))
+            padded_chars_rep = padded_chars_rep.unsqueeze(0)
+            chars_representation.append(padded_chars_rep)
+        words_and_chars = torch.cat([embeds, torch.cat(chars_representation)], dim=-1)
 
         outputs = dict()
         for label in tags_to_produce:
-            packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+            packed_input = pack_padded_sequence(words_and_chars, list(seq_lengths), batch_first=True)
             packed_output, (hidden_states, cell_states) = self.lstms[label](packed_input)
             lstm_out, _ = pad_packed_sequence(packed_output, batch_first=True)
             lstm_out = lstm_out[rev_perm_idx]
@@ -353,3 +365,35 @@ class SimpleLSTMTagger(nn.Module):
             outputs[label] = tag_space
 
         return outputs
+
+
+class CharRNN(nn.Module):
+    def __init__(self, chars, chars_embedding, hidden_dim):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.embeddings = nn.Embedding(len(chars), chars_embedding, padding_idx=0)
+        self.char_lstm = nn.LSTM(
+            chars_embedding,
+            self.hidden_dim,
+            batch_first=True,
+            bidirectional=True
+        )
+
+
+    def forward(self, words):
+        """
+        Input is a list of strings that we want
+        To input into the RNN
+        :param words: List[str]
+        :return:
+        """
+        seq_lengths = words.data.ne(0).long().sum(dim=1)
+        seq_lengths, perm_idx = seq_lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+        seq_tensor = words[perm_idx]
+
+        embeds = self.embeddings(seq_tensor)
+        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+        packed_output, (ht, ct) = self.char_lstm(packed_input)
+        concatenated_hiddens = torch.cat([ht[0], ht[1]], dim=-1)
+        return concatenated_hiddens[rev_perm_idx]

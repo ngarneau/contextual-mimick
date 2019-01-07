@@ -15,7 +15,7 @@ from sacred.observers import MongoObserver
 
 from torch.utils.data import DataLoader
 from downstream_task.sequence_tagging import collate_examples_multiple_tags
-from downstream_task.models import SimpleLSTMTagger
+from downstream_task.models import SimpleLSTMTagger, CharRNN
 
 from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback
@@ -29,7 +29,7 @@ PADDING_WORD = "<PAD>"
 PADDING_CHAR = "<*>"
 POS_KEY = "POS"
 
-Instance = collections.namedtuple("Instance", ["source", "sentence", "tags"])
+Instance = collections.namedtuple("Instance", ["source", "sentence", "chars", "tags"])
 
 # Logging thangs
 base_config_file = './configs/base.json'
@@ -229,6 +229,7 @@ def read_file(filename, w2i, t2is, c2i, options):
 
         # running sentence buffers (lines are tokens)
         sentence = []
+        chars = []
         source = []
         tags = defaultdict(list)
 
@@ -249,8 +250,9 @@ def read_file(filename, w2i, t2is, c2i, options):
                         seq.extend([1] * (slen - len(seq))) # 0 guaranteed below to represent NONE_TAG
 
                 # add sentence to dataset
-                instances.append(Instance(source, sentence, tags))
+                instances.append(Instance(source, sentence, chars, tags))
                 source = []
+                chars = []
                 sentence = []
                 tags = defaultdict(list)
 
@@ -276,9 +278,14 @@ def read_file(filename, w2i, t2is, c2i, options):
                 pt2i = t2is[POS_KEY]
                 if postag not in pt2i:
                     pt2i[postag] = len(pt2i)
+
+                chars_for_word = list()
                 for c in word:
                     if c not in c2i:
                         c2i[c] = len(c2i)
+                    chars_for_word.append(c2i[c])
+                chars.append(chars_for_word)
+
                 for key, val in morphotags.items():
                     if key not in t2is:
                         t2is[key] = {PADDING_WORD: 0, NONE_TAG: 1}
@@ -306,13 +313,13 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     language = LanguageDataset(*languages[language])
 
-    train_sentences = [instance.sentence for instance in language.training_instances]
+    train_sentences = [(instance.sentence, instance.chars) for instance in language.training_instances]
     train_tags = [instance.tags for instance in language.training_instances]
 
-    dev_sentences = [instance.sentence for instance in language.dev_instances]
+    dev_sentences = [(instance.sentence, instance.chars) for instance in language.dev_instances]
     dev_tags = [instance.tags for instance in language.dev_instances]
 
-    test_sentences = [instance.sentence for instance in language.test_instances]
+    test_sentences = [(instance.sentence, instance.chars) for instance in language.test_instances]
     test_tags = [instance.tags for instance in language.test_instances]
 
     train_dataset = list(zip(train_sentences, train_tags))
@@ -341,7 +348,14 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer.load_words_embeddings(language.embeddings)
 
+    char_model = CharRNN(
+        language.char_to_index,
+        20,
+        lstm_hidden_layer
+    )
+
     model = SimpleLSTMTagger(
+        char_model,
         embedding_layer,
         lstm_hidden_layer,
         {label: len(tags) for label, tags in language.tags_to_index.items()}
