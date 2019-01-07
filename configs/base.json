@@ -3,5 +3,5 @@
     "batch_size": 1,
     "lstm_hidden_layer": 128,
     "language": "kk",
-    "epochs": 40
+    "epochs": 20
 }

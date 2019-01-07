@@ -124,7 +124,7 @@ class LanguageDataset:
         self.ud_filename_prefix = ud_filename_prefix
 
         self.options = {
-            'ud_tags': False,
+            'ud_tags': True,
             'no_morphotags': False
         }
 
@@ -298,6 +298,7 @@ def read_file(filename, w2i, t2is, c2i, options):
 
     return instances, vocab_counter
 
+
 @experiment.command
 def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     np.random.seed(seed)
@@ -375,40 +376,11 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     print("Testing on test set...")
     expt.test(test_loader)
 
+
 @experiment.main
 def main():
-    # languages = [
-    #     LanguageDataset('kk', 'UD_Kazakh', 'kk-ud'),
-        # LanguageDataset('ta', 'UD_Tamil', 'ta-ud'),
-        # LanguageDataset('lv', 'UD_Latvian', 'lv-ud'),
-        # LanguageDataset('vi', 'UD_Vietnamese', 'vi-ud'),
-        # LanguageDataset('hu', 'UD_Hungarian', 'hu-ud'),
-        # LanguageDataset('tr', 'UD_Turkish', 'tr-ud'),
-        # LanguageDataset('el', 'UD_Greek', 'el-ud'),
-        # LanguageDataset('bg', 'UD_Bulgarian', 'bg-ud'),
-        # LanguageDataset('sv', 'UD_Swedish', 'sv-ud'),
-        # LanguageDataset('eu', 'UD_Basque', 'eu-ud'),
-        # LanguageDataset('ru', 'UD_Russian', 'ru-ud'),
-        # LanguageDataset('da', 'UD_Danish', 'da-ud'),
-        # LanguageDataset('id', 'UD_Indonesian', 'id-ud'),
-        # LanguageDataset('zh', 'UD_Chinese', 'zh-ud'),
-        # LanguageDataset('fa', 'UD_Persian', 'fa-ud'),
-        # LanguageDataset('he', 'UD_Hebrew', 'he-ud'),
-        # LanguageDataset('ro', 'UD_Romanian', 'ro-ud'),
-        # LanguageDataset('en', 'UD_English', 'en-ud'),
-        # LanguageDataset('ar', 'UD_Arabic', 'ar-ud'),
-        # LanguageDataset('hi', 'UD_Hindi', 'hi-ud'),
-        # LanguageDataset('it', 'UD_Italian', 'it-ud'),
-        # LanguageDataset('es', 'UD_Spanish', 'es-ud'),
-        # LanguageDataset('cs', 'UD_Czech', 'cs-ud'),
-    # ]
-
     for language in languages:
         run = experiment.run_command('train', config_updates={'language': language})
-
-
-
-
 
 
 if __name__ == '__main__':

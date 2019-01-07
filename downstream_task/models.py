@@ -291,27 +291,30 @@ class SimpleLSTMTagger(nn.Module):
         self.embedding_layer = embedding_layer
         self.hidden_dim = hidden_dim
         self.num_layers = 2
-        self.word_lstm = nn.LSTM(
-            self.embedding_layer.embedding_dim,
-            self.hidden_dim,
-            batch_first=True,
-            bidirectional=True,
-            num_layers=self.num_layers,
-            dropout=0.5
-        )
+        self.tags = tags
+        # self.word_lstm = nn.LSTM(
+        #     self.embedding_layer.embedding_dim,
+        #     self.hidden_dim,
+        #     batch_first=True,
+        #     bidirectional=True,
+        #     num_layers=self.num_layers,
+        #     dropout=0.5
+        # )
 
-        # self.lstms = nn.ModuleDict()
+        self.lstms = nn.ModuleDict()
         self.hidden2tags = nn.ModuleDict()
         for tag, tagset_size in tags.items():
-            # self.lstms.add_module(
-            #     tag,
-            #     nn.LSTM(
-            #         self.embedding_layer.embedding_dim,
-            #         self.hidden_dim,
-            #         batch_first=True,
-            #         bidirectional=True
-            #     )
-            # )
+            self.lstms.add_module(
+                tag,
+                nn.LSTM(
+                    self.embedding_layer.embedding_dim,
+                    self.hidden_dim,
+                    batch_first=True,
+                    bidirectional=True,
+                    num_layers=self.num_layers,
+                    dropout=0.5
+                )
+            )
             self.hidden2tags.add_module(
                 tag,
                 nn.Linear(self.hidden_dim*2, tagset_size)
@@ -340,13 +343,12 @@ class SimpleLSTMTagger(nn.Module):
 
         embeds = self.embedding_layer(sentence_sorted)
 
-        packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
-        packed_output, (hidden_states, cell_states) = self.word_lstm(packed_input)
-        lstm_out, _ = pad_packed_sequence(packed_output, batch_first=True)
-        lstm_out = lstm_out[rev_perm_idx]
-
         outputs = dict()
         for label in tags_to_produce:
+            packed_input = pack_padded_sequence(embeds, list(seq_lengths), batch_first=True)
+            packed_output, (hidden_states, cell_states) = self.lstms[label](packed_input)
+            lstm_out, _ = pad_packed_sequence(packed_output, batch_first=True)
+            lstm_out = lstm_out[rev_perm_idx]
             tag_space = self.hidden2tags[label](lstm_out)
             outputs[label] = tag_space
 
