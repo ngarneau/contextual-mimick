@@ -1,11 +1,18 @@
 import torch
 from torch import nn, autograd
 from torch.nn import functional as F
-from torch.nn.init import kaiming_uniform, constant
+from torch.nn.init import kaiming_uniform, kaiming_normal_, constant
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from typing import Dict
 
+
+def make_substrings(s, lmin=3, lmax=6) :
+    s = '<' + s + '>'
+    for i in range(len(s)) :
+        s0 = s[i:]
+        for j in range(lmin, 1 + min(lmax, len(s0))) :
+            yield s0[:j]
 
 class Module(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -90,8 +97,7 @@ class MirrorLSTM(Module):
     """
 
     def __init__(self,
-                 num_embeddings,
-                 embedding_dim,
+                 embedding_layer,
                  hidden_state_dim,
                  padding_idx=0,
                  freeze_embeddings=True,
@@ -99,10 +105,7 @@ class MirrorLSTM(Module):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
 
-        self.embeddings = nn.Embedding(
-            num_embeddings=num_embeddings,
-            embedding_dim=embedding_dim,
-            padding_idx=0)
+        self.embeddings = embedding_layer
         kaiming_uniform(self.embeddings.weight)
         if freeze_embeddings:
             for param in self.embeddings.parameters():
@@ -110,7 +113,7 @@ class MirrorLSTM(Module):
                 param.requires_grad = False
 
         self.lstm_left = nn.LSTM(
-            input_size=embedding_dim,
+            input_size=embedding_layer.embedding_dim,
             hidden_size=hidden_state_dim,
             num_layers=1,
             batch_first=True,
@@ -119,15 +122,16 @@ class MirrorLSTM(Module):
         )
 
         self.lstm_right = nn.LSTM(
-            input_size=embedding_dim,
+            input_size=embedding_layer.embedding_dim,
             hidden_size=hidden_state_dim,
             num_layers=1,
             batch_first=True,
             bidirectional=True,
             dropout=dropout,
         )
-        self.lstms = {'left': self.lstm_left,
-                      'right': self.lstm_right}
+        self.lstms = nn.ModuleDict()
+        self.lstms.add_module('left', self.lstm_left)
+        self.lstms.add_module('right', self.lstm_right)
 
     def forward(self, x_left, x_right):
 
@@ -452,6 +456,19 @@ class Mimick(Module):
         output = self.fc_output(output)
         return output
 
+
+class BoS(Module):
+    def __init__(self, bos_vocabulary, embedding_dim):
+        super().__init__()
+        self.bos_vocabulary = bos_vocabulary
+        self.embedding_dim = embedding_dim
+        self.embeddings = nn.Embedding(len(self.bos_vocabulary), self.embedding_dim, padding_idx=0)
+
+    def forward(self, bos):
+        lengths = bos.data.ne(0).long().sum(dim=1)
+        return self.embeddings(bos).sum(dim=1)/lengths.view(-1, 1).float()
+
+
 class TheFinalComick(Module):
     def __init__(self,
                  characters_vocabulary: Dict[str, int],
@@ -497,24 +514,19 @@ class TheFinalComick(Module):
         if words_embeddings != None:
             self.load_words_embeddings(words_embeddings)
 
-        self.fc_context_left = nn.Linear(in_features=2 * word_embeddings_dimension,
-                                         out_features=word_embeddings_dimension)
+        self.fc_context_left = nn.Linear(in_features=2 * word_embeddings_dimension, out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context_left.weight)
 
-        self.fc_context_right = nn.Linear(in_features=2 * word_embeddings_dimension,
-                                          out_features=word_embeddings_dimension)
+        self.fc_context_right = nn.Linear(in_features=2 * word_embeddings_dimension, out_features=word_embeddings_dimension)
         kaiming_uniform(self.fc_context_right.weight)
 
-        self.left_ponderation = nn.Linear(in_features=word_embeddings_dimension,
-                                          out_features=1)
+        self.left_ponderation = nn.Linear(in_features=word_embeddings_dimension, out_features=1)
         constant(self.left_ponderation.weight, 0.25)
 
-        self.right_ponderation = nn.Linear(in_features=word_embeddings_dimension,
-                                           out_features=1)
+        self.right_ponderation = nn.Linear(in_features=word_embeddings_dimension, out_features=1)
         constant(self.right_ponderation.weight, 0.25)
 
-        self.middle_ponderation = nn.Linear(in_features=word_embeddings_dimension,
-                                           out_features=1)
+        self.middle_ponderation = nn.Linear(in_features=word_embeddings_dimension, out_features=1)
         constant(self.middle_ponderation.weight, 0.5)
 
         self.attention_layer = nn.Linear(word_embeddings_dimension * 3, 3)
@@ -555,6 +567,9 @@ class TheFinalComick(Module):
     def get_stats(self):
         return self.stats
 
+    def vectorize_words(self, words):
+        return [[self.characters_vocabulary[c] for c in w] for w in words]
+
     def forward(self, x):
         left_context, word, right_context = x
 
@@ -574,6 +589,78 @@ class TheFinalComick(Module):
         # output = self.middle_ponderation.weight * word_rep + self.left_ponderation.weight * left_context_rep + self.right_ponderation.weight * right_context_rep
         output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
         # output = word_rep + left_context_rep + right_context_rep
-        output = self.mimick.fc_output(output)
+        # output = self.mimick.fc_output(output)
+
+        return output
+
+
+class TheFinalComickBoS(Module):
+    def __init__(self,
+                 embedding_layer,
+                 bos_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=20,
+                 char_hidden_state_dimension=128,
+                 word_hidden_state_dimension=128,
+                 chars_embeddings=None,
+                 lstm_dropout=.3,
+                 freeze_word_embeddings=True,
+                 stats=None,
+                 ):
+        super().__init__()
+        self.stats = stats
+        self.embedding_layer = embedding_layer
+        self.words_vocabulary = embedding_layer.word_to_idx
+        self.word_embeddings_dimension = embedding_layer.embedding_dim
+        self.bos_vocabulary = bos_vocabulary
+        self.version = 3.0
+
+        self.bos_model = BoS(
+            self.bos_vocabulary,
+            self.word_embeddings_dimension
+        )
+
+        self.contexts = MirrorLSTM(
+            embedding_layer,
+            hidden_state_dim=self.word_embeddings_dimension,
+            freeze_embeddings=freeze_word_embeddings,
+            dropout=0.3)
+
+        self.fc_context_left = nn.Linear(in_features=2 * self.word_embeddings_dimension, out_features=self.word_embeddings_dimension)
+        kaiming_uniform(self.fc_context_left.weight)
+
+        self.fc_context_right = nn.Linear(in_features=2 * self.word_embeddings_dimension, out_features=self.word_embeddings_dimension)
+        kaiming_uniform(self.fc_context_right.weight)
+
+        self.attention_layer = nn.Linear(self.word_embeddings_dimension * 3, 3)
+
+    def log_stats(self, left_context, word, right_context, attention):
+        if self.stats:
+            self.stats.update(left_context, word, right_context, attention)
+
+    def get_stats(self):
+        return self.stats
+
+    def vectorize_words(self, words):
+        return [[self.bos_vocabulary[b] for b in make_substrings(w)] for w in words]
+
+    def forward(self, x):
+        left_context, word, right_context = x
+
+        word_rep = self.bos_model(word)
+
+        left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
+        left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
+        right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
+
+        attn_input = torch.cat([word_rep, left_context_rep, right_context_rep], dim=1)
+        attn_logits = self.attention_layer(attn_input.view(-1, self.word_embeddings_dimension * 3))
+        attn_pond = F.softmax(attn_logits)
+
+        self.log_stats(left_context, word, right_context, attn_pond)
+
+        # output = self.middle_ponderation.weight * word_rep + self.left_ponderation.weight * left_context_rep + self.right_ponderation.weight * right_context_rep
+        output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
+        # output = word_rep + left_context_rep + right_context_rep
+        # output = self.mimick.fc_output(output)
 
         return output

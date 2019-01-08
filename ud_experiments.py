@@ -4,6 +4,8 @@ import collections
 from collections import defaultdict
 from polyglot import text
 
+from sklearn.metrics import f1_score
+
 import numpy as np
 
 import torch
@@ -20,7 +22,7 @@ from downstream_task.models import SimpleLSTMTagger, CharRNN
 from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback
 
-from comick import LRComick, TheFinalComick
+from comick import TheFinalComick, TheFinalComickBoS
 
 
 UNK_TAG = "<UNK>"
@@ -31,7 +33,7 @@ PADDING_WORD = "<PAD>"
 PADDING_CHAR = "<*>"
 POS_KEY = "POS"
 
-Instance = collections.namedtuple("Instance", ["source", "sentence", "chars", "tags"])
+Instance = collections.namedtuple("Instance", ["source", "sentence", "chars", "substrings", "tags"])
 
 # Logging thangs
 base_config_file = './configs/base.json'
@@ -134,6 +136,7 @@ class LanguageDataset:
         self.word_to_index = {} # mapping from word to index
         self.tags_to_index = {} # mapping from attribute name to mapping from tag to index
         self.char_to_index = {} # mapping from character to index, for char-RNN concatenations
+        self.bos_to_index = {} # mapping from character to index, for char-RNN concatenations
 
         # Add special tokens / tags / chars to dicts
         self.word_to_index[PADDING_WORD] = len(self.word_to_index)
@@ -142,6 +145,7 @@ class LanguageDataset:
         #     t2i[START_TAG] = len(t2i)
         #     t2i[END_TAG] = len(t2i)
         self.char_to_index[PADDING_CHAR] = len(self.char_to_index)
+        self.bos_to_index[PADDING_CHAR] = len(self.bos_to_index)
 
         self.embedding_dim = None
         self.__get_embeddings()
@@ -161,6 +165,7 @@ class LanguageDataset:
             self.word_to_index,
             self.tags_to_index,
             self.char_to_index,
+            self.bos_to_index,
             self.options
         )
 
@@ -169,6 +174,7 @@ class LanguageDataset:
             self.word_to_index,
             self.tags_to_index,
             self.char_to_index,
+            self.bos_to_index,
             self.options
         )
 
@@ -177,6 +183,7 @@ class LanguageDataset:
             self.word_to_index,
             self.tags_to_index,
             self.char_to_index,
+            self.bos_to_index,
             self.options
         )
 
@@ -211,9 +218,15 @@ def split_tagstring(s, uni_key=False, has_pos=False):
             ret.append(attval)
     return ret
 
+def make_substrings(s, lmin=3, lmax=6) :
+    s = '<' + s + '>'
+    for i in range(len(s)) :
+        s0 = s[i:]
+        for j in range(lmin, 1 + min(lmax, len(s0))) :
+            yield s0[:j]
 
 
-def read_file(filename, w2i, t2is, c2i, options):
+def read_file(filename, w2i, t2is, c2i, b2i, options):
     """
     Read in a dataset and turn it into a list of instances.
     Modifies the w2i, t2is and c2i dicts, adding new words/attributes/tags/chars
@@ -233,6 +246,7 @@ def read_file(filename, w2i, t2is, c2i, options):
         # running sentence buffers (lines are tokens)
         sentence = []
         chars = []
+        substrings = []
         source = []
         tags = defaultdict(list)
 
@@ -253,9 +267,10 @@ def read_file(filename, w2i, t2is, c2i, options):
                         seq.extend([1] * (slen - len(seq))) # 0 guaranteed below to represent NONE_TAG
 
                 # add sentence to dataset
-                instances.append(Instance(source, sentence, chars, tags))
+                instances.append(Instance(source, sentence, chars, substrings, tags))
                 source = []
                 chars = []
+                substrings = []
                 sentence = []
                 tags = defaultdict(list)
 
@@ -289,6 +304,15 @@ def read_file(filename, w2i, t2is, c2i, options):
                     chars_for_word.append(c2i[c])
                 chars.append(chars_for_word)
 
+                # BoS data prep
+                bos = make_substrings(word)
+                bos_for_word = list()
+                for b in bos:
+                    if b not in b2i:
+                        b2i[b] = len(b2i)
+                    bos_for_word.append(b2i[b])
+                substrings.append(bos_for_word)
+
                 for key, val in morphotags.items():
                     if key not in t2is:
                         t2is[key] = {PADDING_WORD: 0, NONE_TAG: 1}
@@ -316,13 +340,13 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     language = LanguageDataset(*languages[language])
 
-    train_sentences = [(instance.sentence, instance.chars) for instance in language.training_instances]
+    train_sentences = [(instance.sentence, instance.chars, instance.substrings) for instance in language.training_instances]
     train_tags = [instance.tags for instance in language.training_instances]
 
-    dev_sentences = [(instance.sentence, instance.chars) for instance in language.dev_instances]
+    dev_sentences = [(instance.sentence, instance.chars, instance.substrings) for instance in language.dev_instances]
     dev_tags = [instance.tags for instance in language.dev_instances]
 
-    test_sentences = [(instance.sentence, instance.chars) for instance in language.test_instances]
+    test_sentences = [(instance.sentence, instance.chars, instance.substrings) for instance in language.test_instances]
     test_tags = [instance.tags for instance in language.test_instances]
 
     train_dataset = list(zip(train_sentences, train_tags))
@@ -348,15 +372,16 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
         collate_fn=collate_examples_multiple_tags
     )
 
-    comick = TheFinalComick(
-        language.char_to_index,
-        language.word_to_index,
-        word_embeddings_dimension=64,
-        word_hidden_state_dimension=64,
-    )
 
-    embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
-    embedding_layer.load_words_embeddings(language.embeddings)
+    embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
+    embedding_layer_comick.load_words_embeddings(language.embeddings)
+
+    comick = TheFinalComickBoS(
+        embedding_layer_comick,
+        language.bos_to_index,
+        word_hidden_state_dimension=64,
+        freeze_word_embeddings=False
+    )
 
     oovs = language.word_to_index.keys() - language.embeddings.keys()
 
@@ -366,6 +391,9 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
         lstm_hidden_layer,
     )
 
+    embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
+    embedding_layer.load_words_embeddings(language.embeddings)
+
     model = SimpleLSTMTagger(
         char_model,
         embedding_layer,
@@ -373,14 +401,14 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
         {label: len(tags) for label, tags in language.tags_to_index.items()},
         comick,
         oovs,
-        n=5
+        n=41
     )
 
     model_name = "{}".format(language.polyglot_abbreviation)
     expt_name = './expt_{}'.format(model_name)
     expt_dir = get_experiment_directory(expt_name)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, nesterov=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
     expt = PytouneExperiment(
         expt_dir,
         model,
@@ -404,6 +432,21 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     print("Testing on test set...")
     expt.test(test_loader)
+
+    all_preds = list()
+    all_trues = list()
+    for x, ys in test_loader:
+        preds = expt.model.predict_on_batch(x)
+        for tag, y in preds.items():
+            if tag is not 'POS':
+                all_pred = np.argmax(y, axis=2).reshape(-1)
+                all_true = ys[tag].view(-1)
+                for y_pred, y_true in zip(all_pred, all_true):
+                    if y_true != 0 and y_true != 1:
+                        all_preds.append(y_pred)
+                        all_trues.append(y_true.item())
+    f1 = f1_score(all_preds, all_trues, average='micro')
+    print("F1 score: {}".format(f1))
 
 
 @experiment.main

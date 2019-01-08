@@ -67,9 +67,11 @@ def collate_examples_multiple_tags(samples):
 
     words = list()
     chars = list()
+    bos = list()
     for e in examples:
         words.append(e[0])
         chars.append(e[1])
+        bos.append(e[2])
 
     seq_lengths = torch.LongTensor([len(s) for s in words])
     padded_words = pad_sequences(words, seq_lengths)
@@ -78,6 +80,11 @@ def collate_examples_multiple_tags(samples):
     for char_list in chars:
         chars_seq_lengths = torch.LongTensor([len(s) for s in char_list])
         padded_chars.append(pad_sequences(char_list, chars_seq_lengths))
+
+    padded_bos = list()
+    for bos_list in bos:
+        bos_seq_lengths = torch.LongTensor([len(s) for s in bos_list])
+        padded_bos.append(pad_sequences(bos_list, bos_seq_lengths))
 
     tags_to_produce = set()
     for example in labels:
@@ -97,7 +104,7 @@ def collate_examples_multiple_tags(samples):
         tags_to_produce.add(label)
 
     return (
-        (padded_words, padded_chars, tags_to_produce),
+        (padded_words, padded_chars, padded_bos, tags_to_produce),
         padded_labels
     )
 

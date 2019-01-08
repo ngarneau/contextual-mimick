@@ -361,8 +361,8 @@ class SimpleLSTMTagger(nn.Module):
     def predict_embeddings(self, words_to_drop):
         batches_i, sents_i, words, left_contexts, right_contexts = list(zip(*words_to_drop))
 
-        vectorized_words = [[self.comick.characters_vocabulary[c] for c in w] for w in words]
-        words_lengths = torch.LongTensor([len(w) for w in words])
+        vectorized_words = self.comick.vectorize_words(words)
+        words_lengths = torch.LongTensor([len(w) for w in vectorized_words])
         padded_words = pad_sequences(vectorized_words, words_lengths)
 
         vectorized_left_contexts = [l.data for l in left_contexts]
@@ -385,7 +385,7 @@ class SimpleLSTMTagger(nn.Module):
             yield (si, i, embedding)
 
     def forward(self, input):
-        sentence, chars, tags_to_produce = input
+        sentence, chars, substrings, tags_to_produce = input
         # Sort sentences in decreasing order
         lengths = sentence.data.ne(0).long().sum(dim=1)
         seq_lengths, perm_idx = lengths.sort(0, descending=True)
@@ -413,6 +413,7 @@ class SimpleLSTMTagger(nn.Module):
             padded_chars_rep = F.pad(chars_rep, (0, 0, 0, embeds.shape[1] - chars_rep.shape[0]))
             padded_chars_rep = padded_chars_rep.unsqueeze(0)
             chars_representation.append(padded_chars_rep)
+        chars = torch.cat(chars_representation)
         words_and_chars = torch.cat([embeds, torch.cat(chars_representation)], dim=-1)
 
         outputs = dict()
