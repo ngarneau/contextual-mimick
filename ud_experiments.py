@@ -408,14 +408,25 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     expt_name = './expt_{}'.format(model_name)
     expt_dir = get_experiment_directory(expt_name)
 
+    device_id = 0
+    device = None
+    if torch.cuda.is_available():
+        torch.cuda.set_device(device_id) # Fix bug where memory is allocated on GPU0 when ask to take GPU1.
+        torch.cuda.manual_seed(seed)
+        device = torch.device('cuda:%d' % device_id)
+        logging.info("Training on GPU %d" % device_id)
+    else:
+        logging.info("Training on CPU")
+
+
     optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
     expt = PytouneExperiment(
         expt_dir,
         model,
-        device=None,
+        device=device,
         optimizer=optimizer,
-        monitor_metric='val_loss',
-        monitor_mode='min'
+        monitor_metric='val_acc',
+        monitor_mode='max'
     )
 
     callbacks = [

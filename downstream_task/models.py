@@ -365,11 +365,11 @@ class SimpleLSTMTagger(nn.Module):
         words_lengths = torch.LongTensor([len(w) for w in vectorized_words])
         padded_words = pad_sequences(vectorized_words, words_lengths)
 
-        vectorized_left_contexts = [l.data for l in left_contexts]
+        vectorized_left_contexts = [l.data.cpu() for l in left_contexts]
         left_contexts_length = torch.LongTensor([len(c) for c in left_contexts])
         padded_left = pad_sequences(vectorized_left_contexts, left_contexts_length)
 
-        vectorized_right_contexts = [l.data for l in right_contexts]
+        vectorized_right_contexts = [l.data.cpu() for l in right_contexts]
         right_contexts_length = torch.LongTensor([len(c) for c in right_contexts])
         padded_right = pad_sequences(vectorized_right_contexts, right_contexts_length)
 
