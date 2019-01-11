@@ -20,7 +20,7 @@ from downstream_task.sequence_tagging import collate_examples_multiple_tags
 from downstream_task.models import SimpleLSTMTagger, CharRNN
 
 from pytoune.framework import Experiment as PytouneExperiment
-from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback
+from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback, EarlyStopping
 
 from comick import TheFinalComick, TheFinalComickBoS
 
@@ -432,6 +432,7 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     callbacks = [
         ClipNorm(model.parameters(), 0.25),
         ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=5, min_delta=1e-4),
         MetricsCallback(_run)
     ]
 
