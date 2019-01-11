@@ -334,7 +334,7 @@ def read_file(filename, w2i, t2is, c2i, b2i, options):
 
 
 @experiment.command
-def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
+def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
@@ -461,10 +461,11 @@ def train(_run, seed, batch_size, lstm_hidden_layer, language, epochs):
     print("F1 score: {}".format(f1))
 
 
-@experiment.main
-def main():
+@experiment.automain
+def main(_config):
     for language in languages:
-        run = experiment.run_command('train', config_updates={'language': language})
+        _config['language'] = language
+        run = experiment.run_command('train', config_updates=_config)
 
 
 if __name__ == '__main__':
