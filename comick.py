@@ -663,4 +663,4 @@ class TheFinalComickBoS(Module):
         # output = word_rep + left_context_rep + right_context_rep
         # output = self.mimick.fc_output(output)
 
-        return output
+        return output, attn_pond

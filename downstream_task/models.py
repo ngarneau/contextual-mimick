@@ -317,14 +317,16 @@ class SimpleLSTMTagger(nn.Module):
         self.metrics = [self.acc]
 
 
-    def loss_function(self, y_pred, y):
+    def loss_function(self, out, y):
         losses = list()
+        y_pred, _ = out
         for label, output in y_pred.items():
             loss = sequence_cross_entropy(output, y[label])
             losses.append(loss)
         return sum(losses)
 
-    def acc(self, y_pred, y):
+    def acc(self, out, y):
+        y_pred, _ = out
         return acc(y_pred['POS'], y['POS'])
 
     def make_ngram(self, sequence, i):
@@ -375,10 +377,10 @@ class SimpleLSTMTagger(nn.Module):
             padded_words = padded_words.cuda()
             padded_right = padded_right.cuda()
 
-        embeddings = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
+        embeddings, attentions = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
 
-        for si, i, embedding in zip(batches_i, sents_i, embeddings):
-            yield (si, i, embedding)
+        for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):
+            yield (si, i, embedding, attention)
 
     def forward(self, input):
         sentence, chars, substrings, tags_to_produce = input
@@ -392,6 +394,8 @@ class SimpleLSTMTagger(nn.Module):
         sorted_chars_by_sent_length = [x for _, x in sorted(zipped_chars)]
 
         # Predict embeddings
+        embeddings_to_replace = list()
+        embeddings_to_replace_with_perm_idx_sentence = list()
         oov_to_predict = self.get_oov(sentence_sorted)
         if len(oov_to_predict) > 0:
             embeddings_to_replace = list(self.predict_embeddings(oov_to_predict))
@@ -400,8 +404,11 @@ class SimpleLSTMTagger(nn.Module):
 
         # Replace by predicted embeddings
         if len(oov_to_predict) > 0:
-            for si, i, embed in embeddings_to_replace:
+            for si, i, embed, attention in embeddings_to_replace:
                 embeds[si, i] = embed
+                embeddings_to_replace_with_perm_idx_sentence.append(
+                    (perm_idx[si], si, i, embed, attention)
+                )
 
         chars_representation = list()
         for c in sorted_chars_by_sent_length:
@@ -421,7 +428,7 @@ class SimpleLSTMTagger(nn.Module):
             tag_space = self.hidden2tags[label](lstm_out)
             outputs[label] = tag_space
 
-        return outputs
+        return outputs, embeddings_to_replace_with_perm_idx_sentence
 
 
 class CharRNN(nn.Module):

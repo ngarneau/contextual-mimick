@@ -434,7 +434,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     callbacks = [
         ClipNorm(model.parameters(), 0.25),
         ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=5, min_delta=1e-4),
+        EarlyStopping(patience=10, min_delta=1e-4, monitor='val_acc'),
         MetricsCallback(_run)
     ]
 
@@ -450,7 +450,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     all_preds = list()
     all_trues = list()
     for x, ys in test_loader:
-        preds = expt.model.predict_on_batch(x)
+        preds, attention = expt.model.predict_on_batch(x)
         for tag, y in preds.items():
             if tag is not 'POS':
                 all_pred = np.argmax(y, axis=2).reshape(-1)
@@ -463,9 +463,10 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     print("F1 score: {}".format(f1))
 
     stats_pos_per_oovs = defaultdict(list)
+    attention_analysis = defaultdict(list)
     for x, ys in test_loader:
         sentence = x[0]
-        preds = expt.model.predict_on_batch(x)
+        preds, attentions = expt.model.predict_on_batch(x)
         for tag, y in preds.items():
             if tag is 'POS':
                 all_pred = np.argmax(y, axis=2).reshape(-1)
@@ -478,6 +479,20 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                             stats_pos_per_oovs[token_value].append(1)
                         else:
                             stats_pos_per_oovs[token_value].append(0)
+        for sent_idx, _, word_idx, embedding, attention in attentions:
+            s = sentence[sent_idx]
+            target_word = language.idx_to_word[s[word_idx].item()]
+            s_to_words = " ".join([language.idx_to_word[w.item()] for w in s if w.item() > 0])
+            result = all_pred[sent_idx] == all_true[sent_idx]
+            attention_analysis[target_word].append((target_word, word_idx, attention, s_to_words, result))
+
+    for target_word, occurrences in attention_analysis.items():
+        print("="*80)
+        print("TARGET WORD: {}".format(target_word))
+        for target_word, word_idx, attention, sentence, result in occurrences:
+            print("{}\t({})\t{}\t{}\n{}".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence))
+            print()
+        print("="*80)
 
     all_occurrences = list()
     for oov, occurrences in stats_pos_per_oovs.items():
