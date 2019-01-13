@@ -21,6 +21,7 @@ from downstream_task.models import SimpleLSTMTagger, CharRNN
 
 from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback, EarlyStopping
+from pytoune.utils import torch_to_numpy
 
 from comick import TheFinalComick, TheFinalComickBoS
 
@@ -188,6 +189,18 @@ class LanguageDataset:
             self.bos_to_index,
             self.options
         )
+
+
+def cos_matrix_multiplication(matrix, vector):
+    """
+    Calculating pairwise cosine distance using matrix vector multiplication.
+    """
+    dotted = matrix.dot(vector)
+    matrix_norms = np.linalg.norm(matrix, axis=1)
+    vector_norm = np.linalg.norm(vector)
+    matrix_vector_norms = np.multiply(matrix_norms, vector_norm)
+    neighbors = np.divide(dotted, matrix_vector_norms)
+    return neighbors
 
 
 def get_source_directory(directory_name):
@@ -433,8 +446,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     callbacks = [
         ClipNorm(model.parameters(), 0.25),
-        ReduceLROnPlateau(monitor='val_loss', mode='min', patience=20, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=10, min_delta=1e-4, monitor='val_acc'),
+        ReduceLROnPlateau(monitor='val_loss', mode='max', patience=10, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=20, min_delta=1e-4, monitor='val_acc', mode='max'),
         MetricsCallback(_run)
     ]
 
@@ -446,6 +459,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     print("Testing on test set...")
     expt.test(test_loader)
+
+    vectors = torch_to_numpy(model.embedding_layer.weight)
 
     all_preds = list()
     all_trues = list()
@@ -482,15 +497,20 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         for sent_idx, _, word_idx, embedding, attention in attentions:
             s = sentence[sent_idx]
             target_word = language.idx_to_word[s[word_idx].item()]
+            sims = cos_matrix_multiplication(vectors, embedding)
+            most_similar_word = language.idx_to_word[np.argmax(sims)]
+            most_similar_word_sim = np.max(sims)
             s_to_words = " ".join([language.idx_to_word[w.item()] for w in s if w.item() > 0])
             result = all_pred[sent_idx] == all_true[sent_idx]
-            attention_analysis[target_word].append((target_word, word_idx, attention, s_to_words, result))
+            attention_analysis[target_word].append((
+                target_word, most_similar_word, most_similar_word_sim, word_idx, attention, s_to_words, result
+            ))
 
     for target_word, occurrences in attention_analysis.items():
         print("="*80)
         print("TARGET WORD: {}".format(target_word))
-        for target_word, word_idx, attention, sentence, result in occurrences:
-            print("{}\t({})\t{}\t{}\n{}".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence))
+        for target_word, sim_word, sim_word_sim, word_idx, attention, sentence, result in occurrences:
+            print("{}\t({})\t{}\t{}\n{}\n{}\t({})".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence, sim_word, sim_word_sim))
             print()
         print("="*80)
 
