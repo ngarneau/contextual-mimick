@@ -151,6 +151,8 @@ class LanguageDataset:
         self.__get_embeddings()
         self.__parse_dataset()
 
+        self.idx_to_word = {v: k for k, v in self.word_to_index.items()}
+
     def __get_embeddings(self):
         embeddings = text.load_embeddings(lang=self.polyglot_abbreviation)
         self.embeddings = dict()
@@ -459,6 +461,29 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                         all_trues.append(y_true.item())
     f1 = f1_score(all_preds, all_trues, average='micro')
     print("F1 score: {}".format(f1))
+
+    stats_pos_per_oovs = defaultdict(list)
+    for x, ys in test_loader:
+        sentence = x[0]
+        preds = expt.model.predict_on_batch(x)
+        for tag, y in preds.items():
+            if tag is 'POS':
+                all_pred = np.argmax(y, axis=2).reshape(-1)
+                all_true = ys[tag].view(-1)
+                all_sentence = sentence.view(-1)
+                for token, y_pred, y_true in zip(all_sentence, all_pred, all_true):
+                    token_value = language.idx_to_word[token.item()]
+                    if token_value in oovs:
+                        if y_pred == y_true.item():
+                            stats_pos_per_oovs[token_value].append(1)
+                        else:
+                            stats_pos_per_oovs[token_value].append(0)
+
+    all_occurrences = list()
+    for oov, occurrences in stats_pos_per_oovs.items():
+        all_occurrences += occurrences
+        print("{}: {} ({})".format(oov, sum(occurrences)/float(len(occurrences)), len(occurrences)))
+    print("Total: {} ({})".format(sum(all_occurrences)/float(len(all_occurrences)), len(all_occurrences)))
 
 
 @experiment.automain
