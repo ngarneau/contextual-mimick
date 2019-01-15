@@ -446,7 +446,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     callbacks = [
         ClipNorm(model.parameters(), 0.25),
-        ReduceLROnPlateau(monitor='val_loss', mode='max', patience=10, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
+        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=10, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
         EarlyStopping(patience=20, min_delta=1e-4, monitor='val_acc', mode='max'),
         MetricsCallback(_run)
     ]
