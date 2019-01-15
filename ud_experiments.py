@@ -25,6 +25,8 @@ from pytoune.utils import torch_to_numpy
 
 from comick import TheFinalComick, TheFinalComickBoS
 
+from utils import load_embeddings
+
 
 UNK_TAG = "<UNK>"
 NONE_TAG = "<NONE>"
@@ -391,6 +393,11 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer_comick.load_words_embeddings(language.embeddings)
 
+    # Mimick embeddings
+    embed_path = "./data/mimick-embs/{}-lstm-est-embs.txt".format(language.polyglot_abbreviation)
+    mimick_embeds = load_embeddings(embed_path)
+    embedding_layer_comick.load_words_embeddings(mimick_embeds)
+
     comick = TheFinalComickBoS(
         embedding_layer_comick,
         language.bos_to_index,
@@ -398,7 +405,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         freeze_word_embeddings=False
     )
 
-    oovs = language.word_to_index.keys() - language.embeddings.keys()
+    # oovs = language.word_to_index.keys() - language.embeddings.keys()
+    oovs = set()
 
     char_model = CharRNN(
         language.char_to_index,
