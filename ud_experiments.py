@@ -405,8 +405,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         freeze_word_embeddings=False
     )
 
-    # oovs = language.word_to_index.keys() - language.embeddings.keys()
-    oovs = set()
+    oovs = language.word_to_index.keys() - language.embeddings.keys()
 
     char_model = CharRNN(
         language.char_to_index,
