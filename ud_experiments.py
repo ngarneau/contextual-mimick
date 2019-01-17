@@ -142,11 +142,11 @@ class LanguageDataset:
         self.bos_to_index = {} # mapping from character to index, for char-RNN concatenations
 
         # Add special tokens / tags / chars to dicts
-        self.word_to_index[PADDING_WORD] = len(self.word_to_index)
-        self.word_to_index[UNK_TAG] = len(self.word_to_index)
-        # for t2i in t2is.values():
-        #     t2i[START_TAG] = len(t2i)
-        #     t2i[END_TAG] = len(t2i)
+        self.word_to_index[PADDING_WORD] = len(self.word_to_index) # Pad is 0
+        self.word_to_index[UNK_TAG] = len(self.word_to_index) # Unk is 1
+        self.word_to_index[START_TAG] = len(self.word_to_index) # Start is 2
+        self.word_to_index[END_TAG] = len(self.word_to_index) # End is 3
+
         self.char_to_index[PADDING_CHAR] = len(self.char_to_index)
         self.bos_to_index[PADDING_CHAR] = len(self.bos_to_index)
 
