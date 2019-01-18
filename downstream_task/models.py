@@ -348,7 +348,7 @@ class SimpleLSTMTagger(nn.Module):
         for si, sentence in enumerate(sentences):
             sent_length = sentence.data.ne(0).long().sum()
             for i, idx in enumerate(sentence):
-                word = self.embedding_layer.idx_to_word[int(idx.data[0])]
+                word = self.embedding_layer.idx_to_word[int(idx.item())]
                 if word in self.oov_words:
                     left_context, right_context = self.make_ngram(sentence[:sent_length], i)
                     left_context = [c.view(1) for c in left_context]
