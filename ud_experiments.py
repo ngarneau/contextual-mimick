@@ -23,6 +23,8 @@ from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback, EarlyStopping
 from pytoune.utils import torch_to_numpy
 
+from pymongo import MongoClient
+
 from comick import TheFinalComick, TheFinalComickBoS
 
 from utils import load_embeddings
@@ -45,6 +47,11 @@ experiment.add_config(base_config_file)
 experiment.observers.append(MongoObserver.create(
     url=os.environ['DB_URL'],
     db_name=os.environ['DB_NAME']))
+
+client = MongoClient(os.environ['DB_URL'])
+database = client[os.environ['DB_NAME']]
+collection = database['logs']
+
 
 
 languages = {
@@ -471,7 +478,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         print('Exiting from training early')
 
     print("Testing on test set...")
-    expt.test(test_loader)
+    metrics = expt.test(test_loader)
+    collection.insert
 
     vectors = torch_to_numpy(model.embedding_layer.weight)
 
@@ -488,7 +496,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                         all_preds.append(y_pred)
                         all_trues.append(y_true.item())
     f1 = f1_score(all_preds, all_trues, average='micro')
-    print("F1 score: {}".format(f1))
+    metrics['f1'] = f1
+    # print("F1 score: {}".format(f1))
 
     stats_pos_per_oovs = defaultdict(list)
     attention_analysis = defaultdict(list)
@@ -519,19 +528,33 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                 target_word, most_similar_word, most_similar_word_sim, word_idx, attention, s_to_words, result
             ))
 
-    for target_word, occurrences in attention_analysis.items():
-        print("="*80)
-        print("TARGET WORD: {}".format(target_word))
-        for target_word, sim_word, sim_word_sim, word_idx, attention, sentence, result in occurrences:
-            print("{}\t({})\t{}\t{}\n{}\n{}\t({})".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence, sim_word, sim_word_sim))
-            print()
-        print("="*80)
+    metrics['attention'] = attention_analysis
+    metrics['pos_per_oov'] = dict()
+
+    # for target_word, occurrences in attention_analysis.items():
+    #     print("="*80)
+    #     print("TARGET WORD: {}".format(target_word))
+    #     for target_word, sim_word, sim_word_sim, word_idx, attention, sentence, result in occurrences:
+    #         print("{}\t({})\t{}\t{}\n{}\n{}\t({})".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence, sim_word, sim_word_sim))
+    #         print()
+    #     print("="*80)
 
     all_occurrences = list()
     for oov, occurrences in stats_pos_per_oovs.items():
+        oov = oov.replace('.', '<DOT>') # For mongodb
         all_occurrences += occurrences
-        print("{}: {} ({})".format(oov, sum(occurrences)/float(len(occurrences)), len(occurrences)))
-    print("Total: {} ({})".format(sum(all_occurrences)/float(len(all_occurrences)), len(all_occurrences)))
+        metrics['pos_per_oov'][oov] = dict()
+        metrics['pos_per_oov'][oov]['percent'] = sum(occurrences)/float(len(occurrences))
+        metrics['pos_per_oov'][oov]['num'] = len(occurrences)
+    metrics['pos_per_oov']['total'] = dict()
+    metrics['pos_per_oov']['total']['percent'] = sum(all_occurrences)/float(len(all_occurrences))
+    metrics['pos_per_oov']['total']['num'] = len(all_occurrences)
+
+    all_stats = {
+        'model': model_name,
+        'metrics': metrics
+    }
+    collection.insert_one(all_stats)
 
 
 @experiment.automain
