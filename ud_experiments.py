@@ -23,6 +23,8 @@ from pytoune.framework import Experiment as PytouneExperiment
 from pytoune.framework.callbacks import ClipNorm, ReduceLROnPlateau, Callback, EarlyStopping
 from pytoune.utils import torch_to_numpy
 
+from pymongo import MongoClient
+
 from comick import TheFinalComick, TheFinalComickBoS
 
 from utils import load_embeddings
@@ -45,6 +47,11 @@ experiment.add_config(base_config_file)
 experiment.observers.append(MongoObserver.create(
     url=os.environ['DB_URL'],
     db_name=os.environ['DB_NAME']))
+
+client = MongoClient(os.environ['DB_URL'])
+database = client[os.environ['DB_NAME']]
+collection = database['logs']
+
 
 
 languages = {
@@ -352,6 +359,7 @@ def read_file(filename, w2i, t2is, c2i, b2i, options):
 
 @experiment.command
 def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
+    print(_config)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
@@ -389,49 +397,53 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         collate_fn=collate_examples_multiple_tags
     )
 
-
-    embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
-    embedding_layer_comick.load_words_embeddings(language.embeddings)
-
-    # Mimick embeddings
-    embed_path = "./data/mimick-embs/{}-lstm-est-embs.txt".format(language.polyglot_abbreviation)
-    mimick_embeds = load_embeddings(embed_path)
-    embedding_layer_comick.load_words_embeddings(mimick_embeds)
-
-    comick = TheFinalComickBoS(
-        embedding_layer_comick,
-        language.bos_to_index,
-        word_hidden_state_dimension=64,
-        freeze_word_embeddings=False
-    )
-
-    # oovs = language.word_to_index.keys() - language.embeddings.keys()
-    oovs = set()
-
-    char_model = CharRNN(
-        language.char_to_index,
-        20,
-        lstm_hidden_layer,
-    )
+    oovs = language.word_to_index.keys() - language.embeddings.keys()
 
     embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer.load_words_embeddings(language.embeddings)
+
+    if _config["embeddings_mode"] == "random":
+        # Leave OOV random embeddings
+        comick = None
+
+    elif _config["embeddings_mode"] == "mimick":
+        # Fill OOV embeddings with Mimick's
+        embed_path = "./data/mimick-embs/{}-lstm-est-embs.txt".format(language.polyglot_abbreviation)
+        mimick_embeds = load_embeddings(embed_path)
+        embedding_layer.load_words_embeddings(mimick_embeds)
+        comick = None
+
+    elif _config["embeddings_mode"] == "comick":
+        embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
+        embedding_layer_comick.load_words_embeddings(language.embeddings)
+        comick = TheFinalComickBoS(
+            embedding_layer_comick,
+            language.bos_to_index,
+            word_hidden_state_dimension=language.embedding_dim,
+            freeze_word_embeddings=False
+        )
+
+    char_model = CharRNN(
+        language.char_to_index,
+        _config["char_embedding_size"],
+        lstm_hidden_layer,
+    )
 
     model = SimpleLSTMTagger(
         char_model,
         embedding_layer,
         lstm_hidden_layer,
         {label: len(tags) for label, tags in language.tags_to_index.items()},
-        comick,
         oovs,
+        comick,
         n=41
     )
 
     model_name = "{}".format(language.polyglot_abbreviation)
-    expt_name = './expt_{}'.format(model_name)
+    expt_name = './expt_{}_{}'.format(model_name, _config["embeddings_mode"])
     expt_dir = get_experiment_directory(expt_name)
 
-    device_id = 0
+    device_id = _config["device"]
     device = None
     if torch.cuda.is_available():
         torch.cuda.set_device(device_id) # Fix bug where memory is allocated on GPU0 when ask to take GPU1.
@@ -442,7 +454,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         logging.info("Training on CPU")
 
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=_config["learning_rate"])
     expt = PytouneExperiment(
         expt_dir,
         model,
@@ -453,9 +465,9 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     )
 
     callbacks = [
-        ClipNorm(model.parameters(), 0.25),
-        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=10, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=20, min_delta=1e-4, monitor='val_acc', mode='max'),
+        ClipNorm(model.parameters(), _config["gradient_clipping"]),
+        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_acc', mode='max'),
         MetricsCallback(_run)
     ]
 
@@ -466,7 +478,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         print('Exiting from training early')
 
     print("Testing on test set...")
-    expt.test(test_loader)
+    metrics = expt.test(test_loader)
+    collection.insert
 
     vectors = torch_to_numpy(model.embedding_layer.weight)
 
@@ -483,7 +496,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                         all_preds.append(y_pred)
                         all_trues.append(y_true.item())
     f1 = f1_score(all_preds, all_trues, average='micro')
-    print("F1 score: {}".format(f1))
+    metrics['f1'] = f1
+    # print("F1 score: {}".format(f1))
 
     stats_pos_per_oovs = defaultdict(list)
     attention_analysis = defaultdict(list)
@@ -514,19 +528,33 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                 target_word, most_similar_word, most_similar_word_sim, word_idx, attention, s_to_words, result
             ))
 
-    for target_word, occurrences in attention_analysis.items():
-        print("="*80)
-        print("TARGET WORD: {}".format(target_word))
-        for target_word, sim_word, sim_word_sim, word_idx, attention, sentence, result in occurrences:
-            print("{}\t({})\t{}\t{}\n{}\n{}\t({})".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence, sim_word, sim_word_sim))
-            print()
-        print("="*80)
+    metrics['attention'] = attention_analysis
+    metrics['pos_per_oov'] = dict()
+
+    # for target_word, occurrences in attention_analysis.items():
+    #     print("="*80)
+    #     print("TARGET WORD: {}".format(target_word))
+    #     for target_word, sim_word, sim_word_sim, word_idx, attention, sentence, result in occurrences:
+    #         print("{}\t({})\t{}\t{}\n{}\n{}\t({})".format(target_word, word_idx, "\t".join([str(a) for a in attention]), result, sentence, sim_word, sim_word_sim))
+    #         print()
+    #     print("="*80)
 
     all_occurrences = list()
     for oov, occurrences in stats_pos_per_oovs.items():
+        oov = oov.replace('.', '<DOT>') # For mongodb
         all_occurrences += occurrences
-        print("{}: {} ({})".format(oov, sum(occurrences)/float(len(occurrences)), len(occurrences)))
-    print("Total: {} ({})".format(sum(all_occurrences)/float(len(all_occurrences)), len(all_occurrences)))
+        metrics['pos_per_oov'][oov] = dict()
+        metrics['pos_per_oov'][oov]['percent'] = sum(occurrences)/float(len(occurrences))
+        metrics['pos_per_oov'][oov]['num'] = len(occurrences)
+    metrics['pos_per_oov']['total'] = dict()
+    metrics['pos_per_oov']['total']['percent'] = sum(all_occurrences)/float(len(all_occurrences))
+    metrics['pos_per_oov']['total']['num'] = len(all_occurrences)
+
+    all_stats = {
+        'model': model_name,
+        'metrics': metrics
+    }
+    collection.insert_one(all_stats)
 
 
 @experiment.automain
