@@ -3,5 +3,17 @@
     "batch_size": 32,
     "lstm_hidden_layer": 128,
     "language": "kk",
-    "epochs": 40
+    "epochs": 40,
+    "device": 0,
+    "embeddings_mode": "random",
+    "char_embedding_size": 20,
+    "learning_rate": 0.005,
+    "gradient_clipping": 0.25,
+    "reduce_lr_on_plateau": {
+        "patience": 10,
+        "factor": 0.5
+    },
+    "early_stopping": {
+        "patience": 20
+    }
 }

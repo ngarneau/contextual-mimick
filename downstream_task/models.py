@@ -286,7 +286,7 @@ class BOWClassifier(nn.Module):
 
 class SimpleLSTMTagger(nn.Module):
 
-    def __init__(self, char_layer, embedding_layer, hidden_dim, tags, comick, oov_words, n):
+    def __init__(self, char_layer, embedding_layer, hidden_dim, tags, oov_words, comick=None, n=41):
         super().__init__()
         self.char_layer = char_layer
         self.embedding_layer = embedding_layer
@@ -382,6 +382,27 @@ class SimpleLSTMTagger(nn.Module):
         for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):
             yield (si, i, embedding, attention)
 
+    def get_embeddings(self, sentence_sorted):
+        embeds = self.embedding_layer(sentence_sorted)
+        if self.comick:
+            # Predict embeddings
+            embeddings_to_replace = list()
+            embeddings_to_replace_with_perm_idx_sentence = list()
+            oov_to_predict = self.get_oov(sentence_sorted)
+            if len(oov_to_predict) > 0:
+                embeddings_to_replace = list(self.predict_embeddings(oov_to_predict))
+
+            # Replace by predicted embeddings
+            if len(oov_to_predict) > 0:
+                for si, i, embed, attention in embeddings_to_replace:
+                    embeds[si, i] = embed
+                    embeddings_to_replace_with_perm_idx_sentence.append(
+                        (perm_idx[si], si, i, embed, attention)
+                    )
+            return embeds, embeddings_to_replace_with_perm_idx_sentence
+        return embeds, []
+
+
     def forward(self, input):
         sentence, chars, substrings, tags_to_produce = input
         # Sort sentences in decreasing order
@@ -390,26 +411,10 @@ class SimpleLSTMTagger(nn.Module):
         _, rev_perm_idx = perm_idx.sort(0)
         sentence_sorted = sentence[perm_idx]
 
+        embeds, embeddings_to_replace_with_perm_idx_sentence = self.get_embeddings(sentence_sorted)
+
         zipped_chars = zip(rev_perm_idx, chars)
         sorted_chars_by_sent_length = [x for _, x in sorted(zipped_chars)]
-
-        # Predict embeddings
-        embeddings_to_replace = list()
-        embeddings_to_replace_with_perm_idx_sentence = list()
-        oov_to_predict = self.get_oov(sentence_sorted)
-        if len(oov_to_predict) > 0:
-            embeddings_to_replace = list(self.predict_embeddings(oov_to_predict))
-
-        embeds = self.embedding_layer(sentence_sorted)
-
-        # Replace by predicted embeddings
-        if len(oov_to_predict) > 0:
-            for si, i, embed, attention in embeddings_to_replace:
-                embeds[si, i] = embed
-                embeddings_to_replace_with_perm_idx_sentence.append(
-                    (perm_idx[si], si, i, embed, attention)
-                )
-
         chars_representation = list()
         for c in sorted_chars_by_sent_length:
             chars_rep = self.char_layer(c)

@@ -352,6 +352,7 @@ def read_file(filename, w2i, t2is, c2i, b2i, options):
 
 @experiment.command
 def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
+    print(_config)
     np.random.seed(seed)
     torch.manual_seed(seed)
 
@@ -389,48 +390,53 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         collate_fn=collate_examples_multiple_tags
     )
 
-
-    embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
-    embedding_layer_comick.load_words_embeddings(language.embeddings)
-
-    # Mimick embeddings
-    embed_path = "./data/mimick-embs/{}-lstm-est-embs.txt".format(language.polyglot_abbreviation)
-    mimick_embeds = load_embeddings(embed_path)
-    embedding_layer_comick.load_words_embeddings(mimick_embeds)
-
-    comick = TheFinalComickBoS(
-        embedding_layer_comick,
-        language.bos_to_index,
-        word_hidden_state_dimension=64,
-        freeze_word_embeddings=False
-    )
-
     oovs = language.word_to_index.keys() - language.embeddings.keys()
-
-    char_model = CharRNN(
-        language.char_to_index,
-        20,
-        lstm_hidden_layer,
-    )
 
     embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer.load_words_embeddings(language.embeddings)
+
+    if _config["embeddings_mode"] == "random":
+        # Leave OOV random embeddings
+        comick = None
+
+    elif _config["embeddings_mode"] == "mimick":
+        # Fill OOV embeddings with Mimick's
+        embed_path = "./data/mimick-embs/{}-lstm-est-embs.txt".format(language.polyglot_abbreviation)
+        mimick_embeds = load_embeddings(embed_path)
+        embedding_layer.load_words_embeddings(mimick_embeds)
+        comick = None
+
+    elif _config["embeddings_mode"] == "comick":
+        embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
+        embedding_layer_comick.load_words_embeddings(language.embeddings)
+        comick = TheFinalComickBoS(
+            embedding_layer_comick,
+            language.bos_to_index,
+            word_hidden_state_dimension=language.embedding_dim,
+            freeze_word_embeddings=False
+        )
+
+    char_model = CharRNN(
+        language.char_to_index,
+        _config["char_embedding_size"],
+        lstm_hidden_layer,
+    )
 
     model = SimpleLSTMTagger(
         char_model,
         embedding_layer,
         lstm_hidden_layer,
         {label: len(tags) for label, tags in language.tags_to_index.items()},
-        comick,
         oovs,
+        comick,
         n=41
     )
 
     model_name = "{}".format(language.polyglot_abbreviation)
-    expt_name = './expt_{}'.format(model_name)
+    expt_name = './expt_{}_{}'.format(model_name, _config["embeddings_mode"])
     expt_dir = get_experiment_directory(expt_name)
 
-    device_id = 0
+    device_id = _config["device"]
     device = None
     if torch.cuda.is_available():
         torch.cuda.set_device(device_id) # Fix bug where memory is allocated on GPU0 when ask to take GPU1.
@@ -441,7 +447,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         logging.info("Training on CPU")
 
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=_config["learning_rate"])
     expt = PytouneExperiment(
         expt_dir,
         model,
@@ -452,9 +458,9 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     )
 
     callbacks = [
-        ClipNorm(model.parameters(), 0.25),
-        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=10, factor=0.5, threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=20, min_delta=1e-4, monitor='val_acc', mode='max'),
+        ClipNorm(model.parameters(), _config["gradient_clipping"]),
+        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_acc', mode='max'),
         MetricsCallback(_run)
     ]
 
