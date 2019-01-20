@@ -382,7 +382,7 @@ class SimpleLSTMTagger(nn.Module):
         for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):
             yield (si, i, embedding, attention)
 
-    def get_embeddings(self, sentence_sorted):
+    def get_embeddings(self, perm_idx, sentence_sorted):
         embeds = self.embedding_layer(sentence_sorted)
         if self.comick:
             # Predict embeddings
@@ -411,7 +411,7 @@ class SimpleLSTMTagger(nn.Module):
         _, rev_perm_idx = perm_idx.sort(0)
         sentence_sorted = sentence[perm_idx]
 
-        embeds, embeddings_to_replace_with_perm_idx_sentence = self.get_embeddings(sentence_sorted)
+        embeds, embeddings_to_replace_with_perm_idx_sentence = self.get_embeddings(perm_idx, sentence_sorted)
 
         zipped_chars = zip(rev_perm_idx, chars)
         sorted_chars_by_sent_length = [x for _, x in sorted(zipped_chars)]
