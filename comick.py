@@ -605,6 +605,7 @@ class TheFinalComickBoS(Module):
                  lstm_dropout=.3,
                  freeze_word_embeddings=True,
                  stats=None,
+                 attention=False
                  ):
         super().__init__()
         self.stats = stats
@@ -613,6 +614,7 @@ class TheFinalComickBoS(Module):
         self.word_embeddings_dimension = embedding_layer.embedding_dim
         self.bos_vocabulary = bos_vocabulary
         self.version = 3.0
+        self.attention = attention
 
         self.bos_model = BoS(
             self.bos_vocabulary,
@@ -632,6 +634,8 @@ class TheFinalComickBoS(Module):
         kaiming_uniform(self.fc_context_right.weight)
 
         self.attention_layer = nn.Linear(self.word_embeddings_dimension * 3, 3)
+
+        self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension * 3, self.word_embeddings_dimension)
 
     def log_stats(self, left_context, word, right_context, attention):
         if self.stats:
@@ -653,14 +657,15 @@ class TheFinalComickBoS(Module):
         right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
         attn_input = torch.cat([word_rep, left_context_rep, right_context_rep], dim=1)
-        attn_logits = self.attention_layer(attn_input.view(-1, self.word_embeddings_dimension * 3))
-        attn_pond = F.softmax(attn_logits)
 
-        self.log_stats(left_context, word, right_context, attn_pond)
+        if self.attention:
+            attn_logits = self.attention_layer(attn_input.view(-1, self.word_embeddings_dimension * 3))
+            attn_pond = F.softmax(attn_logits)
+            self.log_stats(left_context, word, right_context, attn_pond)
+            output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
+            return output, attn_pond
+        else:
+            output = F.tanh(self.representations_mapping_to_ouput(attn_input))
+            return output, []
 
-        # output = self.middle_ponderation.weight * word_rep + self.left_ponderation.weight * left_context_rep + self.right_ponderation.weight * right_context_rep
-        output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
-        # output = word_rep + left_context_rep + right_context_rep
-        # output = self.mimick.fc_output(output)
 
-        return output, attn_pond
