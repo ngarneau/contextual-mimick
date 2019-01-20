@@ -440,7 +440,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     )
 
     model_name = "{}".format(language.polyglot_abbreviation)
-    expt_name = './expt_{}_{}'.format(model_name, _config["embeddings_mode"])
+    expt_name = './expt_{}_{}_{}'.format(model_name, _config["embeddings_mode"], os.environ['DB_NAME'])
     expt_dir = get_experiment_directory(expt_name)
 
     device_id = _config["device"]
@@ -460,14 +460,14 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         model,
         device=device,
         optimizer=optimizer,
-        monitor_metric='val_acc',
-        monitor_mode='max'
+        monitor_metric='val_loss',
+        monitor_mode='min'
     )
 
     callbacks = [
         ClipNorm(model.parameters(), _config["gradient_clipping"]),
-        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_acc', mode='max'),
+        ReduceLROnPlateau(monitor='val_loss', mode='min', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_loss', mode='min'),
         MetricsCallback(_run)
     ]
 
@@ -479,7 +479,6 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
 
     print("Testing on test set...")
     metrics = expt.test(test_loader)
-    collection.insert
 
     vectors = torch_to_numpy(model.embedding_layer.weight)
 
@@ -524,8 +523,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
             most_similar_word_sim = np.max(sims)
             s_to_words = " ".join([language.idx_to_word[w.item()] for w in s if w.item() > 0])
             result = all_pred[sent_idx] == all_true[sent_idx]
-            attention_analysis[target_word].append((
-                target_word, most_similar_word, most_similar_word_sim, word_idx, attention, s_to_words, result
+            attention_analysis[target_word.replace('.', '<DOT>')].append((
+                target_word, most_similar_word, float(most_similar_word_sim), int(word_idx), [float(a) for a in attention], s_to_words, int(result.item())
             ))
 
     metrics['attention'] = attention_analysis
