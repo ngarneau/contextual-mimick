@@ -1,7 +1,7 @@
 import torch
 from torch import nn, autograd
 from torch.nn import functional as F
-from torch.nn.init import kaiming_uniform, kaiming_normal_, constant
+from torch.nn.init import kaiming_uniform, kaiming_normal, constant
 from torch.nn.utils.rnn import pack_padded_sequence
 
 from typing import Dict
@@ -419,7 +419,7 @@ class Mimick(Module):
                  hidden_state_dimension=128,
                  fc_dropout_p=0,
                  lstm_dropout=0,
-                 comick_compatibility=True
+                 comick_compatibility=False
                  ):
         super().__init__()
         self.version = 1.0
@@ -437,15 +437,16 @@ class Mimick(Module):
             in_features=2 * hidden_state_dimension,
             out_features=word_embeddings_dimension
         )
-        kaiming_uniform(self.fc_word.weight)
 
         self.fc_output = nn.Linear(
             in_features=word_embeddings_dimension,
             out_features=word_embeddings_dimension
         )
-        kaiming_uniform(self.fc_output.weight)
 
         self.dropout = nn.Dropout(p=fc_dropout_p)
+
+    def vectorize_words(self, words):
+        return [[self.characters_vocabulary[c] for c in w] for w in words]
 
     def forward(self, x):
         if self.comick_compatibility:
@@ -463,6 +464,9 @@ class BoS(Module):
         self.bos_vocabulary = bos_vocabulary
         self.embedding_dim = embedding_dim
         self.embeddings = nn.Embedding(len(self.bos_vocabulary), self.embedding_dim, padding_idx=0)
+
+    def vectorize_words(self, words):
+        return [[self.bos_vocabulary[b] for b in make_substrings(w)] for w in words]
 
     def forward(self, bos):
         lengths = bos.data.ne(0).long().sum(dim=1)
@@ -597,8 +601,9 @@ class TheFinalComick(Module):
 class TheFinalComickBoS(Module):
     def __init__(self,
                  embedding_layer,
-                 bos_vocabulary: Dict[str, int],
-                 characters_embedding_dimension=20,
+                 oov_word_model,
+                 # bos_vocabulary: Dict[str, int],
+                 # characters_embedding_dimension=20,
                  char_hidden_state_dimension=128,
                  word_hidden_state_dimension=128,
                  chars_embeddings=None,
@@ -608,18 +613,13 @@ class TheFinalComickBoS(Module):
                  attention=False
                  ):
         super().__init__()
+        self.oov_word_model = oov_word_model
         self.stats = stats
         self.embedding_layer = embedding_layer
         self.words_vocabulary = embedding_layer.word_to_idx
         self.word_embeddings_dimension = embedding_layer.embedding_dim
-        self.bos_vocabulary = bos_vocabulary
         self.version = 3.0
         self.attention = attention
-
-        self.bos_model = BoS(
-            self.bos_vocabulary,
-            self.word_embeddings_dimension
-        )
 
         self.contexts = MirrorLSTM(
             embedding_layer,
@@ -645,12 +645,12 @@ class TheFinalComickBoS(Module):
         return self.stats
 
     def vectorize_words(self, words):
-        return [[self.bos_vocabulary[b] for b in make_substrings(w)] for w in words]
+        return self.oov_word_model.vectorize_words(words)
 
     def forward(self, x):
         left_context, word, right_context = x
 
-        word_rep = self.bos_model(word)
+        word_rep = self.oov_word_model(word)
 
         left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
         left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
@@ -665,7 +665,7 @@ class TheFinalComickBoS(Module):
             output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
             return output, attn_pond
         else:
-            output = F.tanh(self.representations_mapping_to_ouput(attn_input))
+            output = self.representations_mapping_to_ouput(attn_input)
             return output, []
 
 

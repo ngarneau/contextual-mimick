@@ -16,6 +16,7 @@ from sacred import Experiment
 from sacred.observers import MongoObserver
 
 from torch.utils.data import DataLoader
+from torch.nn.init import kaiming_uniform, kaiming_normal, constant
 from downstream_task.sequence_tagging import collate_examples_multiple_tags
 from downstream_task.models import SimpleLSTMTagger, CharRNN
 
@@ -25,7 +26,7 @@ from pytoune.utils import torch_to_numpy
 
 from pymongo import MongoClient
 
-from comick import TheFinalComick, TheFinalComickBoS
+from comick import TheFinalComick, TheFinalComickBoS, BoS, Mimick
 
 from utils import load_embeddings
 
@@ -416,12 +417,26 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     elif _config["embeddings_mode"] == "comick":
         embedding_layer_comick = MyEmbeddings(language.word_to_index, language.embedding_dim)
         embedding_layer_comick.load_words_embeddings(language.embeddings)
+
+        if _config["oov_word_model"] == "mimick":
+            oov_word_model = Mimick(
+                characters_vocabulary=language.char_to_index,
+                word_embeddings_dimension=language.embedding_dim
+            )
+        elif _config["oov_word_model"] == "bos":
+            oov_word_model = BoS(
+                language.bos_to_index,
+                embedding_dim=language.embedding_dim,
+            )
+
         comick = TheFinalComickBoS(
             embedding_layer_comick,
-            language.bos_to_index,
+            oov_word_model,
             word_hidden_state_dimension=language.embedding_dim,
-            freeze_word_embeddings=False
+            freeze_word_embeddings=False,
+            attention=_config['attention']
         )
+
 
     char_model = CharRNN(
         language.char_to_index,
@@ -438,6 +453,13 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         comick,
         n=41
     )
+
+    for name, parameter in model.named_parameters():
+        if 'embedding' not in name:
+            if 'bias' in name:
+                constant(parameter, 0)
+            elif 'weight' in name:
+                kaiming_normal(parameter)
 
     model_name = "{}".format(language.polyglot_abbreviation)
     expt_name = './expt_{}_{}_{}'.format(model_name, _config["embeddings_mode"], os.environ['DB_NAME'])

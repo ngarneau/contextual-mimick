@@ -15,5 +15,7 @@
     },
     "early_stopping": {
         "patience": 20
-    }
+    },
+    "attention": false,
+    "oov_word_model": "mimick"
 }
