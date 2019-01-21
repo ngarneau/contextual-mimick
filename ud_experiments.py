@@ -482,14 +482,14 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         model,
         device=device,
         optimizer=optimizer,
-        monitor_metric='val_loss',
-        monitor_mode='min'
+        monitor_metric='val_acc',
+        monitor_mode='max'
     )
 
     callbacks = [
         ClipNorm(model.parameters(), _config["gradient_clipping"]),
-        ReduceLROnPlateau(monitor='val_loss', mode='min', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_loss', mode='min'),
+        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_acc', mode='max'),
         MetricsCallback(_run)
     ]
 
@@ -518,7 +518,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                         all_trues.append(y_true.item())
     f1 = f1_score(all_preds, all_trues, average='micro')
     metrics['f1'] = f1
-    # print("F1 score: {}".format(f1))
+    print("F1 score: {}".format(f1))
 
     stats_pos_per_oovs = defaultdict(list)
     attention_analysis = defaultdict(list)
@@ -570,6 +570,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     metrics['pos_per_oov']['total'] = dict()
     metrics['pos_per_oov']['total']['percent'] = sum(all_occurrences)/float(len(all_occurrences))
     metrics['pos_per_oov']['total']['num'] = len(all_occurrences)
+    print(metrics['pos_per_oov']['total']['percent'], metrics['pos_per_oov']['total']['num'])
 
     all_stats = {
         'model': model_name,
