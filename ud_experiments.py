@@ -455,7 +455,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     )
 
     for name, parameter in model.named_parameters():
-        if 'embedding' not in name:
+        if 'embedding_layer' not in name:
             if 'bias' in name:
                 constant(parameter, 0)
             elif 'weight' in name:
