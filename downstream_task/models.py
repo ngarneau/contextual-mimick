@@ -294,6 +294,10 @@ class SimpleLSTMTagger(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_layers = 2
         self.tags = tags
+        self.words_not_worth_predicting = {
+            '<UNK>', '<NONE>', '<START>', '<STOP>', '<PAD>', '<*>',
+            '.', '-', '...', ',', '"', "'", "!", "_", "(", ")"
+        }
 
         # Comick params
         self.n_gram = n
@@ -350,7 +354,7 @@ class SimpleLSTMTagger(nn.Module):
         :return:
         """
         words = self.embedding_layer.word_to_idx.keys()
-        candidate_words_to_drop = words - self.oov_words - {'<UNK>', '<NONE>', '<START>', '<STOP>', '<PAD>', '<*>'}
+        candidate_words_to_drop = words - self.oov_words - self.words_not_worth_predicting
         train_words_to_drop = set(random.sample(candidate_words_to_drop, int(len(candidate_words_to_drop) * 0.1)))
         if self.training:
             oovs = self.oov_words | train_words_to_drop
@@ -391,8 +395,12 @@ class SimpleLSTMTagger(nn.Module):
 
         embeddings, attentions = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
 
-        for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):
-            yield (si, i, embedding, attention)
+        if self.comick.attention:
+            for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):
+                yield (si, i, embedding, attention)
+        else:
+            for si, i, embedding, in zip(batches_i, sents_i, embeddings):
+                yield (si, i, embedding, None)
 
     def get_embeddings(self, perm_idx, sentence_sorted):
         embeds = self.embedding_layer(sentence_sorted)
