@@ -400,7 +400,7 @@ class SimpleLSTMTagger(nn.Module):
                 yield (si, i, embedding, attention)
         else:
             for si, i, embedding, in zip(batches_i, sents_i, embeddings):
-                yield (si, i, embedding, None)
+                yield (si, i, embedding, [])
 
     def get_embeddings(self, perm_idx, sentence_sorted):
         embeds = self.embedding_layer(sentence_sorted)
