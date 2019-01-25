@@ -520,8 +520,9 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     metrics['f1'] = f1
     print("F1 score: {}".format(f1))
 
+    pred_morph_per_oovs = defaultdict(list)
+    true_morph_per_oovs = defaultdict(list)
     stats_pos_per_oovs = defaultdict(list)
-    stats_morph_per_oovs = defaultdict(list)
     attention_analysis = defaultdict(list)
     for x, ys in test_loader:
         sentence = x[0]
@@ -545,10 +546,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                 for token, y_pred, y_true in zip(all_sentence, all_pred, all_true):
                     token_value = language.idx_to_word[token.item()]
                     if token_value in oovs:
-                        if y_pred == y_true.item():
-                            stats_morph_per_oovs[token_value].append(1)
-                        else:
-                            stats_morph_per_oovs[token_value].append(0)
+                        true_morph_per_oovs[token_value].append(y_true.item())
+                        pred_morph_per_oovs[token_value].append(y_pred)
         for sent_idx, _, word_idx, embedding, attention in attentions:
             s = sentence[sent_idx]
             target_word = language.idx_to_word[s[word_idx].item()]
@@ -584,18 +583,12 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     metrics['pos_per_oov']['total']['num'] = len(all_occurrences)
     print("OOV acc rate: {}".format(metrics['pos_per_oov']['total']['percent'], metrics['pos_per_oov']['total']['num']))
 
-    metrics['morph_per_oov'] = dict()
     all_occurrences = list()
-    for oov, occurrences in stats_morph_per_oovs.items():
-        oov = oov.replace('.', '<DOT>') # For mongodb
-        all_occurrences += occurrences
-        metrics['morph_per_oov'][oov] = dict()
-        metrics['morph_per_oov'][oov]['percent'] = sum(occurrences)/float(len(occurrences))
-        metrics['morph_per_oov'][oov]['num'] = len(occurrences)
-    metrics['morph_per_oov']['total'] = dict()
-    metrics['morph_per_oov']['total']['percent'] = sum(all_occurrences)/float(len(all_occurrences))
-    metrics['morph_per_oov']['total']['num'] = len(all_occurrences)
-    print("OOV F1 rate: {}".format(metrics['morph_per_oov']['total']['percent'], metrics['morph_per_oov']['total']['num']))
+    all_true_occurrences = list()
+    for oov, preds in pred_morph_per_oovs.items():
+        all_occurrences += preds
+        all_true_occurrences += true_morph_per_oovs[oov]
+    print("OOV F1 rate: {}".format(f1_score(all_occurrences, all_true_occurrences, average='micro')))
 
     all_stats = {
         'model': model_name,
