@@ -4,7 +4,7 @@ import collections
 from collections import defaultdict
 from polyglot import text
 
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score, classification_report
 
 import numpy as np
 
@@ -79,6 +79,7 @@ languages = {
     'it': ('it', 'UD_Italian', 'it-ud'),
     'es': ('es', 'UD_Spanish', 'es-ud'),
     'cs': ('cs', 'UD_Czech', 'cs-ud'),
+    'fr': ('fr', 'UD_French', 'fr-ud'),
 }
 
 
@@ -399,6 +400,17 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     )
 
     oovs = language.word_to_index.keys() - language.embeddings.keys()
+    t_oovs = language.test_vocab.keys() & oovs
+    print("Ratio OOVs: {} ({}/{})".format(len(oovs)/len(language.word_to_index), len(oovs), len(language.word_to_index)))
+
+    # Compute the number of occurences of OOVs in the test set as well as the ratio
+    oovs_ids = {language.word_to_index[o] for o in oovs}
+    print(len([word_id for s, _, _ in train_sentences for word_id in s]))
+    print(len([word_id for s, _, _ in dev_sentences for word_id in s]))
+    print(len([word_id for s, _, _ in test_sentences for word_id in s]))
+    num_words = len([word_id for s, _, _ in test_sentences for word_id in s])
+    num_oovs = len([word_id for s, _, _ in test_sentences for word_id in s if word_id in oovs_ids])
+    print("Ratio of occurrences of OOVs: {} ({}/{})".format(num_oovs/num_words, num_oovs, num_words))
 
     embedding_layer = MyEmbeddings(language.word_to_index, language.embedding_dim)
     embedding_layer.load_words_embeddings(language.embeddings)
@@ -518,7 +530,10 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                         all_trues.append(y_true.item())
     f1 = f1_score(all_preds, all_trues, average='micro')
     metrics['f1'] = f1
+    print("Precision score: {}".format(precision_score(all_preds, all_trues, average='micro')))
+    print("Recall score: {}".format(recall_score(all_preds, all_trues, average='micro')))
     print("F1 score: {}".format(f1))
+    print(classification_report(all_trues, all_preds, digits=4))
 
     pred_morph_per_oovs = defaultdict(list)
     true_morph_per_oovs = defaultdict(list)
@@ -544,10 +559,11 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                 all_true = ys[tag].view(-1)
                 all_sentence = sentence.view(-1)
                 for token, y_pred, y_true in zip(all_sentence, all_pred, all_true):
-                    token_value = language.idx_to_word[token.item()]
-                    if token_value in oovs:
-                        true_morph_per_oovs[token_value].append(y_true.item())
-                        pred_morph_per_oovs[token_value].append(y_pred)
+                    if y_true != 0 and y_true != 1:
+                        token_value = language.idx_to_word[token.item()]
+                        if token_value in oovs:
+                            true_morph_per_oovs[token_value].append(y_true.item())
+                            pred_morph_per_oovs[token_value].append(y_pred)
         for sent_idx, _, word_idx, embedding, attention in attentions:
             s = sentence[sent_idx]
             target_word = language.idx_to_word[s[word_idx].item()]
@@ -588,6 +604,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     for oov, preds in pred_morph_per_oovs.items():
         all_occurrences += preds
         all_true_occurrences += true_morph_per_oovs[oov]
+    print("OOV Precision rate: {}".format(precision_score(all_occurrences, all_true_occurrences, average='micro')))
+    print("OOV Recall rate: {}".format(recall_score(all_occurrences, all_true_occurrences, average='micro')))
     print("OOV F1 rate: {}".format(f1_score(all_occurrences, all_true_occurrences, average='micro')))
 
     all_stats = {
