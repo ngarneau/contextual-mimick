@@ -444,7 +444,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         comick = TheFinalComickBoS(
             embedding_layer_comick,
             oov_word_model,
-            word_hidden_state_dimension=language.embedding_dim,
+            word_hidden_state_dimension=128,
             freeze_word_embeddings=False,
             attention=_config['attention']
         )

@@ -2,7 +2,7 @@ import torch
 from torch import nn, autograd
 from torch.nn import functional as F
 from torch.nn.init import kaiming_uniform, kaiming_normal, constant
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from typing import Dict
 
@@ -78,11 +78,11 @@ class MultiLSTM(Module):
             embeddings = self.dropout(embeddings)
 
             # Initialize hidden to zero
-            packed_input = pack_padded_sequence(
-                embeddings, list(seq_lengths), batch_first=True)
+            packed_input = pack_padded_sequence(embeddings, list(seq_lengths), batch_first=True)
             packed_output, (hidden_states, cell_states) = lstm(packed_input)
-            output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
-            output = output[rev_perm_idx]
+            padded_output, lengths = pad_packed_sequence(packed_output, batch_first=True)
+            # output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
+            output = padded_output[rev_perm_idx]
             outputs.append(output)
 
         return outputs if len(outputs) > 1 else outputs[0]
@@ -149,17 +149,16 @@ class MirrorLSTM(Module):
             embeddings = self.dropout(embeddings)
 
             # Initialize hidden to zero
-            packed_input = pack_padded_sequence(
-                embeddings, list(seq_lengths), batch_first=True)
-            packed_output, (hidden_states, cell_states) = self.lstms[side](
-                packed_input)
+            packed_input = pack_padded_sequence(embeddings, list(seq_lengths), batch_first=True)
+            packed_output, (hidden_states, cell_states) = self.lstms[side](packed_input)
+            output, _ = pad_packed_sequence(packed_output, batch_first=True)
 
-            if side == 'left':
-                # Concatenate [forward, backward]
-                output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
-            else:
-            # Concatenate [backward, forward]
-                output = torch.cat([hidden_states[1], hidden_states[0]], dim=1)
+            # if side == 'left':
+            #     # Concatenate [forward, backward]
+            #     output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
+            # else:
+            # # Concatenate [backward, forward]
+            #     output = torch.cat([hidden_states[1], hidden_states[0]], dim=1)
             output = output[rev_perm_idx]
             outputs.append(output)
 
@@ -451,10 +450,7 @@ class Mimick(Module):
     def forward(self, x):
         if self.comick_compatibility:
             _CL, x, _CR = x
-        word_hidden_rep = self.fc_word(self.mimick_lstm(x))
-        output = word_hidden_rep
-        output = F.tanh(output)
-        output = self.fc_output(output)
+        output = self.mimick_lstm(x)
         return output
 
 
@@ -602,8 +598,6 @@ class TheFinalComickBoS(Module):
     def __init__(self,
                  embedding_layer,
                  oov_word_model,
-                 # bos_vocabulary: Dict[str, int],
-                 # characters_embedding_dimension=20,
                  char_hidden_state_dimension=128,
                  word_hidden_state_dimension=128,
                  chars_embeddings=None,
@@ -623,7 +617,7 @@ class TheFinalComickBoS(Module):
 
         self.contexts = MirrorLSTM(
             embedding_layer,
-            hidden_state_dim=self.word_embeddings_dimension,
+            hidden_state_dim=word_hidden_state_dimension,
             freeze_embeddings=freeze_word_embeddings,
             dropout=0.3)
 
@@ -633,9 +627,9 @@ class TheFinalComickBoS(Module):
         self.fc_context_right = nn.Linear(in_features=2 * self.word_embeddings_dimension, out_features=self.word_embeddings_dimension)
         kaiming_uniform(self.fc_context_right.weight)
 
-        self.attention_layer = nn.Linear(self.word_embeddings_dimension * 3, 3)
+        self.attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
 
-        self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension * 3, self.word_embeddings_dimension)
+        self.representations_mapping_to_ouput = nn.Linear(word_hidden_state_dimension * 2, self.word_embeddings_dimension)
 
     def log_stats(self, left_context, word, right_context, attention):
         if self.stats:
@@ -650,19 +644,26 @@ class TheFinalComickBoS(Module):
     def forward(self, x):
         left_context, word, right_context = x
 
+        l_lengths = left_context.data.ne(0).long().sum(dim=1)
+        w_lengths = word.data.ne(0).long().sum(dim=1)
+        r_lengths = right_context.data.ne(0).long().sum(dim=1)
+        import pdb; pdb.set_trace()
+
         word_rep = self.oov_word_model(word)
 
         left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
-        left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
-        right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
+        # left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
+        # right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
-        attn_input = torch.cat([word_rep, left_context_rep, right_context_rep], dim=1)
+        attn_input = torch.cat([word_rep, left_context_hidden_rep, right_context_hidden_rep], dim=1)
 
         if self.attention:
-            attn_logits = self.attention_layer(attn_input.view(-1, self.word_embeddings_dimension * 3))
-            attn_pond = F.softmax(attn_logits)
-            self.log_stats(left_context, word, right_context, attn_pond)
-            output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
+            attn_logits = self.attention_layer(attn_input)
+            attn_pond = F.softmax(attn_logits, dim=1)
+            attended_output = attn_input.transpose(1, 2).matmul(attn_pond).squeeze(-1)
+            # self.log_stats(left_context, word, right_context, attn_pond)
+            # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
+            output = self.representations_mapping_to_ouput(attended_output)
             return output, attn_pond
         else:
             output = self.representations_mapping_to_ouput(attn_input)
