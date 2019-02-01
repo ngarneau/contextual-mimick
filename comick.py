@@ -629,7 +629,9 @@ class TheFinalComickBoS(Module):
 
         self.attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
 
-        self.representations_mapping_to_ouput = nn.Linear(word_hidden_state_dimension * 2, self.word_embeddings_dimension)
+        self.fc1 = nn.Linear(word_hidden_state_dimension * 2, self.word_embeddings_dimension)
+
+        self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension, self.word_embeddings_dimension)
 
     def log_stats(self, left_context, word, right_context, attention):
         if self.stats:
@@ -662,7 +664,8 @@ class TheFinalComickBoS(Module):
             attended_output = attn_input.transpose(1, 2).matmul(attn_pond).squeeze(-1)
             # self.log_stats(left_context, word, right_context, attn_pond)
             # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
-            output = self.representations_mapping_to_ouput(attended_output)
+            output = F.tanh(self.fc1(attended_output))
+            output = self.representations_mapping_to_ouput(output)
             real_attentions = list()
             for i, example in enumerate(attn_pond):
                 left_attention = example[:l_lengths[i]]
