@@ -647,7 +647,6 @@ class TheFinalComickBoS(Module):
         l_lengths = left_context.data.ne(0).long().sum(dim=1)
         w_lengths = word.data.ne(0).long().sum(dim=1)
         r_lengths = right_context.data.ne(0).long().sum(dim=1)
-        import pdb; pdb.set_trace()
 
         word_rep = self.oov_word_model(word)
 
@@ -664,7 +663,13 @@ class TheFinalComickBoS(Module):
             # self.log_stats(left_context, word, right_context, attn_pond)
             # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
             output = self.representations_mapping_to_ouput(attended_output)
-            return output, attn_pond
+            real_attentions = list()
+            for i, example in enumerate(attn_pond):
+                left_attention = example[:l_lengths[i]]
+                word_attention = example[l_lengths.max():l_lengths.max()+w_lengths[i]]
+                right_attention = example[l_lengths.max() + w_lengths.max():l_lengths.max() + w_lengths.max()+r_lengths[i]]
+                real_attentions.append((left_attention, word_attention, right_attention))
+            return output, real_attentions
         else:
             output = self.representations_mapping_to_ouput(attn_input)
             return output, []
