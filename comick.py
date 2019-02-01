@@ -659,19 +659,26 @@ class TheFinalComickBoS(Module):
         attn_input = torch.cat([word_rep, left_context_hidden_rep, right_context_hidden_rep], dim=1)
 
         if self.attention:
-            attn_logits = self.attention_layer(attn_input)
-            attn_pond = F.softmax(attn_logits, dim=1)
-            attended_output = attn_input.transpose(1, 2).matmul(attn_pond).squeeze(-1)
+            output = list()
+            real_attentions = list()
+            for i, example in enumerate(attn_input):
+                left_input = example[:l_lengths[i]]
+                word_input = example[l_lengths.max():l_lengths.max()+w_lengths[i]]
+                right_input = example[l_lengths.max() + w_lengths.max():l_lengths.max() + w_lengths.max()+r_lengths[i]]
+                all_input = torch.cat([left_input, word_input, right_input], dim=0)
+                attn_logits = self.attention_layer(all_input)
+                attn_pond = F.softmax(attn_logits, dim=0)
+                attended_output = all_input.transpose(0, 1).matmul(attn_pond).view(1, -1)
+                output.append(attended_output)
+
+                left_attention = attn_pond[:l_lengths[i]]
+                word_attention = attn_pond[l_lengths[i]:l_lengths[i]+w_lengths[i]]
+                right_attention = attn_pond[l_lengths[i] + w_lengths[i]:l_lengths[i] + w_lengths[i]+r_lengths[i]]
+                real_attentions.append((left_attention, word_attention, right_attention))
             # self.log_stats(left_context, word, right_context, attn_pond)
             # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
-            output = F.tanh(self.fc1(attended_output))
+            output = F.tanh(self.fc1(torch.cat(output)))
             output = self.representations_mapping_to_ouput(output)
-            real_attentions = list()
-            for i, example in enumerate(attn_pond):
-                left_attention = example[:l_lengths[i]]
-                word_attention = example[l_lengths.max():l_lengths.max()+w_lengths[i]]
-                right_attention = example[l_lengths.max() + w_lengths.max():l_lengths.max() + w_lengths.max()+r_lengths[i]]
-                real_attentions.append((left_attention, word_attention, right_attention))
             return output, real_attentions
         else:
             output = self.representations_mapping_to_ouput(attn_input)

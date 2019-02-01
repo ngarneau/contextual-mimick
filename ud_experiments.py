@@ -572,8 +572,16 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
             most_similar_word_sim = np.max(sims)
             s_to_words = " ".join([language.idx_to_word[w.item()] for w in s if w.item() > 0])
             result = all_pred[sent_idx] == all_true[sent_idx]
+
+            formatted_attention = []
+            l, w, r = attention
+            l1 = l.reshape(-1).tolist()
+            w1 = w.reshape(-1).tolist()
+            r1 = r.reshape(-1).tolist()
+            formatted_attention += [l1, w1, r1]
+
             attention_analysis[target_word.replace('.', '<DOT>')].append((
-                target_word, most_similar_word, float(most_similar_word_sim), int(word_idx), [float(a) for a in attention], s_to_words, int(result.item())
+                target_word, most_similar_word, float(most_similar_word_sim), int(word_idx), formatted_attention, s_to_words, int(result.item())
             ))
 
     metrics['attention'] = attention_analysis
