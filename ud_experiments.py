@@ -528,12 +528,13 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                     if y_true != 0 and y_true != 1:
                         all_preds.append(y_pred)
                         all_trues.append(y_true.item())
-    f1 = f1_score(all_preds, all_trues, average='micro')
-    metrics['f1'] = f1
-    print("Precision score: {}".format(precision_score(all_preds, all_trues, average='micro')))
-    print("Recall score: {}".format(recall_score(all_preds, all_trues, average='micro')))
-    print("F1 score: {}".format(f1))
-    print(classification_report(all_trues, all_preds, digits=4))
+    if len(all_preds) > 0:
+        f1 = f1_score(all_preds, all_trues, average='micro')
+        metrics['f1'] = f1
+        print("Precision score: {}".format(precision_score(all_preds, all_trues, average='micro')))
+        print("Recall score: {}".format(recall_score(all_preds, all_trues, average='micro')))
+        print("F1 score: {}".format(f1))
+        print(classification_report(all_trues, all_preds, digits=4))
 
     pred_morph_per_oovs = defaultdict(list)
     true_morph_per_oovs = defaultdict(list)
@@ -612,9 +613,10 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
     for oov, preds in pred_morph_per_oovs.items():
         all_occurrences += preds
         all_true_occurrences += true_morph_per_oovs[oov]
-    print("OOV Precision rate: {}".format(precision_score(all_occurrences, all_true_occurrences, average='micro')))
-    print("OOV Recall rate: {}".format(recall_score(all_occurrences, all_true_occurrences, average='micro')))
-    print("OOV F1 rate: {}".format(f1_score(all_occurrences, all_true_occurrences, average='micro')))
+    if len(all_occurrences) > 0:
+        print("OOV Precision rate: {}".format(precision_score(all_occurrences, all_true_occurrences, average='micro')))
+        print("OOV Recall rate: {}".format(recall_score(all_occurrences, all_true_occurrences, average='micro')))
+        print("OOV F1 rate: {}".format(f1_score(all_occurrences, all_true_occurrences, average='micro')))
 
     all_stats = {
         'model': model_name,

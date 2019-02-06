@@ -115,7 +115,7 @@ class MirrorLSTM(Module):
         self.lstm_left = nn.LSTM(
             input_size=embedding_layer.embedding_dim,
             hidden_size=hidden_state_dim,
-            num_layers=1,
+            num_layers=2,
             batch_first=True,
             bidirectional=True,
             dropout=dropout,
@@ -124,7 +124,7 @@ class MirrorLSTM(Module):
         self.lstm_right = nn.LSTM(
             input_size=embedding_layer.embedding_dim,
             hidden_size=hidden_state_dim,
-            num_layers=1,
+            num_layers=2,
             batch_first=True,
             bidirectional=True,
             dropout=dropout,
@@ -627,9 +627,10 @@ class TheFinalComickBoS(Module):
         self.fc_context_right = nn.Linear(in_features=2 * self.word_embeddings_dimension, out_features=self.word_embeddings_dimension)
         kaiming_uniform(self.fc_context_right.weight)
 
-        self.attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
+        self.word_attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
+        self.char_attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
 
-        self.fc1 = nn.Linear(word_hidden_state_dimension * 2, self.word_embeddings_dimension)
+        self.fc1 = nn.Linear(word_hidden_state_dimension * 4, self.word_embeddings_dimension)
 
         self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension, self.word_embeddings_dimension)
 
@@ -665,15 +666,24 @@ class TheFinalComickBoS(Module):
                 left_input = example[:l_lengths[i]]
                 word_input = example[l_lengths.max():l_lengths.max()+w_lengths[i]]
                 right_input = example[l_lengths.max() + w_lengths.max():l_lengths.max() + w_lengths.max()+r_lengths[i]]
-                all_input = torch.cat([left_input, word_input, right_input], dim=0)
-                attn_logits = self.attention_layer(all_input)
-                attn_pond = F.softmax(attn_logits, dim=0)
-                attended_output = all_input.transpose(0, 1).matmul(attn_pond).view(1, -1)
-                output.append(attended_output)
 
-                left_attention = attn_pond[:l_lengths[i]]
-                word_attention = attn_pond[l_lengths[i]:l_lengths[i]+w_lengths[i]]
-                right_attention = attn_pond[l_lengths[i] + w_lengths[i]:l_lengths[i] + w_lengths[i]+r_lengths[i]]
+                # Words attention
+                all_words_input = torch.cat([left_input, right_input], dim=0)
+                words_attn_logits = self.word_attention_layer(all_words_input)
+                words_attn_pond = F.softmax(words_attn_logits, dim=0)
+                words_attended_output = all_words_input.transpose(0, 1).matmul(words_attn_pond).view(1, -1)
+
+                # Chars attention
+                all_chars_input = word_input
+                chars_attn_logits = self.char_attention_layer(all_chars_input)
+                chars_attn_pond = F.softmax(chars_attn_logits, dim=0)
+                chars_attended_output = all_chars_input.transpose(0, 1).matmul(chars_attn_pond).view(1, -1)
+
+                output.append(torch.cat([words_attended_output, chars_attended_output], dim=1))
+
+                left_attention = words_attn_pond[:l_lengths[i]].view(-1)
+                right_attention = words_attn_pond[l_lengths[i]:l_lengths[i]+r_lengths[i]].view(-1)
+                word_attention = chars_attn_pond.view(-1)
                 real_attentions.append((left_attention, word_attention, right_attention))
             # self.log_stats(left_context, word, right_context, attn_pond)
             # output = word_rep * attn_pond[:, 0].view(-1, 1) + left_context_rep * attn_pond[:, 1].view(-1, 1) + right_context_rep * attn_pond[:, 2].view(-1, 1)
