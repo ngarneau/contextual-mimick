@@ -355,7 +355,7 @@ class SimpleLSTMTagger(nn.Module):
         """
         words = self.embedding_layer.word_to_idx.keys()
         candidate_words_to_drop = words - self.oov_words - self.words_not_worth_predicting
-        train_words_to_drop = set(random.sample(candidate_words_to_drop, int(len(candidate_words_to_drop) * 0.1)))
+        train_words_to_drop = set(random.sample(candidate_words_to_drop, int(len(candidate_words_to_drop) * 0.15)))
         if self.training:
             oovs = self.oov_words | train_words_to_drop
         else:
