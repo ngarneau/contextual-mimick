@@ -657,7 +657,7 @@ class TheFinalComickBoS(Module):
         # left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
         # right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
-        attn_input = torch.cat([word_rep, left_context_hidden_rep, right_context_hidden_rep], dim=1)
+        attn_input = torch.cat([left_context_hidden_rep, word_rep, right_context_hidden_rep], dim=1)
 
         if self.attention:
             output = list()
