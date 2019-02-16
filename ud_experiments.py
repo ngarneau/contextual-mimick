@@ -1,3 +1,4 @@
+import math
 import logging
 import os
 import collections
@@ -81,6 +82,22 @@ languages = {
     'cs': ('cs', 'UD_Czech', 'cs-ud'),
     'fr': ('fr', 'UD_French', 'fr-ud'),
 }
+
+
+class KLWeightingSigmoidDecay(Callback):
+    def __init__(self, k, batches_per_epoch):
+        super().__init__()
+        self.k = k
+        self.batches_per_epoch = batches_per_epoch
+
+    def on_epoch_begin(self, epoch, logs):
+        self.i = epoch * self.batches_per_epoch
+
+    def on_batch_begin(self, batch, logs):
+        self.i += 1
+        ratio = self.k / (self.k + math.exp(self.i / self.k))
+        words_to_drop_ratio = max(0, ratio - 0.6)
+        self.model.model.oov_rate_to_drop = words_to_drop_ratio
 
 
 class MetricsCallback(Callback):
@@ -548,6 +565,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
                 all_pred = np.argmax(y, axis=2).reshape(-1)
                 all_true = ys[tag].view(-1)
                 all_sentence = sentence.view(-1)
+                attention_pred_tag = np.argmax(y, axis=2)
+                attention_true_tag = ys[tag]
                 for token, y_pred, y_true in zip(all_sentence, all_pred, all_true):
                     token_value = language.idx_to_word[token.item()]
                     if token_value in oovs:
@@ -572,7 +591,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
             most_similar_word = language.idx_to_word[np.argmax(sims)]
             most_similar_word_sim = np.max(sims)
             s_to_words = " ".join([language.idx_to_word[w.item()] for w in s if w.item() > 0])
-            result = all_pred[sent_idx] == all_true[sent_idx]
+            result = attention_pred_tag[sent_idx][word_idx] == attention_true_tag[sent_idx][word_idx]
 
             formatted_attention = []
             l, w, r = attention
