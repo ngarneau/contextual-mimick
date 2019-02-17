@@ -27,7 +27,7 @@ from pytoune.utils import torch_to_numpy
 
 from pymongo import MongoClient
 
-from comick import TheFinalComick, TheFinalComickBoS, BoS, Mimick
+from comick import TheFinalComick, TheFinalComickBoS, BoS, Mimick, MimickV2
 
 from utils import load_embeddings
 
@@ -448,9 +448,10 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         embedding_layer_comick.load_words_embeddings(language.embeddings)
 
         if _config["oov_word_model"] == "mimick":
-            oov_word_model = Mimick(
+            oov_word_model = MimickV2(
                 characters_vocabulary=language.char_to_index,
-                word_embeddings_dimension=language.embedding_dim
+                word_embeddings_dimension=language.embedding_dim,
+                context_size=512
             )
         elif _config["oov_word_model"] == "bos":
             oov_word_model = BoS(

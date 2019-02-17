@@ -159,8 +159,9 @@ class MirrorLSTM(Module):
             # else:
             # # Concatenate [backward, forward]
             #     output = torch.cat([hidden_states[1], hidden_states[0]], dim=1)
+            last_output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
             output = output[rev_perm_idx]
-            outputs.append(output)
+            outputs.append((output, last_output))
 
         return outputs
 
@@ -454,6 +455,66 @@ class Mimick(Module):
         return output
 
 
+class MimickV2(Module):
+    """
+    This is new Mimick architecture
+    """
+
+    def __init__(self,
+                 characters_vocabulary: Dict[str, int],
+                 characters_embedding_dimension=100,
+                 context_size=128,
+                 word_embeddings_dimension=100,
+                 hidden_state_dimension=128,
+                 fc_dropout_p=0,
+                 lstm_dropout=0,
+                 comick_compatibility=False
+                 ):
+        super().__init__()
+        self.version = 2.0
+        self.characters_vocabulary = characters_vocabulary
+        self.context_size = context_size
+
+        self.embeddings = nn.Embedding(
+            num_embeddings=len(self.characters_vocabulary),
+            embedding_dim=characters_embedding_dimension,
+            padding_idx=0)
+        kaiming_uniform(self.embeddings.weight)
+
+        self.lstm = nn.LSTM(
+                input_size=characters_embedding_dimension + self.context_size,
+                hidden_size=hidden_state_dimension,
+                num_layers=2,
+                batch_first=True,
+                bidirectional=True,
+                )
+
+    def vectorize_words(self, words):
+        return [[self.characters_vocabulary[c] for c in w] for w in words]
+
+    def forward(self, x, contexts):
+        lengths = x.data.ne(0).long().sum(dim=1)
+        seq_lengths, perm_idx = lengths.sort(0, descending=True)
+        _, rev_perm_idx = perm_idx.sort(0)
+        sorted_contexts = contexts[perm_idx]
+        expanded_contexts = sorted_contexts.expand(
+            x.shape[1], x.shape[0], -1
+        ).transpose(0, 1)
+
+        # Embed
+        embeddings = self.embeddings(x[perm_idx])
+
+        lstm_input = torch.cat([embeddings, expanded_contexts], dim=2)
+
+        # Initialize hidden to zero
+        packed_input = pack_padded_sequence(lstm_input, list(seq_lengths), batch_first=True)
+        packed_output, (hidden_states, cell_states) = self.lstm(packed_input)
+        padded_output, lengths = pad_packed_sequence(packed_output, batch_first=True)
+        # output = torch.cat([hidden_states[0], hidden_states[1]], dim=1)
+        output = padded_output[rev_perm_idx]
+        return output
+
+
 class BoS(Module):
     def __init__(self, bos_vocabulary, embedding_dim):
         super().__init__()
@@ -651,9 +712,13 @@ class TheFinalComickBoS(Module):
         w_lengths = word.data.ne(0).long().sum(dim=1)
         r_lengths = right_context.data.ne(0).long().sum(dim=1)
 
-        word_rep = self.oov_word_model(word)
+        left, right = self.contexts(left_context, right_context)
+        left_context_hidden_rep, left_last_output = left
+        right_context_hidden_rep, right_last_output = right
 
-        left_context_hidden_rep, right_context_hidden_rep = self.contexts(left_context, right_context)
+        contexts = torch.cat([left_last_output, right_last_output], dim=1)
+        word_rep = self.oov_word_model(word, contexts)
+
         # left_context_rep = F.tanh(self.fc_context_left(left_context_hidden_rep))
         # right_context_rep = F.tanh(self.fc_context_right(right_context_hidden_rep))
 
