@@ -339,12 +339,19 @@ class SimpleLSTMTagger(nn.Module):
         m = self.n_gram // 2
         left_idx = max(0, i - m)
         left_side = tuple(sequence[left_idx:i])
+        use_gpu = torch.cuda.is_available()
         if len(left_side) == 0:
-            left_side = tuple(Variable(torch.LongTensor([2])))
+            if use_gpu:
+                left_side = tuple(torch.LongTensor([2]).cuda())
+            else:
+                left_side = tuple(torch.LongTensor([2]))
         right_idx = min(L, i + m + 1)
         right_side = tuple(sequence[i+1:right_idx])
         if len(right_side) == 0:
-            right_side = tuple(Variable(torch.LongTensor([3])))
+            if use_gpu:
+                right_side = tuple(torch.LongTensor([3]).cuda())
+            else:
+                right_side = tuple(torch.LongTensor([3]))
         return left_side, right_side
 
     def get_oov(self, sentences):
@@ -369,31 +376,36 @@ class SimpleLSTMTagger(nn.Module):
                     left_context, right_context = self.make_ngram(sentence[:sent_length], i)
                     left_context = [c.view(1) for c in left_context]
                     right_context = [c.view(1) for c in right_context]
-                    words_to_drop.append((si, i, word, torch.cat(left_context), torch.cat(right_context)))
+                    context = left_context + right_context
+                    words_to_drop.append((si, i, word, torch.cat(left_context), torch.cat(right_context), torch.cat(context)))
         return words_to_drop
 
     def predict_embeddings(self, words_to_drop):
-        batches_i, sents_i, words, left_contexts, right_contexts = list(zip(*words_to_drop))
+        batches_i, sents_i, words, left_contexts, right_contexts, contexts = list(zip(*words_to_drop))
 
         vectorized_words = self.comick.vectorize_words(words)
         words_lengths = torch.LongTensor([len(w) for w in vectorized_words])
         padded_words = pad_sequences(vectorized_words, words_lengths)
 
-        vectorized_left_contexts = [l.data.cpu() for l in left_contexts]
-        left_contexts_length = torch.LongTensor([len(c) for c in left_contexts])
-        padded_left = pad_sequences(vectorized_left_contexts, left_contexts_length)
+        vectorized_contexts = [l.data.cpu() for l in contexts]
+        contexts_length = torch.LongTensor([len(c) for c in contexts])
+        padded = pad_sequences(vectorized_contexts, contexts_length)
 
-        vectorized_right_contexts = [l.data.cpu() for l in right_contexts]
-        right_contexts_length = torch.LongTensor([len(c) for c in right_contexts])
-        padded_right = pad_sequences(vectorized_right_contexts, right_contexts_length)
+        # vectorized_left_contexts = [l.data.cpu() for l in left_contexts]
+        # left_contexts_length = torch.LongTensor([len(c) for c in left_contexts])
+        # padded_left = pad_sequences(vectorized_left_contexts, left_contexts_length)
+
+        # vectorized_right_contexts = [l.data.cpu() for l in right_contexts]
+        # right_contexts_length = torch.LongTensor([len(c) for c in right_contexts])
+        # padded_right = pad_sequences(vectorized_right_contexts, right_contexts_length)
 
         use_gpu = torch.cuda.is_available()
         if use_gpu:
-            padded_left = padded_left.cuda()
+            padded = padded.cuda()
             padded_words = padded_words.cuda()
-            padded_right = padded_right.cuda()
+            # padded_right = padded_right.cuda()
 
-        embeddings, attentions = self.comick((Variable(padded_left), Variable(padded_words), Variable(padded_right)))
+        embeddings, attentions = self.comick((padded, padded_words))
 
         if self.comick.attention:
             for si, i, embedding, attention, in zip(batches_i, sents_i, embeddings, attentions):

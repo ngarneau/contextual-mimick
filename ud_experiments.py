@@ -448,10 +448,9 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         embedding_layer_comick.load_words_embeddings(language.embeddings)
 
         if _config["oov_word_model"] == "mimick":
-            oov_word_model = MimickV2(
+            oov_word_model = Mimick(
                 characters_vocabulary=language.char_to_index,
                 word_embeddings_dimension=language.embedding_dim,
-                context_size=512
             )
         elif _config["oov_word_model"] == "bos":
             oov_word_model = BoS(
@@ -595,11 +594,10 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
             result = attention_pred_tag[sent_idx][word_idx] == attention_true_tag[sent_idx][word_idx]
 
             formatted_attention = []
-            l, w, r = attention
-            l1 = l.reshape(-1).tolist()
+            c, w = attention
+            c1 = c.reshape(-1).tolist()
             w1 = w.reshape(-1).tolist()
-            r1 = r.reshape(-1).tolist()
-            formatted_attention += [l1, w1, r1]
+            formatted_attention += [c1, w1]
 
             attention_analysis[target_word.replace('.', '<DOT>')].append((
                 target_word, most_similar_word, float(most_similar_word_sim), int(word_idx), formatted_attention, s_to_words, int(result.item())
