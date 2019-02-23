@@ -746,15 +746,15 @@ class TheFinalComickBoS(Module):
             real_attentions = list()
             for i, word_rep in enumerate(word_last): # Loop over the last hidden states of each words
                 # First, compute attention over context condition with word representation
-                context_hidden = context_hiddens[i]
+                context_hidden = context_hiddens[i][:c_lengths[i]]
                 # expanded_word_rep = word_rep.expand_as(context_hidden)
                 # attention_input = torch.cat([context_hidden, expanded_word_rep], dim=1)
                 words_attn_logits = self.word_attention_layer(context_hidden)
                 words_attn_pond = F.softmax(words_attn_logits, dim=0)
                 words_attended_output = context_hidden.transpose(0, 1).matmul(words_attn_pond).view(1, -1)
 
-                word_hidden = word_hiddens[i]
-                context_rep = context_last[i]
+                word_hidden = word_hiddens[i][:w_lengths[i]]
+                # context_rep = context_last[i]
                 # expanded_context_rep = context_rep.expand_as(word_hidden)
                 # attention_input = torch.cat([word_hidden, expanded_context_rep], dim=1)
                 chars_attn_logits = self.char_attention_layer(word_hidden)
