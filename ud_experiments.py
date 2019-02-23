@@ -378,6 +378,8 @@ def read_file(filename, w2i, t2is, c2i, b2i, options):
 
 @experiment.command
 def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
+    if _config['tag_to_predict'] == 'MORPH' and language in {'vi', 'id'}:
+        return None
     print(_config)
     np.random.seed(seed)
     torch.manual_seed(seed)
