@@ -480,7 +480,8 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
         {label: len(tags) for label, tags in language.tags_to_index.items()},
         oovs,
         comick,
-        n=41
+        n=41,
+        tag_to_predict=_config['tag_to_predict']
     )
 
     for name, parameter in model.named_parameters():
@@ -506,19 +507,21 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
 
 
     optimizer = torch.optim.Adam(model.parameters(), lr=_config["learning_rate"])
+    monitor_metric = 'val_loss' if _config['tag_to_predict'] == 'MORPH' else 'val_acc'
+    monitor_mode = 'min' if _config['tag_to_predict'] == 'MORPH' else 'max'
     expt = PytouneExperiment(
         expt_dir,
         model,
         device=device,
         optimizer=optimizer,
-        monitor_metric='val_acc',
-        monitor_mode='max'
+        monitor_metric=monitor_metric,
+        monitor_mode=monitor_mode
     )
 
     callbacks = [
         ClipNorm(model.parameters(), _config["gradient_clipping"]),
-        ReduceLROnPlateau(monitor='val_acc', mode='max', patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
-        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor='val_acc', mode='max'),
+        ReduceLROnPlateau(monitor=monitor_metric, mode=monitor_mode, patience=_config["reduce_lr_on_plateau"]["patience"], factor=_config["reduce_lr_on_plateau"]["factor"], threshold_mode='abs', threshold=1e-3, verbose=True),
+        EarlyStopping(patience=_config["early_stopping"]["patience"], min_delta=1e-4, monitor=monitor_metric, mode=monitor_mode),
         MetricsCallback(_run)
     ]
 

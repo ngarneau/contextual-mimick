@@ -287,8 +287,9 @@ class BOWClassifier(nn.Module):
 
 class SimpleLSTMTagger(nn.Module):
 
-    def __init__(self, char_layer, embedding_layer, hidden_dim, tags, oov_words, comick=None, n=41):
+    def __init__(self, char_layer, embedding_layer, hidden_dim, tags, oov_words, comick=None, n=41, tag_to_predict=None):
         super().__init__()
+        self.tag_to_predict = tag_to_predict
         self.char_layer = char_layer
         self.embedding_layer = embedding_layer
         self.hidden_dim = hidden_dim
@@ -323,12 +324,22 @@ class SimpleLSTMTagger(nn.Module):
 
 
     def loss_function(self, out, y):
-        losses = list()
         y_pred, _ = out
-        for label, output in y_pred.items():
-            loss = sequence_cross_entropy(output, y[label])
-            losses.append(loss)
-        return sum(losses)
+        if self.tag_to_predict == 'POS':
+            return sequence_cross_entropy(y_pred['POS'], y['POS'])
+        elif self.tag_to_predict == 'MORPH':
+            losses = list()
+            for label, output in y_pred.items():
+                if label != 'POS':
+                    loss = sequence_cross_entropy(output, y[label])
+                    losses.append(loss)
+            return sum(losses)
+        else:
+            losses = list()
+            for label, output in y_pred.items():
+                loss = sequence_cross_entropy(output, y[label])
+                losses.append(loss)
+            return sum(losses)
 
     def acc(self, out, y):
         y_pred, _ = out
