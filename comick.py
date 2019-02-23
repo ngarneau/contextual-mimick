@@ -761,7 +761,7 @@ class TheFinalComickBoS(Module):
                 chars_attn_pond = F.softmax(chars_attn_logits, dim=0)
                 chars_attended_output = word_hidden.transpose(0, 1).matmul(chars_attn_pond).view(1, -1)
                 output.append(torch.cat([words_attended_output, chars_attended_output], dim=1))
-                real_attentions.append((words_attended_output, chars_attended_output))
+                real_attentions.append((words_attn_pond, chars_attn_pond))
 
         # if self.attention:
         #     output = list()
