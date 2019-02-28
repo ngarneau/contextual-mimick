@@ -453,6 +453,7 @@ def train(_run, _config, seed, batch_size, lstm_hidden_layer, language, epochs):
             oov_word_model = Mimick(
                 characters_vocabulary=language.char_to_index,
                 word_embeddings_dimension=language.embedding_dim,
+                characters_embedding_dimension=64
             )
         elif _config["oov_word_model"] == "bos":
             oov_word_model = BoS(

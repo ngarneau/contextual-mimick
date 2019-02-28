@@ -693,10 +693,10 @@ class TheFinalComickBoS(Module):
             dropout=0.3,
         )
 
-        self.word_attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
-        self.char_attention_layer = nn.Linear(word_hidden_state_dimension * 2, 1)
+        self.word_attention_layer = nn.Linear(self.word_embeddings_dimension, 1)
+        self.char_attention_layer = nn.Linear(self.oov_word_model.mimick_lstm.embeddings.embedding_dim, 1)
 
-        self.fc1 = nn.Linear(word_hidden_state_dimension * 4, self.word_embeddings_dimension)
+        self.fc1 = nn.Linear(self.word_embeddings_dimension + self.oov_word_model.mimick_lstm.embeddings.embedding_dim, self.word_embeddings_dimension)
 
         self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension, self.word_embeddings_dimension)
 
@@ -732,19 +732,21 @@ class TheFinalComickBoS(Module):
     def forward(self, x):
         context, word = x
 
-        context_hiddens, context_last = self.get_context_rep(context)
+        # context_hiddens, context_last = self.get_context_rep(context)
+        context_hiddens = self.embedding_layer(context)
 
         c_lengths = context.data.ne(0).long().sum(dim=1)
         w_lengths = word.data.ne(0).long().sum(dim=1)
 
-        word_hiddens, word_last = self.oov_word_model(word)
+        # word_hiddens, word_last = self.oov_word_model(word)
+        word_hiddens = self.oov_word_model.mimick_lstm.embeddings(word)
 
         # attn_input = torch.cat([left_context_hidden_rep, word_rep, right_context_hidden_rep], dim=1)
 
         if self.attention:
             output = list()
             real_attentions = list()
-            for i, word_rep in enumerate(word_last): # Loop over the last hidden states of each words
+            for i, w in enumerate(word): # Loop over the last hidden states of each words
                 # First, compute attention over context condition with word representation
                 context_hidden = context_hiddens[i][:c_lengths[i]]
                 # expanded_word_rep = word_rep.expand_as(context_hidden)
