@@ -694,9 +694,9 @@ class TheFinalComickBoS(Module):
         )
 
         self.word_attention_layer = nn.Linear(self.word_embeddings_dimension, 1)
-        self.char_attention_layer = nn.Linear(self.oov_word_model.mimick_lstm.embeddings.embedding_dim, 1)
+        self.char_attention_layer = nn.Linear(self.oov_word_model.embeddings.embedding_dim, 1)
 
-        self.fc1 = nn.Linear(self.word_embeddings_dimension + self.oov_word_model.mimick_lstm.embeddings.embedding_dim, self.word_embeddings_dimension)
+        self.fc1 = nn.Linear(self.word_embeddings_dimension + self.oov_word_model.embeddings.embedding_dim, self.word_embeddings_dimension)
 
         self.representations_mapping_to_ouput = nn.Linear(self.word_embeddings_dimension, self.word_embeddings_dimension)
 
@@ -739,7 +739,7 @@ class TheFinalComickBoS(Module):
         w_lengths = word.data.ne(0).long().sum(dim=1)
 
         # word_hiddens, word_last = self.oov_word_model(word)
-        word_hiddens = self.oov_word_model.mimick_lstm.embeddings(word)
+        word_hiddens = self.oov_word_model.embeddings(word)
 
         # attn_input = torch.cat([left_context_hidden_rep, word_rep, right_context_hidden_rep], dim=1)
 
