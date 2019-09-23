@@ -17,5 +17,6 @@
         "patience": 20
     },
     "attention": false,
-    "oov_word_model": "mimick"
+    "oov_word_model": "mimick",
+    "tag_to_predict": false
 }
